@@ -40,11 +40,13 @@
         .btn-log { background: #4a5568; }
         .btn:disabled { background: #cbd5e0 !important; color: #a0aec0 !important; opacity: 0.6; cursor: not-allowed !important; }
         
-        .nav-bar { background: #ffffff; padding: 10px 12px; display: flex; gap: 6px; flex-wrap: wrap; border-bottom: 1px solid #e2e8f0; position: sticky; top: 56px; z-index: 100; }
+        .nav-bar { background: #ffffff; padding: 10px 12px; display: flex; gap: 6px; flex-wrap: wrap; border-bottom: 1px solid #e2e8f0; position: sticky; top: 56px; z-index: 100; transition: opacity 0.2s; }
         .nav-link { text-decoration: none; color: var(--text-muted); font-weight: 600; font-size: 13px; padding: 6px 12px; background: var(--bg); border-radius: 20px; border: 1px solid #e2e8f0; }
         .nav-link.active { color: #ffffff; background: var(--primary); border-color: var(--primary); }
         
-        .app-body { padding: 12px; max-width: 1600px; margin: 0 auto; }
+        .app-body { padding: 12px; max-width: 1600px; margin: 0 auto; transition: opacity 0.2s; }
+        .session-locked { opacity: 0.4 !important; pointer-events: none !important; user-select: none !important; }
+        
         .category-section { margin-bottom: 20px; scroll-margin-top: 130px; } 
         .category-title { font-size: 14px; font-weight: 700; margin-bottom: 10px; color: var(--text-main); display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
         .category-title::after { content: ''; flex: 1; height: 1px; background: #e2e8f0; }
@@ -68,7 +70,7 @@
             .card-price { font-size: 11px; margin-top: 1px; margin-bottom: 0; }
         }
         
-        .footer-bar { position: fixed; bottom: 0; left: 0; right: 0; background: white; padding: 8px 16px; box-shadow: 0 -4px 20px rgba(0,0,0,0.06); border-top: 1px solid #e2e8f0; z-index: 101; display: flex; flex-direction: column; gap: 4px; }
+        .footer-bar { position: fixed; bottom: 0; left: 0; right: 0; background: white; padding: 8px 16px; box-shadow: 0 -4px 20px rgba(0,0,0,0.06); border-top: 1px solid #e2e8f0; z-index: 101; display: flex; flex-direction: column; gap: 4px; transition: opacity 0.2s; }
         .footer-row { display: flex; justify-content: space-between; align-items: center; width: 100%; }
         .cart-preview { font-size: 11px; color: var(--text-muted); max-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; border-bottom: 1px dashed #e2e8f0; padding-bottom: 4px; margin-bottom: 2px; font-weight: 500; }
         .summary-info { font-size: 13px; font-weight: 600; color: var(--text-main); }
@@ -107,15 +109,17 @@
         <div class="controls">
             <button class="btn btn-start" id="startBtn" onclick="triggerCustomPrompt('START')">▶ Start Billing</button>
             <button class="btn btn-end" id="endBtn" onclick="triggerCustomPrompt('END')" disabled>■ End Billing</button>
-            <button class="btn btn-bill" id="billBtn" onclick="openBillModal()">🧾 Bill</button>
-            <button class="btn btn-log" onclick="openLogModal()">View Log</button>
+            <button class="btn btn-bill" id="billBtn" onclick="openBillModal()" disabled>🧾 Bill</button>
+            <button class="btn btn-log" id="logBtn" onclick="openLogModal()" disabled>View Log</button>
         </div>
     </header>
 
-    <div class="nav-bar" id="categoryNav"></div>
-    <div class="app-body"><div class="menu-container" id="menuContainer">Loading menu...</div></div>
+    <div class="nav-bar session-locked" id="categoryNav"></div>
+    <div class="app-body session-locked" id="mainAppBody">
+        <div class="menu-container" id="menuContainer">Loading menu catalog matrix...</div>
+    </div>
 
-    <div class="footer-bar">
+    <div class="footer-bar session-locked" id="mainAppFooter">
         <div class="cart-preview" id="cartPreviewList">Basket is empty</div>
         <div class="footer-row">
             <div class="summary-info">Total: <span id="basketTotal">₹0</span></div>
@@ -142,6 +146,62 @@
         let menuData = []; 
         const orderQuantities = {};
         let pType = null, pRow = null;
+        let previousStateMemory = null; 
+
+        if (!localStorage.getItem('farmcode_device_id')) {
+            localStorage.setItem('farmcode_device_id', 'DEV_' + Math.random().toString(36).substring(2, 11).toUpperCase());
+        }
+        const myDeviceToken = localStorage.getItem('farmcode_device_id');
+
+        function checkExistingSessionMemory() {
+            fetch(`save.php?action=get_session_status&device_token=${myDeviceToken}`)
+                .then(r => r.json())
+                .then(data => {
+                    const startBtn = document.getElementById('startBtn');
+                    const endBtn = document.getElementById('endBtn');
+                    const billBtn = document.getElementById('billBtn');
+                    const logBtn = document.getElementById('logBtn');
+                    
+                    if (previousStateMemory === "MY_SESSION" && data.state === "BUSY_LOCKED") {
+                        alert("⚠️ Session Lost! Another device has taken control of this billing window.");
+                    }
+                    previousStateMemory = data.state;
+
+                    if (data.state === "MY_SESSION") {
+                        startBtn.innerText = "▶ Billing Active"; startBtn.className = "btn btn-start"; startBtn.disabled = true;
+                        startBtn.onclick = null;
+                        endBtn.disabled = false; billBtn.disabled = false; logBtn.disabled = false;
+                        toggleLockStyles(false);
+                    } else if (data.state === "BUSY_LOCKED") {
+                        startBtn.innerText = "⚡ Overtake Session"; startBtn.className = "btn btn-bill"; startBtn.disabled = false;
+                        startBtn.onclick = () => { if(confirm("Take over active billing session from the other device?")) executeOvertake(); };
+                        endBtn.disabled = true; billBtn.disabled = true; logBtn.disabled = true;
+                        toggleLockStyles(true);
+                    } else {
+                        startBtn.innerText = "▶ Start Billing"; startBtn.className = "btn btn-start"; startBtn.disabled = false;
+                        startBtn.onclick = () => triggerCustomPrompt('START');
+                        endBtn.disabled = true; billBtn.disabled = true; logBtn.disabled = true;
+                        toggleLockStyles(true);
+                    }
+                }).catch(() => toggleLockStyles(true));
+        }
+
+        function executeOvertake() {
+            fetch(`save.php?action=overtake_session&device_token=${myDeviceToken}`)
+                .then(r => r.json())
+                .then(() => {
+                    alert("Session successfully transferred to this device.");
+                    checkExistingSessionMemory();
+                });
+        }
+
+        function toggleLockStyles(shouldLock) {
+            const elements = ['categoryNav', 'mainAppBody', 'mainAppFooter'];
+            elements.forEach(id => {
+                const el = document.getElementById(id);
+                if(el) shouldLock ? el.classList.add('session-locked') : el.classList.remove('session-locked');
+            });
+        }
 
         function loadDynamicMenu() {
             fetch('save.php?action=get_menu')
@@ -149,6 +209,8 @@
                 .then(data => {
                     menuData = data;
                     renderMenu();
+                    checkExistingSessionMemory();
+                    setInterval(checkExistingSessionMemory, 5000);
                 });
         }
 
@@ -211,11 +273,10 @@
             if (pType === "START" || pType === "END") {
                 fetch(`save.php?action=save_order`, {
                     method: 'POST',
-                    body: JSON.stringify({ status: pType === "START" ? "SESSION_START" : "SESSION_END", items: [{ name: pType + " MARKER", category: "SYSTEM_SESSION", quantity: 1, price: 0, total: 0 }] })
+                    body: JSON.stringify({ deviceToken: myDeviceToken, status: pType === "START" ? "SESSION_START" : "SESSION_END", items: [{ name: pType + " MARKER", category: "SYSTEM_SESSION", quantity: 1, price: 0, total: 0 }] })
                 }).then(r => r.json()).then(res => {
-                    alert(pType === "START" ? "Check-in logged." : "Checkout logged.");
-                    document.getElementById('startBtn').disabled = (pType === "START");
-                    document.getElementById('endBtn').disabled = (pType === "END");
+                    if (res.status === "locked") { alert(res.message); }
+                    checkExistingSessionMemory();
                 });
             } else if (pType === "DELETE_ITEM") {
                 fetch(`save.php?action=delete_row&row_id=${pRow}`).then(r => r.json()).then(() => openLogModal());
@@ -229,17 +290,16 @@
             });
             if (!items.length) { alert("Add items first."); return; }
             document.getElementById('submitBtn').innerText = "Adding...";
-            fetch('save.php?action=save_order', { method: 'POST', body: JSON.stringify({ items: items }) })
+            fetch('save.php?action=save_order', { method: 'POST', body: JSON.stringify({ deviceToken: myDeviceToken, items: items }) })
                 .then(r => r.json()).then(res => {
-                    alert("Added to billing");
-                    globalSyncLocalDateStr = res.currentLocalDate;
+                    if (res.status === "locked") { alert(res.message); } else { alert("Added to billing"); }
+                    globalSyncLocalDateStr = res.currentLocalDate || globalSyncLocalDateStr;
                     menuData.forEach(item => { orderQuantities[item.id] = 0; document.getElementById(`qty-${item.id}`).innerText = 0; });
                     calculateRunningTotal();
+                    checkExistingSessionMemory();
                 })
-                .catch(() => alert("Connection timeout. Please try again."))
-                .finally(() => {
-                    document.getElementById('submitBtn').innerText = "Add Order";
-                });
+                .catch(() => alert("Connection timeout."))
+                .finally(() => { document.getElementById('submitBtn').innerText = "Add Order"; });
         }
 
         function openLogModal() {
@@ -255,17 +315,15 @@
                         return;
                     }
                     container.innerHTML = "";
-                    data.forEach(row => {
-                        if (row.category === "SYSTEM_SESSION") return; 
+                    data.filter(r => r.category !== 'SYSTEM_SESSION').forEach(row => {
                         const isDel = row.status === 'DELETED';
-                        
                         container.innerHTML += `
                             <div class="log-item ${isDel ? 'deleted' : ''}">
                                 <div>
                                     <span style="color:var(--primary); font-weight:700; margin-right:6px;">[${row.timestamp.substring(0,5)}]</span> 
                                     <strong>${row.name}</strong> <span style="color:var(--text-muted)">x${row.quantity}</span> — ₹${row.total}
                                 </div>
-                                ${!isDel ? `<button class="btn-del" onclick="triggerCustomPrompt('DELETE_ITEM', ${row.rowId})">&times;</button>` : '<span style="font-size:11px; font-weight:700; color:var(--text-muted);">[VOID]</span>'}
+                                ${!isDel ? `<button class="btn-del" onclick="triggerCustomPrompt('DELETE_ITEM', '${row.rowId}')">&times;</button>` : '<span style="font-size:11px; font-weight:700; color:var(--text-muted);">[VOID]</span>'}
                             </div>`;
                     });
                 });
@@ -276,7 +334,7 @@
             document.getElementById('billSessionMeta').innerText = "Summary generated at " + new Date().toLocaleTimeString();
             fetch('save.php?action=get_active_session').then(r => r.json()).then(rows => {
                 let active = rows.filter(r => r.category !== 'SYSTEM_SESSION' && r.status !== 'DELETED');
-                let c = document.getElementById('billContainer'); if(!active.length) { c.innerHTML = "No active items."; return; }
+                let c = document.getElementById('billContainer'); if(!active.length) { c.innerHTML = "No active items found on this guest's tab."; return; }
                 let bill = {}, total = 0;
                 active.forEach(item => {
                     if(bill[item.name]) { bill[item.name].quantity += Number(item.quantity); bill[item.name].total += Number(item.total); }
@@ -285,7 +343,7 @@
                 });
                 let html = `<table class="bill-table"><thead><tr><th>Details</th><th style="text-align:center;">Qty</th><th>Rate</th><th>Amt</th></tr></thead><tbody>`;
                 for(let k in bill) {
-                    html += `<tr><td><strong>${bill[k].name}</strong></td><td style="text-align:center;"><button class="bill-mod-btn" onclick="adjItem(${bill[k].rowId},-1)">-</button> <b>${bill[k].quantity}</b> <button class="bill-mod-btn" onclick="adjItem(${bill[k].rowId},1)">+</button></td><td>₹${bill[k].price}</td><td>₹${bill[k].total}</td></tr>`;
+                    html += `<tr><td><strong>${bill[k].name}</strong></td><td style="text-align:center;"><button class="bill-mod-btn" onclick="adjItem('${bill[k].rowId}',-1)">-</button> <b>${bill[k].quantity}</b> <button class="bill-mod-btn" onclick="adjItem('${bill[k].rowId}',1)">+</button></td><td>₹${bill[k].price}</td><td>₹${bill[k].total}</td></tr>`;
                 }
                 html += `<tr class="bill-total-row"><td colspan="3" style="text-align:right; padding:10px;">Total:</td><td>₹${total}</td></tr></tbody></table>`;
                 c.innerHTML = html;
@@ -294,6 +352,7 @@
 
         function adjItem(id, v) { fetch(`save.php?action=modify_qty&row_id=${id}&change=${v}`).then(r => r.json()).then(() => openBillModal()); }
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+        
         loadDynamicMenu();
     </script>
 </body>
