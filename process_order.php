@@ -1,5 +1,9 @@
 <?php
 require_once "../config/db.php";
+if (!isset($_SESSION["user_id"]) && !isset($_SESSION["order_authenticated"])) {
+    echo json_encode(["success" => false, "message" => "Unauthorized access"]);
+    exit;
+}
 header("Content-Type: application/json");
 $data = json_decode(file_get_contents("php://input"), true);
 $guest = $pdo->query("SELECT id FROM guests WHERE status = 'Active' LIMIT 1")->fetch();

@@ -1,0 +1,2 @@
+DirectoryIndex index.php index.html installer.php
+RewriteCond %{REQUEST_URI} !^/Order/api/ [NC]

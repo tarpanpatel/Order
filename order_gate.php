@@ -1,8 +1,8 @@
 <?php
 require_once "config/db.php";
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
-    if ($_POST["pad_password"] === "farm123") { $_SESSION["order_authenticated"] = true; header("Location: order.php"); exit; }
-    else { $error = "Incorrect Entry Passcode String Reference."; }
+    if ($_POST["pad_password"] === "1202") { $_SESSION["order_authenticated"] = true; header("Location: order.php"); exit; }
+    else { $error = "Incorrect Passcode"; }
 }
 ?>
 <!DOCTYPE html><html><head><link rel="stylesheet" href="assets/css/style.css"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>

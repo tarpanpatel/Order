@@ -1,5 +1,7 @@
 <?php
-require_once "config/db.php";
+require_once "config/db.php"; 
+// Hard check forcing entry block unless role matches Super Admin
+requireSuperAdmin();
 if (!isset($_SESSION["user_id"])) { header("Location: login.php"); exit; }
 
 // Handle Adding a New Material
