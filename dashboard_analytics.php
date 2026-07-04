@@ -22,6 +22,8 @@ $filterDates = $pdo->query("
     SELECT DISTINCT MONTH(date) as m, YEAR(date) as y FROM kitchen_expenses WHERE date IS NOT NULL
     UNION 
     SELECT DISTINCT MONTH(date) as m, YEAR(date) as y FROM farm_expenses WHERE date IS NOT NULL
+    UNION
+    SELECT DISTINCT MONTH(check_in_date) as m, YEAR(check_in_date) as y FROM farm_bookings WHERE check_in_date IS NOT NULL
     ORDER BY y DESC, m DESC
 ")->fetchAll(PDO::FETCH_ASSOC);
 
@@ -29,13 +31,13 @@ if (empty($filterDates)) {
     $filterDates[] = ['m' => intval(date('m')), 'y' => intval(date('Y'))];
 }
 
-// 3. COMPUTE FINANCIAL METRICS VIA INDEPENDENT TABLES (CLEAN SQL FIX)
+// 3. COMPUTE EXECUTIVE FINANCIAL METRICS VIA FINALIZED TABLES
 $bookingIncomeStmt = $pdo->prepare("SELECT COALESCE(SUM(total_charge + decoration_charges + tip_amount), 0) FROM guests WHERE MONTH(checkin_date) = :m AND YEAR(checkin_date) = :y");
 $bookingIncomeStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
 $totalBookingIncome = $bookingIncomeStmt->fetchColumn();
 
-// SQL RESOLUTION: Pulls total food income sums accurately using the verified 'total_food' field inside your guests profile table
-$foodIncomeStmt = $pdo->prepare("SELECT COALESCE(SUM(total_food), 0) FROM guests WHERE MONTH(checkin_date) = :m AND YEAR(checkin_date) = :y");
+// SQL CORRECTION: Pulls aggregate food income directly from your finalized farm booking receipts table
+$foodIncomeStmt = $pdo->prepare("SELECT COALESCE(SUM(total_food_bill), 0) FROM farm_bookings WHERE MONTH(check_in_date) = :m AND YEAR(check_in_date) = :y");
 $foodIncomeStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
 $totalFoodIncome = $foodIncomeStmt->fetchColumn();
 
@@ -77,9 +79,9 @@ if (!$is_ajax) { include 'includes/header.php'; }
         
         .excel-tabs-bar { display: flex; border-bottom: 2px solid #e2e8f0; gap: 4px; margin-bottom: 20px; flex-wrap: wrap; }
         .excel-tab-link { padding: 10px 16px; font-size: 13px; font-weight: 600; color: #64748b; text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s ease; }
+        .excel-tab-link:hover { color: #06b6d4; }
         .excel-tab-link.is-active { color: #06b6d4; border-bottom-color: #06b6d4; background: rgba(6, 182, 212, 0.04); border-radius: 6px 6px 0 0; }
 
-        /* HORIZONTAL SCREEN BOUNDING SCROLLER FRAME WRAPPER */
         .excel-table-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow-x: auto; max-width: 100%; display: block; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .excel-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; table-layout: auto; }
         .excel-table th { background: #f8fafc; color: #334155; font-weight: 600; padding: 12px 16px; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
@@ -149,7 +151,7 @@ if (!$is_ajax) { include 'includes/header.php'; }
                     <?php elseif ($activeTab === 'bookings'): ?>
                         <th>Guest Profile</th><th>Booking Source</th><th>Contact No.</th><th>No. of Guest</th><th>Check-In Date</th><th>Check-Out Date</th><th>Total Days</th><th>Per Night Charges</th><th>Total Charge</th><th>Advance Paid</th><th>Received by</th><th>Pending Amount</th><th>Received by</th><th>Decoration</th><th>Tip</th>
                     <?php elseif ($activeTab === 'food_logs'): ?>
-                        <th>Guest Profile</th><th>Contact No.</th><th>Check-In Date</th><th>Total Food Revenue</th><th>Received by</th>
+                        <th>Guest Reference</th><th>Contact No.</th><th>Check-In Date</th><th>Total Food Revenue</th><th>Received by</th>
                     <?php elseif ($activeTab === 'kitchen_expenses'): ?>
                         <th>Recorded Date</th><th>Category</th><th>Inventory Item Detail</th><th>Vendor</th><th>Quantity</th><th>Unit Price</th><th>Total Outbound Disbursed</th>
                     <?php elseif ($activeTab === 'farm_upkeep'): ?>
