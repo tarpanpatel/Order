@@ -1,6 +1,8 @@
 <?php
 // /home/apartment/artistsfarmjaipur.com/Order/dashboard_analytics.php
 
+if (session_status() === PHP_SESSION_NONE) { session_start(); }
+
 // Include your standard database connection
 include_once __DIR__ . '/config/db.php'; 
 
@@ -20,12 +22,11 @@ $monthsQuery = "
 $monthsStmt = $pdo->query($monthsQuery);
 $availableMonths = $monthsStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// If no data exists yet, ensure the dropdown has at least the current month
 if (empty($availableMonths)) {
     $availableMonths[] = ['m' => intval(date('m')), 'y' => intval(date('Y'))];
 }
 
-// 3. Fetch Financial Summary Data for the Chosen Month (Fixes SQLSTATE[HY093] parameter reuse bug)
+// 3. Fetch Financial Summary Data for the Chosen Month
 $summaryQuery = "
     SELECT 
         COALESCE(SUM(total_charge + total_food_bill + decoration_charges + tip_amount), 0) AS gross_revenue,
@@ -49,43 +50,42 @@ $metrics = $stmt->fetch(PDO::FETCH_ASSOC);
 $revenue = $metrics['gross_revenue'];
 $expenses = $metrics['farm_exp'] + $metrics['kitchen_exp'];
 $profit = $revenue - $expenses;
+
+// Detect if this page is loaded via the AJAX single-page routine engine
+$is_ajax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') || isset($_GET['ajax']);
+
+if (!$is_ajax) {
+    include 'includes/header.php';
+}
 ?>
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Farm Operations Dashboard</title>
+<div class="main-content" style="padding: 12px; width: 100%;">
+    
     <style>
-        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6f9; margin: 20px; color: #333; }
-        h2, h3 { color: #2c3e50; }
-        .filter-bar { background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+        .analytics-title { color: #2c3e50; font-family: 'Segoe UI', Arial, sans-serif; margin-bottom: 5px; }
+        .filter-bar { background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; display: flex; align-items: center; gap: 10px; font-family: 'Segoe UI', Arial, sans-serif; }
         .filter-bar select { padding: 8px 12px; font-size: 14px; border-radius: 4px; border: 1px solid #ccc; background: #fff; }
         .filter-bar button { padding: 8px 15px; font-size: 14px; background: #007bff; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
         .filter-bar button:hover { background: #0056b3; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px; }
-        .card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .card h3 { margin: 0 0 10px 0; color: #7f8c8d; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .card .value { font-size: 26px; font-weight: bold; }
-        .revenue { border-left: 5px solid #28a745; }
-        .revenue .value { color: #28a745; }
-        .expenses { border-left: 5px solid #dc3545; }
-        .expenses .value { color: #dc3545; }
-        .profit { border-left: 5px solid #17a2b8; }
-        .profit .value { color: #17a2b8; }
-        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 30px; }
-        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; }
-        th { background: #343a40; color: #fff; font-weight: 600; }
-        tr:hover { background-color: #f8f9fa; }
+        .analytics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px; font-family: 'Segoe UI', Arial, sans-serif; }
+        .analytics-card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .analytics-card h3 { margin: 0 0 10px 0; color: #7f8c8d; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .analytics-card .value { font-size: 26px; font-weight: bold; }
+        .revenue-card { border-left: 5px solid #28a745; }
+        .revenue-card .value { color: #28a745; }
+        .expenses-card { border-left: 5px solid #dc3545; }
+        .expenses-card .value { color: #dc3545; }
+        .profit-card { border-left: 5px solid #17a2b8; }
+        .profit-card .value { color: #17a2b8; }
+        .ledger-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 30px; font-family: 'Segoe UI', Arial, sans-serif; }
+        .ledger-table th, .ledger-table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; }
+        .ledger-table th { background: #343a40; color: #fff; font-weight: 600; }
+        .ledger-table tr:hover { background-color: #f8f9fa; }
     </style>
-</head>
-<body>
 
-    <h2>Operational Overview</h2>
+    <h2 class="analytics-title">Operational Overview</h2>
     
-    <!-- Dynamic Month & Year Filter Form -->
-    <form method="GET" class="filter-bar">
+    <form method="GET" action="dashboard_analytics.php" class="filter-bar" id="analyticsFilterForm">
         <label for="date_select"><strong>Select View Period:</strong></label>
         <select id="date_select" onchange="splitPeriodValue(this.value)">
             <?php
@@ -104,25 +104,23 @@ $profit = $revenue - $expenses;
         <button type="submit">Filter Metrics</button>
     </form>
 
-    <!-- Financial Metrics Grid -->
-    <div class="grid">
-        <div class="card revenue">
+    <div class="analytics-grid">
+        <div class="analytics-card revenue-card">
             <h3>Total Earnings (Stay + Food)</h3>
             <div class="value">₹<?php echo number_format($revenue, 2); ?></div>
         </div>
-        <div class="card expenses">
+        <div class="analytics-card expenses-card">
             <h3>Total Expenses (Farm + Kitchen)</h3>
             <div class="value">₹<?php echo number_format($expenses, 2); ?></div>
         </div>
-        <div class="card profit">
+        <div class="analytics-card profit-card">
             <h3>Net Operational Profit</h3>
             <div class="value">₹<?php echo number_format($profit, 2); ?></div>
         </div>
     </div>
 
-    <!-- Vendor Distribution Ledger Table -->
-    <h3>Kitchen Vendor Distributions</h3>
-    <table>
+    <h3 class="analytics-title">Kitchen Vendor Distributions</h3>
+    <table class="ledger-table">
         <thead>
             <tr>
                 <th>Vendor Name</th>
@@ -159,7 +157,6 @@ $profit = $revenue - $expenses;
     </table>
 
     <script>
-    // JavaScript helper to unpack the dropdown value into structured HTTP parameters
     function splitPeriodValue(val) {
         if(!val) return;
         var parts = val.split('-');
@@ -167,12 +164,15 @@ $profit = $revenue - $expenses;
         document.getElementById('hidden_year').value = parts[1];
     }
     
-    // Ensure accurate value parsing immediately on runtime initialization
     var initialSelect = document.getElementById('date_select');
     if(initialSelect) {
         splitPeriodValue(initialSelect.value);
     }
     </script>
+</div>
 
-</body>
-</html>
+<?php
+if (!$is_ajax) {
+    include 'includes/footer.php';
+}
+?>
