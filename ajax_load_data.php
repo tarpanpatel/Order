@@ -5,12 +5,12 @@ require_once __DIR__ . '/config/db.php';
 $offset = isset($_GET['offset']) ? intval($_GET['offset']) : 0;
 $m = isset($_GET['month']) ? intval($_GET['month']) : intval(date('m'));
 $y = isset($_GET['year']) ? intval($_GET['year']) : intval(date('Y'));
-$tab = isset($_GET['tab']) ? $_GET['tab'] : 'overview';
+$tab = $_GET['tab'] ?? 'overview';
 $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 30;
 
 if ($tab === 'overview') {
     $bookingIncome = $pdo->query("SELECT COALESCE(SUM(total_charge + decoration_charges + tip_amount), 0) FROM guests WHERE MONTH(checkin_date) = $m AND YEAR(checkin_date) = $y")->fetchColumn();
-    $foodIncome = $pdo->query("SELECT COALESCE(SUM(total_food), 0) FROM guests WHERE MONTH(checkin_date) = $m AND YEAR(checkin_date) = $y")->fetchColumn();
+    $foodIncome = $pdo->query("SELECT COALESCE(SUM(total_food_bill), 0) FROM farm_bookings WHERE MONTH(check_in_date) = $m AND YEAR(check_in_date) = $y")->fetchColumn();
     $farmTotalRevenue = $bookingIncome + $foodIncome;
 
     $kitchenExpenses = $pdo->query("SELECT COALESCE(SUM(qty * price_per_unit), 0) FROM kitchen_expenses WHERE MONTH(date) = $m AND YEAR(date) = $y")->fetchColumn();
@@ -43,7 +43,7 @@ if ($tab === 'overview') {
     $stmt->bindValue(':limit', $limit, PDO::PARAM_INT); $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
     $stmt->execute();
     
-    while ($g = $stmt->fetch(PDO::FETCH_ASSOC)) {
+    while ($g = $stmt->fetch()) {
         echo '<tr>
             <td><strong>' . htmlspecialchars($g['guest_name'] ?: 'Unnamed') . '</strong></td>
             <td>' . htmlspecialchars($g['booking_source'] ?: 'Offline') . '</td>
@@ -64,18 +64,19 @@ if ($tab === 'overview') {
     }
 
 } elseif ($tab === 'food_logs') {
-    $stmt = $pdo->prepare("SELECT guest_name, phone_number, checkin_date, total_food, food_received_by FROM guests WHERE MONTH(checkin_date) = :m AND YEAR(checkin_date) = :y AND total_food > 0 ORDER BY checkin_date DESC LIMIT :limit OFFSET :offset");
+    // RESOLVED: Querying directly from farm_bookings to catch historical checkout totals correctly
+    $stmt = $pdo->prepare("SELECT booking_source as guest_name, contact_no as phone_number, check_in_date as checkin_date, total_food_bill as total_food, food_received_by FROM farm_bookings WHERE MONTH(check_in_date) = :m AND YEAR(check_in_date) = :y ORDER BY check_in_date DESC LIMIT :limit OFFSET :offset");
     $stmt->bindValue(':m', $m, PDO::PARAM_INT); $stmt->bindValue(':y', $y, PDO::PARAM_INT);
     $stmt->bindValue(':limit', $limit, PDO::PARAM_INT); $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
     $stmt->execute();
     
-    while ($g = $stmt->fetch(PDO::FETCH_ASSOC)) {
+    while ($g = $stmt->fetch()) {
         echo '<tr>
-            <td><strong>' . htmlspecialchars($g['guest_name'] ?: 'Unnamed') . '</strong></td>
-            <td>' . htmlspecialchars($g['phone_number'] ?: '0000000000') . '</td>
+            <td><strong>' . htmlspecialchars($g['guest_name'] ?: 'Offline Guest') . '</strong></td>
+            <td>' . htmlspecialchars($g['phone_number'] ?: 'N/A') . '</td>
             <td>' . ($g['checkin_date'] ? date('d M Y', strtotime($g['checkin_date'])) : '-') . '</td>
             <td style="color: #06b6d4; font-weight: 700;">₹' . number_format($g['total_food'], 2) . '</td>
-            <td><span class="badge badge-rev">' . htmlspecialchars($g['food_received_by'] ?: 'Unnamed') . '</span></td>
+            <td><span class="badge badge-rev">' . htmlspecialchars($g['food_received_by'] ?: 'System Ledger') . '</span></td>
         </tr>';
     }
 
@@ -85,7 +86,7 @@ if ($tab === 'overview') {
     $stmt->bindValue(':limit', $limit, PDO::PARAM_INT); $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
     $stmt->execute();
     
-    while ($k = $stmt->fetch(PDO::FETCH_ASSOC)) {
+    while ($k = $stmt->fetch()) {
         echo '<tr>
             <td>' . date('d M Y', strtotime($k['date'])) . '</td>
             <td><span class="badge" style="background:rgba(245,158,11,0.1); color:#f59e0b;">' . htmlspecialchars($k['category']) . '</span></td>
@@ -103,7 +104,7 @@ if ($tab === 'overview') {
     $stmt->bindValue(':limit', $limit, PDO::PARAM_INT); $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
     $stmt->execute();
     
-    while ($f = $stmt->fetch(PDO::FETCH_ASSOC)) {
+    while ($f = $stmt->fetch()) {
         echo '<tr>
             <td>' . date('d M Y', strtotime($f['date'])) . '</td>
             <td><span class="badge" style="background: rgba(16,185,129,0.1); color: #10b981;">' . htmlspecialchars($f['category']) . '</span></td>
@@ -119,7 +120,7 @@ if ($tab === 'overview') {
     $stmt->bindValue(':limit', $limit, PDO::PARAM_INT); $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
     $stmt->execute();
     
-    while ($s = $stmt->fetch(PDO::FETCH_ASSOC)) {
+    while ($s = $stmt->fetch()) {
         echo '<tr>
             <td>' . date('d M Y', strtotime($s['date'])) . '</td>
             <td><span class="badge" style="background: rgba(59,130,246,0.1); color: #3b82f6;">' . htmlspecialchars($s['category']) . '</span></td>
