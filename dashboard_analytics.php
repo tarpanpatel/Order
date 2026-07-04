@@ -8,7 +8,7 @@ $selectedMonth = isset($_GET['month']) ? intval($_GET['month']) : intval(date('m
 $selectedYear  = isset($_GET['year']) ? intval($_GET['year']) : intval(date('Y'));
 $activeTab     = isset($_GET['tab']) ? $_GET['tab'] : 'overview';
 
-// --- AJAX PAGINATION INTERCEPTOR INTERACTION ---
+// --- AJAX PAGINATION INTERCEPTOR PIPE ---
 if (isset($_GET['action_ajax_load_more'])) {
     $_GET['limit'] = 30;
     include 'ajax_load_data.php';
@@ -29,19 +29,18 @@ if (empty($filterDates)) {
     $filterDates[] = ['m' => intval(date('m')), 'y' => intval(date('Y'))];
 }
 
-// 3. FINANCIAL CALCULATIONS FOR THE CHOSEN PERIOD
-// Income Breakdown
+// 3. COMPUTE EXECUTIVE FINANCIAL METRICS FOR ACTIVE PERIOD
 $bookingIncomeStmt = $pdo->prepare("SELECT COALESCE(SUM(total_charge + decoration_charges + tip_amount), 0) FROM guests WHERE MONTH(checkin_date) = :m AND YEAR(checkin_date) = :y");
 $bookingIncomeStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
 $totalBookingIncome = $bookingIncomeStmt->fetchColumn();
 
-$foodIncomeStmt = $pdo->prepare("SELECT COALESCE(SUM(total_food), 0) FROM guests WHERE MONTH(checkin_date) = :m AND YEAR(checkin_date) = :y");
+// Pulling food income dynamically from the live kitchen orders table profile count
+$foodIncomeStmt = $pdo->prepare("SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE MONTH(created_at) = :m AND YEAR(created_at) = :y AND status = 'Served'");
 $foodIncomeStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
 $totalFoodIncome = $foodIncomeStmt->fetchColumn();
 
 $farmTotalRevenue = $totalBookingIncome + $totalFoodIncome;
 
-// Outbound Expense Breakdown
 $kitExpStmt = $pdo->prepare("SELECT COALESCE(SUM(qty * price_per_unit), 0) FROM kitchen_expenses WHERE MONTH(date) = :m AND YEAR(date) = :y");
 $kitExpStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
 $kitchenExpensesSum = $kitExpStmt->fetchColumn();
@@ -78,17 +77,19 @@ if (!$is_ajax) { include 'includes/header.php'; }
         
         .excel-tabs-bar { display: flex; border-bottom: 2px solid #e2e8f0; gap: 4px; margin-bottom: 20px; flex-wrap: wrap; }
         .excel-tab-link { padding: 10px 16px; font-size: 13px; font-weight: 600; color: #64748b; text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s ease; }
+        .excel-tab-link:hover { color: #06b6d4; }
         .excel-tab-link.is-active { color: #06b6d4; border-bottom-color: #06b6d4; background: rgba(6, 182, 212, 0.04); border-radius: 6px 6px 0 0; }
 
+        /* FIXED RESPONSIVE SCROLLER BOX SYSTEM */
         .excel-table-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow-x: auto; max-width: 100%; display: block; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .excel-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; table-layout: auto; }
         .excel-table th { background: #f8fafc; color: #334155; font-weight: 600; padding: 12px 16px; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
         .excel-table td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; color: #475569; white-space: nowrap; }
         .excel-table tr:hover { background-color: #f8fafc; }
         
-        .column-visibility-widget { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 15px; width: 100%; box-sizing: border-box; }
-        .toggle-flex-wrap { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; border-top: 1px dashed #e2e8f0; padding-top: 8px; }
-        .toggle-checkbox-label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #334155; cursor: pointer; font-weight: 500; }
+        .badge { padding: 2px 8px; font-size: 11px; font-weight: 600; border-radius: 4px; }
+        .badge-rev { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+        .badge-exp { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
     </style>
 
     <div class="page-header">
@@ -125,7 +126,7 @@ if (!$is_ajax) { include 'includes/header.php'; }
             <h3>Farm Total Revenue</h3>
             <div class="value">₹<?= number_format($farmTotalRevenue, 2) ?></div>
         </div>
-        <div class="metric-card" style="border-left-color: #3b82f6;">
+        <div class="metric-card style="border-left-color: #3b82f6;">
             <h3>Total Operational Expenses</h3>
             <div class="value">₹<?= number_format($totalExpenses, 2) ?></div>
         </div>
@@ -136,13 +137,9 @@ if (!$is_ajax) { include 'includes/header.php'; }
         <a href="dashboard_analytics.php?tab=bookings&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" class="excel-tab-link <?= $activeTab === 'bookings' ? 'is-active' : '' ?>">🏠 Booking Registry</a>
         <a href="dashboard_analytics.php?tab=food_logs&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" class="excel-tab-link <?= $activeTab === 'food_logs' ? 'is-active' : '' ?>">🍽️ Food Order Logs</a>
         <a href="dashboard_analytics.php?tab=kitchen_expenses&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" class="excel-tab-link <?= $activeTab === 'kitchen_expenses' ? 'is-active' : '' ?>">🍳 Kitchen Inventory Expenses</a>
-        <a href="dashboard_analytics.php?tab=farm_upkeep&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" class="excel-tab-link <?= $activeTab === 'farm_upkeep' ? 'is-active' : '' ?>">🛠️ Farm Upkeep & Salaries</a>
+        <a href="dashboard_analytics.php?tab=farm_upkeep&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" class="excel-tab-link <?= $activeTab === 'farm_upkeep' ? 'is-active' : '' ?>">🛠️ Farm Upkeep</a>
+        <a href="dashboard_analytics.php?tab=salaries&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" class="excel-tab-link <?= $activeTab === 'salaries' ? 'is-active' : '' ?>">💼 Salaries Registry</a>
     </div>
-
-    <details class="column-visibility-widget" open>
-        <summary style="cursor:pointer;"><i class="fa-solid fa-filter" style="color:#06b6d4; margin-right:4px;"></i> Hide / Show Columns Selector</summary>
-        <div class="toggle-flex-wrap" id="liveColumnToggleWrapperPanel"></div>
-    </details>
 
     <div class="excel-table-box">
         <table class="excel-table" id="analyticsPrimaryTargetMatrix">
@@ -153,11 +150,13 @@ if (!$is_ajax) { include 'includes/header.php'; }
                     <?php elseif ($activeTab === 'bookings'): ?>
                         <th>Guest Profile</th><th>Booking Source</th><th>Contact No.</th><th>No. of Guest</th><th>Check-In Date</th><th>Check-Out Date</th><th>Total Days</th><th>Per Night Charges</th><th>Total Charge</th><th>Advance Paid</th><th>Received by</th><th>Pending Amount</th><th>Received by</th><th>Decoration</th><th>Tip</th>
                     <?php elseif ($activeTab === 'food_logs'): ?>
-                        <th>Guest Profile</th><th>Contact No.</th><th>Check-In Date</th><th>Total Food Revenue</th><th>Received by</th>
+                        <th>Order ID</th><th>Guest Reference</th><th>Order Date & Time</th><th>Table / Room No</th><th>Order Summary Items</th><th>Food Billing Amount</th><th>Payment Status</th>
                     <?php elseif ($activeTab === 'kitchen_expenses'): ?>
                         <th>Recorded Date</th><th>Category</th><th>Inventory Item Detail</th><th>Vendor</th><th>Quantity</th><th>Unit Price</th><th>Total Outbound Disbursed</th>
                     <?php elseif ($activeTab === 'farm_upkeep'): ?>
-                        <th>Recorded Date</th><th>Classification Category</th><th>Voucher Narration Description</th><th>Vendor / Employee Name</th><th>Amount Disbursed</th>
+                        <th>Recorded Date</th><th>Classification Category</th><th>Voucher Narration Description</th><th>Vendor Name</th><th>Amount Disbursed</th>
+                    <?php elseif ($activeTab === 'salaries'): ?>
+                        <th>Disbursed Date</th><th>Classification Profile</th><th>Voucher Reference/Notes</th><th>Employee Name</th><th>Net Salary Disbursed</th>
                     <?php endif; ?>
                 </tr>
             </thead>
@@ -167,7 +166,7 @@ if (!$is_ajax) { include 'includes/header.php'; }
                 $_GET['tab'] = $activeTab;
                 $_GET['month'] = $selectedMonth;
                 $_GET['year'] = $selectedYear;
-                $_GET['limit'] = ($activeTab === 'overview') ? 10 : 31; // Overview doesn't use standard pagination
+                $_GET['limit'] = ($activeTab === 'overview') ? 10 : 31;
                 include 'ajax_load_data.php';
                 ?>
             </tbody>
@@ -184,37 +183,9 @@ if (!$is_ajax) { include 'includes/header.php'; }
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     const tableTarget = document.getElementById("analyticsPrimaryTargetMatrix");
-    const containerPanel = document.getElementById("liveColumnToggleWrapperPanel");
-    
-    // 1. Column Hide/Show Selector Engine
-    if (tableTarget && containerPanel) {
-        tableTarget.querySelectorAll("thead th").forEach((thCell, index) => {
-            const labelNode = document.createElement("label");
-            labelNode.className = "toggle-checkbox-label";
-            
-            const checkControl = document.createElement("input");
-            checkControl.type = "checkbox"; checkControl.checked = true;
-            checkControl.dataset.targetColumnIndex = index;
-            
-            checkControl.addEventListener("change", function() {
-                const targetIdx = this.dataset.targetColumnIndex;
-                const displayStyle = this.checked ? "" : "none";
-                thCell.style.display = displayStyle;
-                tableTarget.querySelectorAll("tbody tr").forEach(row => {
-                    const dataCell = row.cells[targetIdx];
-                    if (dataCell) dataCell.style.display = displayStyle;
-                });
-            });
-            
-            labelNode.appendChild(checkControl);
-            labelNode.appendChild(document.createTextNode(thCell.innerText.trim()));
-            containerPanel.appendChild(labelNode);
-        });
-    }
-
-    // 2. Universal AJAX Pagination Flow Channel
     const actionFetchButton = document.getElementById("btnTriggerLiveFetch");
-    if (actionFetchButton) {
+    
+    if (actionFetchButton && tableTarget) {
         if (tableTarget.querySelectorAll("tbody tr").length < 31) {
             actionFetchButton.style.display = "none";
         }
@@ -238,18 +209,12 @@ document.addEventListener("DOMContentLoaded", function() {
                     this.setAttribute("data-current-offset", currentOffset + 30);
                     this.innerText = "Load More Rows...";
                     this.disabled = false;
-                    
-                    // Re-apply column visibility preferences on new layout metrics cells
-                    containerPanel.querySelectorAll("input[type='checkbox']").forEach(cb => {
-                        if (!cb.checked) {
-                            const uncheckedIdx = cb.dataset.targetColumnIndex;
-                            targetDataContainer.querySelectorAll("tr").forEach(r => {
-                                const singleCell = r.cells[uncheckedIdx];
-                                if (singleCell) singleCell.style.display = "none";
-                            });
-                        }
-                    });
                 }
+            })
+            .catch(err => {
+                console.error("Fetch pipeline failed:", err);
+                this.innerText = "Network Error. Retry.";
+                this.disabled = false;
             });
         });
     }
