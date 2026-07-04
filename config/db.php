@@ -20,7 +20,7 @@ $db_name = "apartment_blue";
 
 try {
     $pdo = new PDO("mysql:host=localhost;dbname=apartment_blue;charset=utf8mb4", "username", "password", [
-        PDO::ATTR_ERRMODE => PDO::ATTR_ERRMODE_EXCEPTION,
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
     ]);
     
