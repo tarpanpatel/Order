@@ -412,5 +412,5 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 });
 </script>
-
+echo 'hello';
 <?php //if (!$is_ajax) { include 'includes/footer.php'; } ?>
