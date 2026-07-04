@@ -19,7 +19,6 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>POS</title>
     <link rel="stylesheet" href="assets/css/style.css?v=<?= time(); ?>">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         /* ==========================================================================
            RESPONSIVE SIDEBAR NAVIGATION TOGGLE UI MECHANICS
@@ -213,7 +212,6 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
                     }
                 }
 
-                // Ensures drop-down state persists across asynchronous AJAX views
                 document.addEventListener("DOMContentLoaded", () => {
                     if (localStorage.getItem("adminPanelExpanded") === "true") {
                         const content = document.getElementById("adminSubMenuContent");
@@ -235,7 +233,6 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
     <div class="main-content" style="padding: 12px;">
 
 <script>
-// Expose the script loop handler on root scope window explicitly for the single-page routing engine
 window.triggerSidebarLedgerActivation = function() {
     const dropdown = document.getElementById("sidebarLiveGuestSelectDropdown");
     if (!dropdown) return;
@@ -254,7 +251,6 @@ window.triggerSidebarLedgerActivation = function() {
     .then(res => res.json())
     .then(data => {
         if (data.success) {
-            // Soft-reloads structural elements flawlessly without duplicate cache loops
             location.reload();
         } else {
             alert("Activation error: " + data.error);
@@ -262,15 +258,4 @@ window.triggerSidebarLedgerActivation = function() {
     })
     .catch(() => alert("Pipeline connection error."));
 };
-
-// Drawer toggle script
-function toggleLeftMenu(shouldOpen) {
-    const sidebar = document.getElementById("appLeftNavigationMenu");
-    if (!sidebar) return;
-    if (shouldOpen) {
-        sidebar.classList.add("is-drawer-open");
-    } else {
-        sidebar.classList.remove("is-drawer-open");
-    }
-}
 </script>
