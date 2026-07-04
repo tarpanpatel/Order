@@ -8,11 +8,13 @@ $selectedMonth = isset($_GET['month']) ? intval($_GET['month']) : intval(date('m
 $selectedYear  = isset($_GET['year']) ? intval($_GET['year']) : intval(date('Y'));
 $activeTab     = isset($_GET['tab']) ? $_GET['tab'] : 'overview';
 
-// 2. Fetch Available Date Ranges Dynamically to Build Filters
+// 2. Fetch Available Date Ranges Dynamically across tables to build filters
 $filterDates = $pdo->query("
-    SELECT DISTINCT MONTH(transaction_date) as m, YEAR(transaction_date) as y FROM transaction_ledger
+    SELECT DISTINCT MONTH(checkin_date) as m, YEAR(checkin_date) as y FROM guests WHERE checkin_date IS NOT NULL
     UNION 
-    SELECT DISTINCT MONTH(checkin_date) as m, YEAR(checkin_date) as y FROM guests
+    SELECT DISTINCT MONTH(date) as m, YEAR(date) as y FROM kitchen_expenses WHERE date IS NOT NULL
+    UNION 
+    SELECT DISTINCT MONTH(date) as m, YEAR(date) as y FROM farm_expenses WHERE date IS NOT NULL
     ORDER BY y DESC, m DESC
 ")->fetchAll(PDO::FETCH_ASSOC);
 
@@ -20,15 +22,35 @@ if (empty($filterDates)) {
     $filterDates[] = ['m' => intval(date('m')), 'y' => intval(date('Y'))];
 }
 
-// 3. COMPUTE EXECUTIVE FINANCIAL METRICS FOR ACTIVE PERIOD
-$revenueStmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM transaction_ledger WHERE MONTH(transaction_date) = :m AND YEAR(transaction_date) = :y AND category IN ('Room Rent', 'Food Bill', 'Decoration', 'Tips')");
+// 3. COMPUTE METRICS FOR THE CHOSEN PERIOD FROM INDIVIDUAL PRODUCTION TABLES
+// Gross Revenue = Total Room Charges + Total Food Bills + Decoration + Tips
+$revenueStmt = $pdo->prepare("
+    SELECT COALESCE(SUM(total_charge + total_food + decoration_charges + tip_amount), 0) 
+    FROM guests 
+    WHERE MONTH(checkin_date) = :m AND YEAR(checkin_date) = :y
+");
 $revenueStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
 $grossRevenue = $revenueStmt->fetchColumn();
 
-$expenseStmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM transaction_ledger WHERE MONTH(transaction_date) = :m AND YEAR(transaction_date) = :y AND category IN ('Farm Expense', 'Kitchen Expense', 'Staff Expense')");
-$expenseStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
-$totalExpenses = $expenseStmt->fetchColumn();
+// Kitchen Expenses
+$kitExpStmt = $pdo->prepare("
+    SELECT COALESCE(SUM(qty * price_per_unit), 0) 
+    FROM kitchen_expenses 
+    WHERE MONTH(date) = :m AND YEAR(date) = :y
+");
+$kitExpStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
+$kitchenExpensesSum = $kitExpStmt->fetchColumn();
 
+// Farm Expenses (including staff, utilities, maintenance)
+$farmExpStmt = $pdo->prepare("
+    SELECT COALESCE(SUM(amount), 0) 
+    FROM farm_expenses 
+    WHERE MONTH(date) = :m AND YEAR(date) = :y AND date != '1970-01-01'
+");
+$farmExpStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
+$farmExpensesSum = $farmExpStmt->fetchColumn();
+
+$totalExpenses = $kitchenExpensesSum + $farmExpensesSum;
 $netProfit = $grossRevenue - $totalExpenses;
 
 // 4. AJAX ROUTING CHECK INTERCEPTOR
@@ -71,7 +93,7 @@ if (!$is_ajax) { include 'includes/header.php'; }
         .excel-table td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; color: #475569; }
         .excel-table tr:hover { background-color: #f8fafc; }
         .badge { padding: 2px 8px; font-size: 11px; font-weight: 600; border-radius: 4px; }
-        .badge-rev { background: rgba(16, 108, 242, 0.1); color: #10b981; }
+        .badge-rev { background: rgba(16, 185, 129, 0.1); color: #10b981; }
         .badge-exp { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
     </style>
 
@@ -80,16 +102,20 @@ if (!$is_ajax) { include 'includes/header.php'; }
         <form method="GET" action="dashboard_analytics.php" class="filter-form">
             <input type="hidden" name="tab" value="<?= htmlspecialchars($activeTab) ?>">
             <select name="month">
-                <?php foreach ($filterDates as $d): 
-                    $dateObj = DateTime::createFromFormat('!m', $d['m']);
-                    $isSelected = ($d['m'] == $selectedMonth && $d['y'] == $selectedYear) ? 'selected' : '';
-                    echo "<option value='{$d['m']}' {$isSelected}>{$dateObj->format('F')} {$d['y']}</option>";
+                <?php 
+                $monthsLogged = array_unique(array_column($filterDates, 'm'));
+                sort($monthsLogged);
+                foreach ($monthsLogged as $m): 
+                    $dateObj = DateTime::createFromFormat('!m', $m);
+                    $isSelected = ($m == $selectedMonth) ? 'selected' : '';
+                    echo "<option value='{$m}' {$isSelected}>{$dateObj->format('F')}</option>";
                 endforeach; ?>
             </select>
             <select name="year">
                 <?php 
-                $years = array_unique(array_column($filterDates, 'y'));
-                foreach ($years as $y):
+                $yearsLogged = array_unique(array_column($filterDates, 'y'));
+                sort($yearsLogged);
+                foreach ($yearsLogged as $y):
                     $isSelected = ($y == $selectedYear) ? 'selected' : '';
                     echo "<option value='{$y}' {$isSelected}>{$y}</option>";
                 endforeach; ?>
@@ -124,31 +150,42 @@ if (!$is_ajax) { include 'includes/header.php'; }
             <table class="excel-table">
                 <thead>
                     <tr>
-                        <th>Transaction Date</th>
+                        <th>Date</th>
                         <th>Classification</th>
                         <th>Narration Description</th>
-                        <th>Method</th>
-                        <th>Cashflow Amount</th>
+                        <th>Vendor / Guest</th>
+                        <th>Amount</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php
-                    $ledgerStmt = $pdo->prepare("SELECT * FROM transaction_ledger WHERE MONTH(transaction_date) = :m AND YEAR(transaction_date) = :y ORDER BY transaction_date DESC");
-                    $ledgerStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
-                    $entries = $ledgerStmt->fetchAll(PDO::FETCH_ASSOC);
+                    // Union statement to pull cashflow highlights sequentially into an overview statement
+                    $unionQuery = "
+                        SELECT checkin_date AS date, 'Room Revenue' AS type, CONCAT('Booking charge collected for group') AS notes, guest_name AS entity, total_charge AS amt, 1 AS is_rev FROM guests WHERE MONTH(checkin_date) = :m1 AND YEAR(checkin_date) = :y1
+                        UNION ALL
+                        SELECT date AS date, 'Kitchen Outbound' AS type, CONCAT(category, ': ', description) AS notes, vendor_name AS entity, (qty * price_per_unit) AS amt, 0 AS is_rev FROM kitchen_expenses WHERE MONTH(date) = :m2 AND YEAR(date) = :y2
+                        UNION ALL
+                        SELECT date AS date, 'Farm Outbound' AS type, description AS notes, vendor_name AS entity, amount AS amt, 0 AS is_rev FROM farm_expenses WHERE MONTH(date) = :m3 AND YEAR(date) = :y3 AND date != '1970-01-01'
+                        ORDER BY date DESC LIMIT 100
+                    ";
+                    $stmt = $pdo->prepare($unionQuery);
+                    $stmt->execute([
+                        ':m1' => $selectedMonth, ':y1' => $selectedYear,
+                        ':m2' => $selectedMonth, ':y2' => $selectedYear,
+                        ':m3' => $selectedMonth, ':y3' => $selectedYear
+                    ]);
+                    $entries = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                     if (empty($entries)): ?>
-                        <tr><td colspan="5" style="text-align: center; color: #94a3b8;">No records logged for this period profile.</td></tr>
-                    <?php else: foreach ($entries as $row): 
-                        $isRev = in_array($row['category'], ['Room Rent', 'Food Bill', 'Decoration', 'Tips']);
-                        ?>
+                        <tr><td colspan="5" style="text-align: center; color: #94a3b8;">No operations logged for this period dashboard view profile.</td></tr>
+                    <?php else: foreach ($entries as $row): ?>
                         <tr>
-                            <td><?= date('d M Y', strtotime($row['transaction_date'])) ?></td>
-                            <td><span class="badge <?= $isRev ? 'badge-rev' : 'badge-exp' ?>"><?= htmlspecialchars($row['category']) ?></span></td>
-                            <td><?= htmlspecialchars($row['description']) ?></td>
-                            <td><strong><?= htmlspecialchars($row['payment_mode']) ?></strong></td>
-                            <td style="font-weight: 700; color: <?= $isRev ? '#10b981' : '#ef4444' ?>;">
-                                <?= $isRev ? '+' : '-' ?> ₹<?= number_format($row['amount'], 2) ?>
+                            <td><?= date('d M Y', strtotime($row['date'])) ?></td>
+                            <td><span class="badge <?= $row['is_rev'] ? 'badge-rev' : 'badge-exp' ?>"><?= htmlspecialchars($row['type']) ?></span></td>
+                            <td><?= htmlspecialchars($row['notes']) ?></td>
+                            <td><strong><?= htmlspecialchars($row['entity'] ?: 'Unnamed') ?></strong></td>
+                            <td style="font-weight: 700; color: <?= $row['is_rev'] ? '#10b981' : '#ef4444' ?>;">
+                                <?= $row['is_rev'] ? '+' : '-' ?> ₹<?= number_format($row['amt'], 2) ?>
                             </td>
                         </tr>
                     <?php endforeach; endif; ?>
@@ -156,37 +193,61 @@ if (!$is_ajax) { include 'includes/header.php'; }
             </table>
 
         <?php elseif ($activeTab === 'bookings'): ?>
-            <table class="excel-table">
-                <thead>
-                    <tr>
-                        <th>Guest Registration Profile</th>
-                        <th>Check In</th>
-                        <th>Check Out</th>
-                        <th>Base Room Tariff</th>
-                        <th>Advance Deposited</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php
-                    $guestStmt = $pdo->prepare("SELECT * FROM guests WHERE MONTH(checkin_date) = :m AND YEAR(checkin_date) = :y ORDER BY checkin_date DESC");
-                    $guestStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
-                    $guestRows = $guestStmt->fetchAll(PDO::FETCH_ASSOC);
-
-                    if (empty($guestRows)): ?>
-                        <tr><td colspan="6" style="text-align: center; color: #94a3b8;">No room registrations records found.</td></tr>
-                    <?php else: foreach ($guestRows as $g): ?>
+            <div style="overflow-x: auto; width: 100%;">
+                <table class="excel-table" style="white-space: nowrap; min-width: 1600px;">
+                    <thead>
                         <tr>
-                            <td><strong><?= htmlspecialchars($g['guest_name']) ?></strong></td>
-                            <td><?= date('d M Y', strtotime($g['checkin_date'])) ?></td>
-                            <td><?= date('d M Y', strtotime($g['checkout_date'])) ?></td>
-                            <td>₹<?= number_format($g['base_room_rent'], 2) ?></td>
-                            <td style="color: #10b981; font-weight: 600;">₹<?= number_format($g['advance_paid'], 2) ?></td>
-                            <td><strong><?= htmlspecialchars($g['payment_status']) ?></strong></td>
+                            <th>Guest Profile</th>
+                            <th>Booking Source</th>
+                            <th>Contact No.</th>
+                            <th>No. of Guest</th>
+                            <th>Check-In Date</th>
+                            <th>Check-Out Date</th>
+                            <th>Total Days</th>
+                            <th>Per Night Charges</th>
+                            <th>Total Charge</th>
+                            <th>Advance Paid</th>
+                            <th>Received by</th>
+                            <th>Pending Amount</th>
+                            <th>Received by</th>
+                            <th>Total Food</th>
+                            <th>Received by</th>
+                            <th>Decoration</th>
+                            <th>Tip</th>
                         </tr>
-                    <?php endforeach; endif; ?>
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        <?php
+                        $guestStmt = $pdo->prepare("SELECT * FROM guests WHERE MONTH(checkin_date) = :m AND YEAR(checkin_date) = :y ORDER BY checkin_date DESC");
+                        $guestStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
+                        $guestRows = $guestStmt->fetchAll(PDO::FETCH_ASSOC);
+
+                        if (empty($guestRows)): ?>
+                            <tr><td colspan="17" style="text-align: center; color: #94a3b8;">No room registrations or food records indexed for this selection period.</td></tr>
+                        <?php else: foreach ($guestRows as $g): ?>
+                            <tr>
+                                <td><strong><?= htmlspecialchars($g['guest_name'] ?: 'Unnamed') ?></strong></td>
+                                <td><?= htmlspecialchars($g['booking_source'] ?: 'Offline') ?></td>
+                                <td><?= htmlspecialchars($g['phone_number'] ?: '0000000000') ?></td>
+                                <td style="text-align: center;"><?= intval($g['no_of_guests']) ?></td>
+                                <td><?= $g['checkin_date'] ? date('d M Y', strtotime($g['checkin_date'])) : '-' ?></td>
+                                <td><?= $g['checkout_date'] ? date('d M Y', strtotime($g['checkout_date'])) : '-' ?></td>
+                                <td style="text-align: center;"><?= intval($g['total_days']) ?></td>
+                                <td>₹<?= number_format($g['per_night_charges'], 2) ?></td>
+                                <td style="font-weight: 600;">₹<?= number_format($g['total_charge'], 2) ?></td>
+                                <td style="color: #10b981; font-weight: 600;">₹<?= number_format($g['advance_paid'], 2) ?></td>
+                                <td><span class="badge" style="background: #f1f5f9; color: #475569;"><?= htmlspecialchars($g['advance_received_by'] ?: 'Unnamed') ?></span></td>
+                                <td style="color: #ef4444; font-weight: 600;">₹<?= number_format($g['pending_amount'], 2) ?></td>
+                                <td><span class="badge" style="background: #f1f5f9; color: #475569;"><?= htmlspecialchars($g['pending_received_by'] ?: 'Unnamed') ?></span></td>
+                                <td style="color: #06b6d4; font-weight: 700;">₹<?= number_format($g['total_food'], 2) ?></td>
+                                <td><span class="badge badge-rev"><?= htmlspecialchars($g['food_received_by'] ?: 'Unnamed') ?></span></td>
+                                <td>₹<?= number_format($g['decoration_charges'], 2) ?></td>
+                                <td style="color: #f59e0b; font-weight: 600;">₹<?= number_format($g['tip_amount'], 2) ?></td>
+                            </tr>
+                        <?php endforeach; endif; ?>
+                    </tbody>
+                </table>
+            </div>
 
         <?php elseif ($activeTab === 'expenses'): ?>
             <table class="excel-table">
@@ -194,23 +255,31 @@ if (!$is_ajax) { include 'includes/header.php'; }
                     <tr>
                         <th>Recorded Date</th>
                         <th>Allocation Category</th>
-                        <th>Voucher Reference/Item Detail</th>
+                        <th>Voucher Reference / Item Detail</th>
+                        <th>Vendor Name</th>
                         <th>Amount Disbursed</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php
-                    $expStmt = $pdo->prepare("SELECT * FROM transaction_ledger WHERE MONTH(transaction_date) = :m AND YEAR(transaction_date) = :y AND category IN ('Farm Expense', 'Kitchen Expense', 'Staff Expense') ORDER BY transaction_date DESC");
-                    $expStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
+                    $expQuery = "
+                        SELECT date, 'Kitchen Cost' AS source, CONCAT(category, ': ', IFNULL(description, 'Provisions')) AS detail, vendor_name, (qty * price_per_unit) AS amount FROM kitchen_expenses WHERE MONTH(date) = :m1 AND YEAR(date) = :y1
+                        UNION ALL
+                        SELECT date, 'Farm Operation' AS source, description AS detail, vendor_name, amount FROM farm_expenses WHERE MONTH(date) = :m2 AND YEAR(date) = :y2 AND date != '1970-01-01'
+                        ORDER BY date DESC
+                    ";
+                    $expStmt = $pdo->prepare($expQuery);
+                    $expStmt->execute([':m1' => $selectedMonth, ':y1' => $selectedYear, ':m2' => $selectedMonth, ':y2' => $selectedYear]);
                     $expRows = $expStmt->fetchAll(PDO::FETCH_ASSOC);
 
                     if (empty($expRows)): ?>
-                        <tr><td colspan="4" style="text-align: center; color: #94a3b8;">No outgoing costs or voucher logs saved.</td></tr>
+                        <tr><td colspan="5" style="text-align: center; color: #94a3b8;">No outgoing cost vouchers or grocery sheets saved for this month profile.</td></tr>
                     <?php else: foreach ($expRows as $e): ?>
                         <tr>
-                            <td><?= date('d M Y', strtotime($e['transaction_date'])) ?></td>
-                            <td><span class="badge badge-exp"><?= htmlspecialchars($e['category']) ?></span></td>
-                            <td><?= htmlspecialchars($e['description']) ?></td>
+                            <td><?= date('d M Y', strtotime($e['date'])) ?></td>
+                            <td><span class="badge badge-exp"><?= htmlspecialchars($e['source']) ?></span></td>
+                            <td><?= htmlspecialchars($e['detail']) ?></td>
+                            <td><strong><?= htmlspecialchars($e['vendor_name'] ?: 'Other') ?></strong></td>
                             <td style="font-weight: 700; color: #ef4444;">₹<?= number_format($e['amount'], 2) ?></td>
                         </tr>
                     <?php endforeach; endif; ?>
