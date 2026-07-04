@@ -36,7 +36,7 @@ $bookingIncomeStmt = $pdo->prepare("SELECT COALESCE(SUM(total_charge + decoratio
 $bookingIncomeStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
 $totalBookingIncome = $bookingIncomeStmt->fetchColumn();
 
-// SQL CORRECTION: Pulls aggregate food income directly from your finalized farm booking receipts table
+// Pull food income directly from finalized farm booking receipts table
 $foodIncomeStmt = $pdo->prepare("SELECT COALESCE(SUM(total_food_bill), 0) FROM farm_bookings WHERE MONTH(check_in_date) = :m AND YEAR(check_in_date) = :y");
 $foodIncomeStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
 $totalFoodIncome = $foodIncomeStmt->fetchColumn();
@@ -140,6 +140,7 @@ if (!$is_ajax) { include 'includes/header.php'; }
         <a href="dashboard_analytics.php?tab=kitchen_expenses&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" class="excel-tab-link <?= $activeTab === 'kitchen_expenses' ? 'is-active' : '' ?>">🍳 Kitchen Inventory Expenses</a>
         <a href="dashboard_analytics.php?tab=farm_upkeep&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" class="excel-tab-link <?= $activeTab === 'farm_upkeep' ? 'is-active' : '' ?>">🛠️ Farm Upkeep</a>
         <a href="dashboard_analytics.php?tab=salaries&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" class="excel-tab-link <?= $activeTab === 'salaries' ? 'is-active' : '' ?>">💼 Salaries Registry</a>
+        <a href="dashboard_analytics.php?tab=dish_stats&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" class="excel-tab-link <?= $activeTab === 'dish_stats' ? 'is-active' : '' ?>">🔥 Popular Dishes</a>
     </div>
 
     <div class="excel-table-box">
@@ -158,6 +159,8 @@ if (!$is_ajax) { include 'includes/header.php'; }
                         <th>Recorded Date</th><th>Classification Category</th><th>Voucher Narration Description</th><th>Vendor Name</th><th>Amount Disbursed</th>
                     <?php elseif ($activeTab === 'salaries'): ?>
                         <th>Disbursed Date</th><th>Classification Profile</th><th>Voucher Reference/Notes</th><th>Employee Name</th><th>Net Salary Disbursed</th>
+                    <?php elseif ($activeTab === 'dish_stats'): ?>
+                        <th>Dish Popularity Rank</th><th>Menu Item Name</th><th>Total Quantity Ordered</th><th>Total Net Sales Revenue Generated</th>
                     <?php endif; ?>
                 </tr>
             </thead>

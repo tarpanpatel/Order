@@ -1,228 +1,133 @@
 <?php
-// /home/apartment/artistsfarmjaipur.com/Order/dashboard_analytics.php
-if (session_status() === PHP_SESSION_NONE) { session_start(); }
-require_once __DIR__ . '/config/db.php'; 
+// /home/apartment/artistsfarmjaipur.com/Order/ajax_load_data.php
+require_once __DIR__ . '/config/db.php';
 
-// 1. Set Active Filtering States (Defaults to current month/year)
-$selectedMonth = isset($_GET['month']) ? intval($_GET['month']) : intval(date('m'));
-$selectedYear  = isset($_GET['year']) ? intval($_GET['year']) : intval(date('Y'));
-$activeTab     = isset($_GET['tab']) ? $_GET['tab'] : 'overview';
+$offset = isset($_GET['offset']) ? intval($_GET['offset']) : 0;
+$m = isset($_GET['month']) ? intval($_GET['month']) : intval(date('m'));
+$y = isset($_GET['year']) ? intval($_GET['year']) : intval(date('Y'));
+$tab = $_GET['tab'] ?? 'overview';
+$limit = isset($_GET['limit']) ? intval($_GET['limit']) : 30;
 
-// --- AJAX PAGINATION INTERCEPTOR PIPE ---
-if (isset($_GET['action_ajax_load_more'])) {
-    $_GET['limit'] = 30;
-    include 'ajax_load_data.php';
-    exit;
-}
+if ($tab === 'overview') {
+    $bookingIncome = $pdo->query("SELECT COALESCE(SUM(total_charge + decoration_charges + tip_amount), 0) FROM guests WHERE MONTH(checkin_date) = $m AND YEAR(checkin_date) = $y")->fetchColumn();
+    $foodIncome = $pdo->query("SELECT COALESCE(SUM(total_food_bill), 0) FROM farm_bookings WHERE MONTH(check_in_date) = $m AND YEAR(check_in_date) = $y")->fetchColumn();
+    $farmTotalRevenue = $bookingIncome + $foodIncome;
 
-// 2. Fetch Available Date Ranges Dynamically across tables to build filters
-$filterDates = $pdo->query("
-    SELECT DISTINCT MONTH(checkin_date) as m, YEAR(checkin_date) as y FROM guests WHERE checkin_date IS NOT NULL
-    UNION 
-    SELECT DISTINCT MONTH(date) as m, YEAR(date) as y FROM kitchen_expenses WHERE date IS NOT NULL
-    UNION 
-    SELECT DISTINCT MONTH(date) as m, YEAR(date) as y FROM farm_expenses WHERE date IS NOT NULL
-    UNION
-    SELECT DISTINCT MONTH(check_in_date) as m, YEAR(check_in_date) as y FROM farm_bookings WHERE check_in_date IS NOT NULL
-    ORDER BY y DESC, m DESC
-")->fetchAll(PDO::FETCH_ASSOC);
-
-if (empty($filterDates)) {
-    $filterDates[] = ['m' => intval(date('m')), 'y' => intval(date('Y'))];
-}
-
-// 3. COMPUTE EXECUTIVE FINANCIAL METRICS VIA FINALIZED TABLES
-$bookingIncomeStmt = $pdo->prepare("SELECT COALESCE(SUM(total_charge + decoration_charges + tip_amount), 0) FROM guests WHERE MONTH(checkin_date) = :m AND YEAR(checkin_date) = :y");
-$bookingIncomeStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
-$totalBookingIncome = $bookingIncomeStmt->fetchColumn();
-
-// Pull food income directly from finalized farm booking receipts table
-$foodIncomeStmt = $pdo->prepare("SELECT COALESCE(SUM(total_food_bill), 0) FROM farm_bookings WHERE MONTH(check_in_date) = :m AND YEAR(check_in_date) = :y");
-$foodIncomeStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
-$totalFoodIncome = $foodIncomeStmt->fetchColumn();
-
-$farmTotalRevenue = $totalBookingIncome + $totalFoodIncome;
-
-$kitExpStmt = $pdo->prepare("SELECT COALESCE(SUM(qty * price_per_unit), 0) FROM kitchen_expenses WHERE MONTH(date) = :m AND YEAR(date) = :y");
-$kitExpStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
-$kitchenExpensesSum = $kitExpStmt->fetchColumn();
-
-$farmMaintenanceStmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM farm_expenses WHERE MONTH(date) = :m AND YEAR(date) = :y AND date != '1970-01-01' AND category != 'Salary'");
-$farmMaintenanceStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
-$farmUpkeepExpensesSum = $farmMaintenanceStmt->fetchColumn();
-
-$salaryStmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM farm_expenses WHERE MONTH(date) = :m AND YEAR(date) = :y AND date != '1970-01-01' AND category = 'Salary'");
-$salaryStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
-$totalSalaries = $salaryStmt->fetchColumn();
-
-$totalExpenses = $kitchenExpensesSum + $farmUpkeepExpensesSum + $totalSalaries;
-$netProfitLoss = $farmTotalRevenue - $totalExpenses;
-
-// 4. AJAX ROUTING CHECK INTERCEPTOR
-$is_ajax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') || isset($_GET['ajax']);
-if (!$is_ajax) { include 'includes/header.php'; }
-?>
-
-<div class="main-content" style="padding: 12px; width: 100%; max-width: 100%; box-sizing: border-box; overflow-x: hidden; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
+    $kitchenExpenses = $pdo->query("SELECT COALESCE(SUM(qty * price_per_unit), 0) FROM kitchen_expenses WHERE MONTH(date) = $m AND YEAR(date) = $y")->fetchColumn();
+    $farmUpkeep = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM farm_expenses WHERE MONTH(date) = $m AND YEAR(date) = $y AND date != '1970-01-01' AND category != 'Salary'")->fetchColumn();
+    $salaries = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM farm_expenses WHERE MONTH(date) = $m AND YEAR(date) = $y AND date != '1970-01-01' AND category = 'Salary'")->fetchColumn();
     
-    <style>
-        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .page-title { font-size: 20px; font-weight: 700; color: #1e293b; margin: 0; }
-        .filter-form { display: flex; gap: 10px; align-items: center; background: #fff; padding: 10px 15px; border-radius: 8px; border: 1px solid #e2e8f0; }
-        .filter-form select { padding: 6px 12px; border-radius: 6px; border: 1px solid #cbd5e0; background: #fff; font-size: 13px; }
-        .filter-form button { padding: 6px 14px; background: #06b6d4; color: #fff; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px; }
-        
-        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
-        .metric-card { background: #fff; padding: 16px; border-radius: 10px; border: 1px solid #e2e8f0; border-left: 4px solid #cbd5e0; }
-        .metric-card h3 { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin: 0 0 8px 0; letter-spacing: 0.5px; }
-        .metric-card .value { font-size: 22px; font-weight: 700; color: #1e293b; }
-        
-        .excel-tabs-bar { display: flex; border-bottom: 2px solid #e2e8f0; gap: 4px; margin-bottom: 20px; flex-wrap: wrap; }
-        .excel-tab-link { padding: 10px 16px; font-size: 13px; font-weight: 600; color: #64748b; text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s ease; }
-        .excel-tab-link:hover { color: #06b6d4; }
-        .excel-tab-link.is-active { color: #06b6d4; border-bottom-color: #06b6d4; background: rgba(6, 182, 212, 0.04); border-radius: 6px 6px 0 0; }
+    $totalExpenses = $kitchenExpenses + $farmUpkeep + $salaries;
+    $netProfitLoss = $farmTotalRevenue - $totalExpenses;
 
-        .excel-table-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow-x: auto; max-width: 100%; display: block; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
-        .excel-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; table-layout: auto; }
-        .excel-table th { background: #f8fafc; color: #334155; font-weight: 600; padding: 12px 16px; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
-        .excel-table td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; color: #475569; white-space: nowrap; }
-        .excel-table tr:hover { background-color: #f8fafc; }
-        
-        .badge { padding: 2px 8px; font-size: 11px; font-weight: 600; border-radius: 4px; }
-        .badge-rev { background: rgba(16, 185, 129, 0.1); color: #10b981; }
-        .badge-exp { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
-    </style>
+    $summaryRows = [
+        ['Total Income from Bookings', $bookingIncome, '#10b981', '+'],
+        ['Total Income from Food Orders', $foodIncome, '#10b981', '+'],
+        ['Farm Total Gross Revenue', $farmTotalRevenue, '#06b6d4', ' '],
+        ['Total Operational Expenses of Kitchen', $kitchenExpenses, '#ef4444', '-'],
+        ['Total Expenses of Farm Upkeep', $farmUpkeep, '#ef4444', '-'],
+        ['Total Employee Salaries Disbursed', $salaries, '#ef4444', '-'],
+        ['Net Executive Profit / Loss Statement Yield', $netProfitLoss, ($netProfitLoss >= 0 ? '#10b981' : '#ef4444'), ($netProfitLoss >= 0 ? '+' : '-')]
+    ];
 
-    <div class="page-header">
-        <h2 class="page-title">📈 Central Operations & Analytics</h2>
-        <form method="GET" action="dashboard_analytics.php" class="filter-form">
-            <input type="hidden" name="tab" value="<?= htmlspecialchars($activeTab) ?>">
-            <select name="month">
-                <?php 
-                $monthsLogged = array_unique(array_column($filterDates, 'm'));
-                sort($monthsLogged);
-                foreach ($monthsLogged as $m): 
-                    $dateObj = DateTime::createFromFormat('!m', $m);
-                    echo "<option value='{$m}' ".($m == $selectedMonth ? 'selected' : '').">{$dateObj->format('F')}</option>";
-                endforeach; ?>
-            </select>
-            <select name="year">
-                <?php 
-                $yearsLogged = array_unique(array_column($filterDates, 'y'));
-                sort($yearsLogged);
-                foreach ($yearsLogged as $y):
-                    echo "<option value='{$y}' ".($y == $selectedYear ? 'selected' : '').">{$y}</option>";
-                endforeach; ?>
-            </select>
-            <button type="submit">Sync Sheet</button>
-        </form>
-    </div>
-
-    <div class="metrics-grid">
-        <div class="metric-card" style="border-left-color: <?= $netProfitLoss >= 0 ? '#10b981' : '#ef4444' ?>;">
-            <h3>Net Profit / Loss</h3>
-            <div class="value" style="color: <?= $netProfitLoss >= 0 ? '#10b981' : '#ef4444' ?>;">₹<?= number_format($netProfitLoss, 2) ?></div>
-        </div>
-        <div class="metric-card" style="border-left-color: #06b6d4;">
-            <h3>Farm Total Revenue</h3>
-            <div class="value">₹<?= number_format($farmTotalRevenue, 2) ?></div>
-        </div>
-        <div class="metric-card" style="border-left-color: #3b82f6;">
-            <h3>Total Operational Expenses</h3>
-            <div class="value">₹<?= number_format($totalExpenses, 2) ?></div>
-        </div>
-    </div>
-
-    <div class="excel-tabs-bar">
-        <a href="dashboard_analytics.php?tab=overview&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" class="excel-tab-link <?= $activeTab === 'overview' ? 'is-active' : '' ?>">📊 Summary Statement</a>
-        <a href="dashboard_analytics.php?tab=bookings&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" class="excel-tab-link <?= $activeTab === 'bookings' ? 'is-active' : '' ?>">🏠 Booking Registry</a>
-        <a href="dashboard_analytics.php?tab=food_logs&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" class="excel-tab-link <?= $activeTab === 'food_logs' ? 'is-active' : '' ?>">🍽️ Food Order Logs</a>
-        <a href="dashboard_analytics.php?tab=kitchen_expenses&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" class="excel-tab-link <?= $activeTab === 'kitchen_expenses' ? 'is-active' : '' ?>">🍳 Kitchen Inventory Expenses</a>
-        <a href="dashboard_analytics.php?tab=farm_upkeep&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" class="excel-tab-link <?= $activeTab === 'farm_upkeep' ? 'is-active' : '' ?>">🛠️ Farm Upkeep</a>
-        <a href="dashboard_analytics.php?tab=salaries&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" class="excel-tab-link <?= $activeTab === 'salaries' ? 'is-active' : '' ?>">💼 Salaries Registry</a>
-        <a href="dashboard_analytics.php?tab=dish_stats&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" class="excel-tab-link <?= $activeTab === 'dish_stats' ? 'is-active' : '' ?>">🔥 Popular Dishes</a>
-    </div>
-
-    <div class="excel-table-box">
-        <table class="excel-table" id="analyticsPrimaryTargetMatrix">
-            <thead>
-                <tr>
-                    <?php if ($activeTab === 'overview'): ?>
-                        <th>Financial Stat Metric Descriptor</th><th>Evaluated Cashflow Statement Value Balance</th>
-                    <?php elseif ($activeTab === 'bookings'): ?>
-                        <th>Guest Profile</th><th>Booking Source</th><th>Contact No.</th><th>No. of Guest</th><th>Check-In Date</th><th>Check-Out Date</th><th>Total Days</th><th>Per Night Charges</th><th>Total Charge</th><th>Advance Paid</th><th>Received by</th><th>Pending Amount</th><th>Received by</th><th>Decoration</th><th>Tip</th>
-                    <?php elseif ($activeTab === 'food_logs'): ?>
-                        <th>Guest Reference</th><th>Contact No.</th><th>Check-In Date</th><th>Total Food Revenue</th><th>Received by</th>
-                    <?php elseif ($activeTab === 'kitchen_expenses'): ?>
-                        <th>Recorded Date</th><th>Category</th><th>Inventory Item Detail</th><th>Vendor</th><th>Quantity</th><th>Unit Price</th><th>Total Outbound Disbursed</th>
-                    <?php elseif ($activeTab === 'farm_upkeep'): ?>
-                        <th>Recorded Date</th><th>Classification Category</th><th>Voucher Narration Description</th><th>Vendor Name</th><th>Amount Disbursed</th>
-                    <?php elseif ($activeTab === 'salaries'): ?>
-                        <th>Disbursed Date</th><th>Classification Profile</th><th>Voucher Reference/Notes</th><th>Employee Name</th><th>Net Salary Disbursed</th>
-                    <?php elseif ($activeTab === 'dish_stats'): ?>
-                        <th>Dish Popularity Rank</th><th>Menu Item Name</th><th>Total Quantity Ordered</th><th>Total Net Sales Revenue Generated</th>
-                    <?php endif; ?>
-                </tr>
-            </thead>
-            <tbody id="ajaxPaginatedTableStream">
-                <?php
-                $_GET['offset'] = 0;
-                $_GET['tab'] = $activeTab;
-                $_GET['month'] = $selectedMonth;
-                $_GET['year'] = $selectedYear;
-                $_GET['limit'] = ($activeTab === 'overview') ? 10 : 31;
-                include 'ajax_load_data.php';
-                ?>
-            </tbody>
-        </table>
-    </div>
-    
-    <?php if ($activeTab !== 'overview'): ?>
-    <div style="padding: 15px; text-align: center; background: #fff; border-top: 1px solid #e2e8f0;">
-        <button type="button" id="btnTriggerLiveFetch" data-current-offset="31" style="padding: 10px 24px; background: #06b6d4; color: #fff; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px;">Load More Rows...</button>
-    </div>
-    <?php endif; ?>
-</div>
-
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-    const tableTarget = document.getElementById("analyticsPrimaryTargetMatrix");
-    const actionFetchButton = document.getElementById("btnTriggerLiveFetch");
-    
-    if (actionFetchButton && tableTarget) {
-        if (tableTarget.querySelectorAll("tbody tr").length < 31) {
-            actionFetchButton.style.display = "none";
-        }
-
-        actionFetchButton.addEventListener("click", function() {
-            const currentOffset = parseInt(this.getAttribute("data-current-offset"));
-            this.innerText = "Loading data stream...";
-            this.disabled = true;
-
-            fetch(`dashboard_analytics.php?action_ajax_load_more=1&tab=<?= $activeTab ?>&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>&offset=${currentOffset}`, {
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
-            })
-            .then(res => res.text())
-            .then(bodyHtmlString => {
-                if (bodyHtmlString.trim() === "") {
-                    this.innerText = "All records loaded completely";
-                    this.style.background = "#94a3b8";
-                } else {
-                    const targetDataContainer = document.getElementById("ajaxPaginatedTableStream");
-                    targetDataContainer.insertAdjacentHTML('beforeend', bodyHtmlString);
-                    this.setAttribute("data-current-offset", currentOffset + 30);
-                    this.innerText = "Load More Rows...";
-                    this.disabled = false;
-                }
-            })
-            .catch(err => {
-                console.error("Fetch pipeline failed:", err);
-                this.innerText = "Network Error. Retry.";
-                this.disabled = false;
-            });
-        });
+    foreach ($summaryRows as $row) {
+        echo '<tr>
+            <td><strong>' . $row[0] . '</strong></td>
+            <td style="font-weight: 700; color: ' . $row[2] . ';">' . $row[3] . ' ₹' . number_format($row[1], 2) . '</td>
+        </tr>';
     }
-});
-</script>
 
-<?php if (!$is_ajax) { include 'includes/footer.php'; } ?>
+} elseif ($tab === 'bookings') {
+    $stmt = $pdo->prepare("SELECT * FROM guests WHERE MONTH(checkin_date) = :m AND YEAR(checkin_date) = :y ORDER BY checkin_date DESC LIMIT :limit OFFSET :offset");
+    $stmt->bindValue(':m', $m, PDO::PARAM_INT); $stmt->bindValue(':y', $y, PDO::PARAM_INT);
+    $stmt->bindValue(':limit', $limit, PDO::PARAM_INT); $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+    $stmt->execute();
+    
+    while ($g = $stmt->fetch()) {
+        echo '<tr>
+            <td><strong>' . htmlspecialchars($g['guest_name'] ?: 'Unnamed') . '</strong></td>
+            <td>' . htmlspecialchars($g['booking_source'] ?: 'Offline') . '</td>
+            <td>' . htmlspecialchars($g['phone_number'] ?: '0000000000') . '</td>
+            <td style="text-align: center;">' . intval($g['no_of_guests']) . '</td>
+            <td>' . ($g['checkin_date'] ? date('d M Y', strtotime($g['checkin_date'])) : '-') . '</td>
+            <td>' . ($g['checkout_date'] ? date('d M Y', strtotime($g['checkout_date'])) : '-') . '</td>
+            <td style="text-align: center;">' . intval($g['total_days']) . '</td>
+            <td>₹' . number_format($g['per_night_charges'], 2) . '</td>
+            <td style="font-weight: 600;">₹' . number_format($g['total_charge'], 2) . '</td>
+            <td style="color: #10b981; font-weight: 600;">₹' . number_format($g['advance_paid'], 2) . '</td>
+            <td><span class="badge" style="background: #f1f5f9; color: #475569;">' . htmlspecialchars($g['advance_received_by'] ?: 'Unnamed') . '</span></td>
+            <td style="color: #ef4444; font-weight: 600;">₹' . number_format($g['pending_amount'], 2) . '</td>
+            <td><span class="badge" style="background: #f1f5f9; color: #475569;">' . htmlspecialchars($g['pending_received_by'] ?: 'Unnamed') . '</span></td>
+            <td>₹' . number_format($g['decoration_charges'], 2) . '</td>
+            <td style="color: #f59e0b; font-weight: 600;">₹' . number_format($g['tip_amount'], 2) . '</td>
+        </tr>';
+    }
+
+} elseif ($tab === 'food_logs') {
+    // RESOLVED: Querying directly from farm_bookings to catch historical checkout totals correctly
+    $stmt = $pdo->prepare("SELECT booking_source as guest_name, contact_no as phone_number, check_in_date as checkin_date, total_food_bill as total_food, food_received_by FROM farm_bookings WHERE MONTH(check_in_date) = :m AND YEAR(check_in_date) = :y ORDER BY check_in_date DESC LIMIT :limit OFFSET :offset");
+    $stmt->bindValue(':m', $m, PDO::PARAM_INT); $stmt->bindValue(':y', $y, PDO::PARAM_INT);
+    $stmt->bindValue(':limit', $limit, PDO::PARAM_INT); $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+    $stmt->execute();
+    
+    while ($g = $stmt->fetch()) {
+        echo '<tr>
+            <td><strong>' . htmlspecialchars($g['guest_name'] ?: 'Offline Guest') . '</strong></td>
+            <td>' . htmlspecialchars($g['phone_number'] ?: 'N/A') . '</td>
+            <td>' . ($g['checkin_date'] ? date('d M Y', strtotime($g['checkin_date'])) : '-') . '</td>
+            <td style="color: #06b6d4; font-weight: 700;">₹' . number_format($g['total_food'], 2) . '</td>
+            <td><span class="badge badge-rev">' . htmlspecialchars($g['food_received_by'] ?: 'System Ledger') . '</span></td>
+        </tr>';
+    }
+
+} elseif ($tab === 'kitchen_expenses') {
+    $stmt = $pdo->prepare("SELECT * FROM kitchen_expenses WHERE MONTH(date) = :m AND YEAR(date) = :y ORDER BY date DESC LIMIT :limit OFFSET :offset");
+    $stmt->bindValue(':m', $m, PDO::PARAM_INT); $stmt->bindValue(':y', $y, PDO::PARAM_INT);
+    $stmt->bindValue(':limit', $limit, PDO::PARAM_INT); $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+    $stmt->execute();
+    
+    while ($k = $stmt->fetch()) {
+        echo '<tr>
+            <td>' . date('d M Y', strtotime($k['date'])) . '</td>
+            <td><span class="badge" style="background:rgba(245,158,11,0.1); color:#f59e0b;">' . htmlspecialchars($k['category']) . '</span></td>
+            <td>' . htmlspecialchars($k['description']) . '</td>
+            <td><strong>' . htmlspecialchars($k['vendor_name'] ?: 'Other') . '</strong></td>
+            <td>' . floatval($k['qty']) . '</td>
+            <td>₹' . number_format($k['price_per_unit'], 2) . '</td>
+            <td style="font-weight: 700; color: #ef4444;">₹' . number_format($k['qty'] * $k['price_per_unit'], 2) . '</td>
+        </tr>';
+    }
+
+} elseif ($tab === 'farm_upkeep') {
+    $stmt = $pdo->prepare("SELECT * FROM farm_expenses WHERE MONTH(date) = :m AND YEAR(date) = :y AND date != '1970-01-01' AND category != 'Salary' ORDER BY date DESC LIMIT :limit OFFSET :offset");
+    $stmt->bindValue(':m', $m, PDO::PARAM_INT); $stmt->bindValue(':y', $y, PDO::PARAM_INT);
+    $stmt->bindValue(':limit', $limit, PDO::PARAM_INT); $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+    $stmt->execute();
+    
+    while ($f = $stmt->fetch()) {
+        echo '<tr>
+            <td>' . date('d M Y', strtotime($f['date'])) . '</td>
+            <td><span class="badge" style="background: rgba(16,185,129,0.1); color: #10b981;">' . htmlspecialchars($f['category']) . '</span></td>
+            <td>' . htmlspecialchars($f['description']) . '</td>
+            <td><strong>' . htmlspecialchars($f['vendor_name'] ?: 'Other') . '</strong></td>
+            <td style="font-weight: 700; color: #ef4444;">₹' . number_format($f['amount'], 2) . '</td>
+        </tr>';
+    }
+
+} elseif ($tab === 'salaries') {
+    $stmt = $pdo->prepare("SELECT * FROM farm_expenses WHERE MONTH(date) = :m AND YEAR(date) = :y AND date != '1970-01-01' AND category = 'Salary' ORDER BY date DESC LIMIT :limit OFFSET :offset");
+    $stmt->bindValue(':m', $m, PDO::PARAM_INT); $stmt->bindValue(':y', $y, PDO::PARAM_INT);
+    $stmt->bindValue(':limit', $limit, PDO::PARAM_INT); $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+    $stmt->execute();
+    
+    while ($s = $stmt->fetch()) {
+        echo '<tr>
+            <td>' . date('d M Y', strtotime($s['date'])) . '</td>
+            <td><span class="badge" style="background: rgba(59,130,246,0.1); color: #3b82f6;">' . htmlspecialchars($s['category']) . '</span></td>
+            <td>' . htmlspecialchars($s['description']) . '</td>
+            <td><strong>' . htmlspecialchars($s['vendor_name'] ?: 'Employee') . '</strong></td>
+            <td style="font-weight: 700; color: #ef4444;">₹' . number_format($s['amount'], 2) . '</td>
+        </tr>';
+    }
+}
+?>
