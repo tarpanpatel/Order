@@ -6,8 +6,7 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
  
-// Force the application layer to use Indian Standard Time
-date_default_timezone_set('Asia/Kolkata');
+ 
 // Your existing PDO database connection code continues below...
 if (session_status() === PHP_SESSION_NONE) { 
     session_start(); 
@@ -18,13 +17,17 @@ $db_user = "apartment_blue";
 $db_pass = "tPatel13@";  
 $db_name = "apartment_blue"; 
 
+ 
+// /home/apartment/artistsfarmjaipur.com/Order/config/db.php
+date_default_timezone_set('Asia/Kolkata');
+
 try {
     $pdo = new PDO("mysql:host=localhost;dbname=apartment_blue;charset=utf8mb4", "username", "password", [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION, // Fixed here
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
     ]);
     
-    // CRITICAL: Force the MySQL connection session to run on IST (+05:30)
+    // Force MySQL session synchronization to Indian Standard Time
     $pdo->exec("SET time_zone = '+05:30';");
 
 } catch (PDOException $e) {
