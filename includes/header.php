@@ -179,9 +179,9 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
             <a href="kitchen.php" class="nav-link <?= ($current_page === 'kitchen.php') ? 'active' : ''; ?>">🍳 Kitchen Orders</a>
             <a href="requisitions.php" class="nav-link <?= ($current_page === 'requisitions.php') ? 'active' : ''; ?>">📦 Material Requests</a>
 
-            <?php if (isset($_SESSION["role"]) && ($_SESSION["role"] === 'Super Admin' || $_SESSION["role"] === 'Admin')): ?>
-                <a href="dashboard_analytics.php" class="nav-link <?= ($current_page === 'dashboard_analytics.php') ? 'active' : ''; ?>" style="background: rgba(6, 182, 212, 0.08); color: #0891b2; font-weight: bold; border-left: 3px solid #06b6d4;">📈 Business Analytics</a>
+            <a href="dashboard_analytics.php" class="nav-link <?= ($current_page === 'dashboard_analytics.php') ? 'active' : ''; ?>">📈 Business Analytics</a>
 
+            <?php if (isset($_SESSION["role"]) && ($_SESSION["role"] === 'Super Admin' || $_SESSION["role"] === 'Admin')): ?>
                 <div class="admin-settings-wrapper" style="margin-top: 10px; border-top: 1px solid #cbd5e0; padding-top: 10px; width: 100%;">
                     <div onclick="toggleAdminSubMenu()" class="nav-link" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 700; color: #475569; padding: 10px 16px;">
                         <span>🛠️ System Settings</span>
@@ -232,31 +232,3 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
     <?php endif; ?>
     
     <div class="main-content" style="padding: 12px;">
-
-<script>
-window.triggerSidebarLedgerActivation = function() {
-    const dropdown = document.getElementById("sidebarLiveGuestSelectDropdown");
-    if (!dropdown) return;
-    
-    const selectedGuestId = dropdown.value;
-    if (!selectedGuestId) {
-        alert("Please select a guest profile first.");
-        return;
-    }
-
-    fetch("api/activate_ledger.php", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ guest_id: selectedGuestId })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            location.reload();
-        } else {
-            alert("Activation error: " + data.error);
-        }
-    })
-    .catch(() => alert("Pipeline connection error."));
-};
-</script>
