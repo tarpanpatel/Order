@@ -2,19 +2,20 @@
 // /home/apartment/artistsfarmjaipur.com/Order/seed_june_data.php
 require_once __DIR__ . '/config/db.php';
 
-echo "<h2>Executing Isolated Database Migration & June Ledger Sync...</h2><hr>";
+echo "<h2>Executing Schema-Aligned June Database Migration & Kitchen Sync...</h2><hr>";
 
 try {
-    // 1. TEMPORARILY DISABLE FOREIGN KEY CONSTRAINTS TO PREVENT TRUNCATE VIOLATIONS
+    // 1. Pause validation checks to safely clear existing data grids
     $pdo->exec("SET FOREIGN_KEY_CHECKS = 0");
     $pdo->exec("TRUNCATE TABLE transaction_ledger");
     $pdo->exec("TRUNCATE TABLE guests");
-    $pdo->exec("SET FOREIGN_KEY_CHECKS = 1"); // Re-enable checks immediately after cleaning
-    echo "✔ Structural data grids cleared with foreign key isolation rules enabled.<br>";
+    $pdo->exec("SET FOREIGN_KEY_CHECKS = 1"); // Immediately restore checks
+    echo "✔ Active databases cleared safely with foreign key isolation rules enabled.<br>";
 
+    // FIXED: Formatted statement parameters to exactly align with NOT NULL production column fields
     $guestInsert = $pdo->prepare("
-        INSERT INTO guests (guest_name, checkin_date, checkout_date, base_room_rent, advance_paid, payment_status, status)
-        VALUES (:name, :in, :out, :rent, :advance, 'Settled', 'CheckedOut')
+        INSERT INTO guests (guest_name, booking_source, phone_number, checkin_date, expected_checkout, status, advance_paid, total_charge, pending_amount)
+        VALUES (:name, 'Offline', :phone, :in, :out, 'CheckedOut', :advance, :total, 0.00)
     ");
 
     $ledgerInsert = $pdo->prepare("
@@ -22,7 +23,7 @@ try {
         VALUES (:guest_id, :t_date, :cat, :descr, :vendor, :amt, :mode)
     ");
 
-    // 2. Loop and generate dynamic entries for 28 Booked Days (Excluding June 23 & 26)
+    // 2. Generate Dynamic Entries for 28 Booked Days (Excluding June 23 & 26)
     $totalDays = 30; 
     $bookedCount = 0;
     
@@ -32,23 +33,25 @@ try {
         }
 
         $formattedDate = sprintf("2026-06-%02d", $day);
+        $checkoutDateTime = sprintf("2026-06-%02d 11:00:00", $day + 1); // Sets standard checkout format
         $dayOfWeek = date('N', strtotime($formattedDate));
         
-        // Premium price on Fri/Sat/Sun, Standard on weekdays
+        // Premium pricing on weekends, standard on weekdays
         $dailyTariff = ($dayOfWeek >= 5) ? 35000.00 : 30000.00; 
 
-        // Seed guest profile rows using the structural fallback names and numbers requested
+        // Seed guest row matching all schema fields
         $guestInsert->execute([
             ':name'    => 'Unnamed',
+            ':phone'   => '0000000000',
             ':in'      => $formattedDate,
-            ':out'     => date('Y-m-d', strtotime($formattedDate . ' +1 day')),
-            ':rent'    => $dailyTariff,
-            ':advance' => $dailyTariff
+            ':out'     => $checkoutDateTime,
+            ':advance' => $dailyTariff,
+            ':total'   => $dailyTariff
         ]);
         $guestId = $pdo->lastInsertId();
         $bookedCount++;
 
-        // Sync incoming room revenue straight into the transaction history ledger
+        // Sync incoming room revenue straight into transaction ledger history
         $ledgerInsert->execute([
             ':guest_id' => $guestId,
             ':t_date'   => $formattedDate,
@@ -61,7 +64,7 @@ try {
     }
     echo "✔ Successfully generated {$bookedCount} active guest booking revenue profiles.<br>";
 
-    // 3. Populate Every Single Itemized Row from the Kitchen Expense Sheet
+    // 3. Populate Every Single Itemized Row from the Kitchen Expense Sheet (Total Kitchen Sum: ₹150,842.00)
     $kitchenExpenses = [
         ['date' => '2026-06-01', 'cat' => 'Kitchen Expense', 'desc' => 'Dairy provisions sourcing', 'vendor' => 'Raju', 'amount' => 842.00, 'mode' => 'UPI'],
         ['date' => '2026-06-01', 'cat' => 'Kitchen Expense', 'desc' => 'Frozen / Cold Items provisions sourcing', 'vendor' => 'Raju', 'amount' => 250.00, 'mode' => 'UPI'],
@@ -201,8 +204,8 @@ try {
         ]);
     }
 
-    echo "✔ Itemized kitchen payouts, staff balances, and utility vouchers imported cleanly.<br>";
-    echo "<h3>🎉 Database migration complete! Refresh Business Analytics to view metrics.</h3>";
+    echo "✔ Data seeds executed smoothly under live structural validations.<br>";
+    echo "<h3>🎉 Database migration complete! Hit Business Analytics to review metrics.</h3>";
 
 } catch (Exception $e) {
     echo "❌ Migration failed: " . $e->getMessage();
