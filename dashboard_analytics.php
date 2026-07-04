@@ -1,178 +1,223 @@
 <?php
 // /home/apartment/artistsfarmjaipur.com/Order/dashboard_analytics.php
-
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
+require_once __DIR__ . '/config/db.php'; 
 
-// Include your standard database connection
-include_once __DIR__ . '/config/db.php'; 
-
-// 1. Determine Selected Month and Year (Defaults to current month/year if not set)
+// 1. Set Active Filtering States (Defaults to current month/year)
 $selectedMonth = isset($_GET['month']) ? intval($_GET['month']) : intval(date('m'));
 $selectedYear  = isset($_GET['year']) ? intval($_GET['year']) : intval(date('Y'));
+$activeTab     = isset($_GET['tab']) ? $_GET['tab'] : 'overview';
 
-// 2. Fetch All Unique Months/Years From the Database for the Filter Menu
-$monthsQuery = "
-    SELECT DISTINCT MONTH(check_in_date) as m, YEAR(check_in_date) as y FROM farm_bookings
-    UNION
-    SELECT DISTINCT MONTH(date) as m, YEAR(date) as y FROM farm_expenses
-    UNION
-    SELECT DISTINCT MONTH(date) as m, YEAR(date) as y FROM kitchen_expenses
+// 2. Fetch Available Date Ranges Dynamically to Build Filters
+$filterDates = $pdo->query("
+    SELECT DISTINCT MONTH(transaction_date) as m, YEAR(transaction_date) as y FROM transaction_ledger
+    UNION 
+    SELECT DISTINCT MONTH(checkin_date) as m, YEAR(checkin_date) as y FROM guests
     ORDER BY y DESC, m DESC
-";
-$monthsStmt = $pdo->query($monthsQuery);
-$availableMonths = $monthsStmt->fetchAll(PDO::FETCH_ASSOC);
+")->fetchAll(PDO::FETCH_ASSOC);
 
-if (empty($availableMonths)) {
-    $availableMonths[] = ['m' => intval(date('m')), 'y' => intval(date('Y'))];
+if (empty($filterDates)) {
+    $filterDates[] = ['m' => intval(date('m')), 'y' => intval(date('Y'))];
 }
 
-// 3. Fetch Financial Summary Data for the Chosen Month
-$summaryQuery = "
-    SELECT 
-        COALESCE(SUM(total_charge + total_food_bill + decoration_charges + tip_amount), 0) AS gross_revenue,
-        (SELECT COALESCE(SUM(amount), 0) FROM farm_expenses WHERE MONTH(date) = :farm_month AND YEAR(date) = :farm_year) AS farm_exp,
-        (SELECT COALESCE(SUM(total_amount), 0) FROM kitchen_expenses WHERE MONTH(date) = :kit_month AND YEAR(date) = :kit_year) AS kitchen_exp
-    FROM farm_bookings
-    WHERE MONTH(check_in_date) = :book_month AND YEAR(check_in_date) = :book_year
-";
+// 3. COMPUTE EXECUTIVE FINANCIAL METRICS FOR ACTIVE PERIOD
+$revenueStmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM transaction_ledger WHERE MONTH(transaction_date) = :m AND YEAR(transaction_date) = :y AND category IN ('Room Rent', 'Food Bill', 'Decoration', 'Tips')");
+$revenueStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
+$grossRevenue = $revenueStmt->fetchColumn();
 
-$stmt = $pdo->prepare($summaryQuery);
-$stmt->execute([
-    ':farm_month'  => $selectedMonth, 
-    ':farm_year'   => $selectedYear,
-    ':kit_month'   => $selectedMonth, 
-    ':kit_year'    => $selectedYear,
-    ':book_month'  => $selectedMonth, 
-    ':book_year'   => $selectedYear
-]);
-$metrics = $stmt->fetch(PDO::FETCH_ASSOC);
+$expenseStmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM transaction_ledger WHERE MONTH(transaction_date) = :m AND YEAR(transaction_date) = :y AND category IN ('Farm Expense', 'Kitchen Expense', 'Staff Expense')");
+$expenseStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
+$totalExpenses = $expenseStmt->fetchColumn();
 
-$revenue = $metrics['gross_revenue'];
-$expenses = $metrics['farm_exp'] + $metrics['kitchen_exp'];
-$profit = $revenue - $expenses;
+$netProfit = $grossRevenue - $totalExpenses;
 
-// Detect if this page is loaded via the AJAX single-page routine engine
+// 4. AJAX ROUTING CHECK INTERCEPTOR
 $is_ajax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') || isset($_GET['ajax']);
-
-if (!$is_ajax) {
-    include 'includes/header.php';
-}
+if (!$is_ajax) { include 'includes/header.php'; }
 ?>
 
-<div class="main-content" style="padding: 12px; width: 100%;">
+<div class="main-content" style="padding: 12px; width: 100%; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
     
     <style>
-        .analytics-title { color: #2c3e50; font-family: 'Segoe UI', Arial, sans-serif; margin-bottom: 5px; }
-        .filter-bar { background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; display: flex; align-items: center; gap: 10px; font-family: 'Segoe UI', Arial, sans-serif; }
-        .filter-bar select { padding: 8px 12px; font-size: 14px; border-radius: 4px; border: 1px solid #ccc; background: #fff; }
-        .filter-bar button { padding: 8px 15px; font-size: 14px; background: #007bff; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        .filter-bar button:hover { background: #0056b3; }
-        .analytics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px; font-family: 'Segoe UI', Arial, sans-serif; }
-        .analytics-card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .analytics-card h3 { margin: 0 0 10px 0; color: #7f8c8d; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .analytics-card .value { font-size: 26px; font-weight: bold; }
-        .revenue-card { border-left: 5px solid #28a745; }
-        .revenue-card .value { color: #28a745; }
-        .expenses-card { border-left: 5px solid #dc3545; }
-        .expenses-card .value { color: #dc3545; }
-        .profit-card { border-left: 5px solid #17a2b8; }
-        .profit-card .value { color: #17a2b8; }
-        .ledger-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 30px; font-family: 'Segoe UI', Arial, sans-serif; }
-        .ledger-table th, .ledger-table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; }
-        .ledger-table th { background: #343a40; color: #fff; font-weight: 600; }
-        .ledger-table tr:hover { background-color: #f8f9fa; }
+        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .page-title { font-size: 20px; font-weight: 700; color: #1e293b; margin: 0; }
+        .filter-form { display: flex; gap: 10px; align-items: center; background: #fff; padding: 10px 15px; border-radius: 8px; border: 1px solid #e2e8f0; }
+        .filter-form select { padding: 6px 12px; border-radius: 6px; border: 1px solid #cbd5e0; background: #fff; font-size: 13px; }
+        .filter-form button { padding: 6px 14px; background: #06b6d4; color: #fff; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px; }
+        .filter-form button:hover { background: #0891b2; }
+        
+        /* Dashboard Metric Cards */
+        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .metric-card { background: #fff; padding: 16px; border-radius: 10px; border: 1px solid #e2e8f0; border-left: 4px solid #cbd5e0; }
+        .metric-card h3 { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin: 0 0 8px 0; letter-spacing: 0.5px; }
+        .metric-card .value { font-size: 24px; font-weight: 700; color: #1e293b; }
+        .card-revenue { border-left-color: #10b981; }
+        .card-revenue .value { color: #10b981; }
+        .card-expenses { border-left-color: #ef4444; }
+        .card-expenses .value { color: #ef4444; }
+        .card-profit { border-left-color: #06b6d4; }
+        .card-profit .value { color: #06b6d4; }
+
+        /* Excel View Tabs Setup */
+        .excel-tabs-bar { display: flex; border-bottom: 2px solid #e2e8f0; gap: 4px; margin-bottom: 20px; }
+        .excel-tab-link { padding: 10px 16px; font-size: 13px; font-weight: 600; color: #64748b; text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s ease; }
+        .excel-tab-link:hover { color: #06b6d4; }
+        .excel-tab-link.is-active { color: #06b6d4; border-bottom-color: #06b6d4; background: rgba(6, 182, 212, 0.04); border-radius: 6px 6px 0 0; }
+
+        /* Ledger Sheets Matrix Tables */
+        .excel-table-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .excel-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+        .excel-table th { background: #f8fafc; color: #334155; font-weight: 600; padding: 12px 16px; border-bottom: 2px solid #e2e8f0; }
+        .excel-table td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; color: #475569; }
+        .excel-table tr:hover { background-color: #f8fafc; }
+        .badge { padding: 2px 8px; font-size: 11px; font-weight: 600; border-radius: 4px; }
+        .badge-rev { background: rgba(16, 108, 242, 0.1); color: #10b981; }
+        .badge-exp { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
     </style>
 
-    <h2 class="analytics-title">Operational Overview</h2>
-    
-    <form method="GET" action="dashboard_analytics.php" class="filter-bar" id="analyticsFilterForm">
-        <label for="date_select"><strong>Select View Period:</strong></label>
-        <select id="date_select" onchange="splitPeriodValue(this.value)">
-            <?php
-            foreach ($availableMonths as $row) {
-                if (empty($row['m']) || empty($row['y'])) continue;
-                $dateObj = DateTime::createFromFormat('!m', $row['m']);
-                $monthName = $dateObj->format('F');
-                $optionValue = $row['m'] . '-' . $row['y'];
-                $isSelected = ($row['m'] == $selectedMonth && $row['y'] == $selectedYear) ? 'selected' : '';
-                echo "<option value='{$optionValue}' {$isSelected}>{$monthName} {$row['y']}</option>";
-            }
-            ?>
-        </select>
-        <input type="hidden" name="month" id="hidden_month" value="<?php echo $selectedMonth; ?>">
-        <input type="hidden" name="year" id="hidden_year" value="<?php echo $selectedYear; ?>">
-        <button type="submit">Filter Metrics</button>
-    </form>
+    <div class="page-header">
+        <h2 class="page-title">📈 Central Operations & Analytics</h2>
+        <form method="GET" action="dashboard_analytics.php" class="filter-form">
+            <input type="hidden" name="tab" value="<?= htmlspecialchars($activeTab) ?>">
+            <select name="month">
+                <?php foreach ($filterDates as $d): 
+                    $dateObj = DateTime::createFromFormat('!m', $d['m']);
+                    $isSelected = ($d['m'] == $selectedMonth && $d['y'] == $selectedYear) ? 'selected' : '';
+                    echo "<option value='{$d['m']}' {$isSelected}>{$dateObj->format('F')} {$d['y']}</option>";
+                endforeach; ?>
+            </select>
+            <select name="year">
+                <?php 
+                $years = array_unique(array_column($filterDates, 'y'));
+                foreach ($years as $y):
+                    $isSelected = ($y == $selectedYear) ? 'selected' : '';
+                    echo "<option value='{$y}' {$isSelected}>{$y}</option>";
+                endforeach; ?>
+            </select>
+            <button type="submit">Sync Sheet</button>
+        </form>
+    </div>
 
-    <div class="analytics-grid">
-        <div class="analytics-card revenue-card">
-            <h3>Total Earnings (Stay + Food)</h3>
-            <div class="value">₹<?php echo number_format($revenue, 2); ?></div>
+    <div class="metrics-grid">
+        <div class="metric-card card-revenue">
+            <h3>Gross Incoming Revenue</h3>
+            <div class="value">₹<?= number_format($grossRevenue, 2) ?></div>
         </div>
-        <div class="analytics-card expenses-card">
-            <h3>Total Expenses (Farm + Kitchen)</h3>
-            <div class="value">₹<?php echo number_format($expenses, 2); ?></div>
+        <div class="metric-card card-expenses">
+            <h3>Operational Expenses</h3>
+            <div class="value">₹<?= number_format($totalExpenses, 2) ?></div>
         </div>
-        <div class="analytics-card profit-card">
-            <h3>Net Operational Profit</h3>
-            <div class="value">₹<?php echo number_format($profit, 2); ?></div>
+        <div class="metric-card card-profit">
+            <h3>Net Property Yield</h3>
+            <div class="value">₹<?= number_format($netProfit, 2) ?></div>
         </div>
     </div>
 
-    <h3 class="analytics-title">Kitchen Vendor Distributions</h3>
-    <table class="ledger-table">
-        <thead>
-            <tr>
-                <th>Vendor Name</th>
-                <th>Total Transaction Logs</th>
-                <th>Total Outstanding Payout</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php
-            $vendorQuery = "
-                SELECT vendor_name, COUNT(*) as logs, SUM(total_amount) as total 
-                FROM kitchen_expenses 
-                WHERE MONTH(date) = :month AND YEAR(date) = :year
-                GROUP BY vendor_name ORDER BY total DESC
-            ";
-            $vendorStmt = $pdo->prepare($vendorQuery);
-            $vendorStmt->execute([':month' => $selectedMonth, ':year' => $selectedYear]);
-            
-            $hasVendors = false;
-            while($vendor = $vendorStmt->fetch(PDO::FETCH_ASSOC)) {
-                $hasVendors = true;
-                $displayVendor = !empty($vendor['vendor_name']) ? htmlspecialchars($vendor['vendor_name']) : 'Unassigned / Generic';
-                echo "<tr>
-                        <td>" . $displayVendor . "</td>
-                        <td>" . $vendor['logs'] . "</td>
-                        <td>₹" . number_format($vendor['total'], 2) . "</td>
-                      </tr>";
-            }
-            if (!$hasVendors) {
-                echo "<tr><td colspan='3' style='text-align:center; color:#999;'>No kitchen expense logs found for this period.</td></tr>";
-            }
-            ?>
-        </tbody>
-    </table>
+    <div class="excel-tabs-bar">
+        <a href="dashboard_analytics.php?tab=overview&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" class="excel-tab-link <?= $activeTab === 'overview' ? 'is-active' : '' ?>">📊 Summary Statement</a>
+        <a href="dashboard_analytics.php?tab=bookings&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" class="excel-tab-link <?= $activeTab === 'bookings' ? 'is-active' : '' ?>">🏠 Bookings & Food Logs</a>
+        <a href="dashboard_analytics.php?tab=expenses&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" class="excel-tab-link <?= $activeTab === 'expenses' ? 'is-active' : '' ?>">💸 Outgoing Expense Register</a>
+    </div>
 
-    <script>
-    function splitPeriodValue(val) {
-        if(!val) return;
-        var parts = val.split('-');
-        document.getElementById('hidden_month').value = parts[0];
-        document.getElementById('hidden_year').value = parts[1];
-    }
-    
-    var initialSelect = document.getElementById('date_select');
-    if(initialSelect) {
-        splitPeriodValue(initialSelect.value);
-    }
-    </script>
+    <div class="excel-table-box">
+        <?php if ($activeTab === 'overview'): ?>
+            <table class="excel-table">
+                <thead>
+                    <tr>
+                        <th>Transaction Date</th>
+                        <th>Classification</th>
+                        <th>Narration Description</th>
+                        <th>Method</th>
+                        <th>Cashflow Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php
+                    $ledgerStmt = $pdo->prepare("SELECT * FROM transaction_ledger WHERE MONTH(transaction_date) = :m AND YEAR(transaction_date) = :y ORDER BY transaction_date DESC");
+                    $ledgerStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
+                    $entries = $ledgerStmt->fetchAll(PDO::FETCH_ASSOC);
+
+                    if (empty($entries)): ?>
+                        <tr><td colspan="5" style="text-align: center; color: #94a3b8;">No records logged for this period profile.</td></tr>
+                    <?php else: foreach ($entries as $row): 
+                        $isRev = in_array($row['category'], ['Room Rent', 'Food Bill', 'Decoration', 'Tips']);
+                        ?>
+                        <tr>
+                            <td><?= date('d M Y', strtotime($row['transaction_date'])) ?></td>
+                            <td><span class="badge <?= $isRev ? 'badge-rev' : 'badge-exp' ?>"><?= htmlspecialchars($row['category']) ?></span></td>
+                            <td><?= htmlspecialchars($row['description']) ?></td>
+                            <td><strong><?= htmlspecialchars($row['payment_mode']) ?></strong></td>
+                            <td style="font-weight: 700; color: <?= $isRev ? '#10b981' : '#ef4444' ?>;">
+                                <?= $isRev ? '+' : '-' ?> ₹<?= number_format($row['amount'], 2) ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; endif; ?>
+                </tbody>
+            </table>
+
+        <?php elseif ($activeTab === 'bookings'): ?>
+            <table class="excel-table">
+                <thead>
+                    <tr>
+                        <th>Guest Registration Profile</th>
+                        <th>Check In</th>
+                        <th>Check Out</th>
+                        <th>Base Room Tariff</th>
+                        <th>Advance Deposited</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php
+                    $guestStmt = $pdo->prepare("SELECT * FROM guests WHERE MONTH(checkin_date) = :m AND YEAR(checkin_date) = :y ORDER BY checkin_date DESC");
+                    $guestStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
+                    $guestRows = $guestStmt->fetchAll(PDO::FETCH_ASSOC);
+
+                    if (empty($guestRows)): ?>
+                        <tr><td colspan="6" style="text-align: center; color: #94a3b8;">No room registrations records found.</td></tr>
+                    <?php else: foreach ($guestRows as $g): ?>
+                        <tr>
+                            <td><strong><?= htmlspecialchars($g['guest_name']) ?></strong></td>
+                            <td><?= date('d M Y', strtotime($g['checkin_date'])) ?></td>
+                            <td><?= date('d M Y', strtotime($g['checkout_date'])) ?></td>
+                            <td>₹<?= number_format($g['base_room_rent'], 2) ?></td>
+                            <td style="color: #10b981; font-weight: 600;">₹<?= number_format($g['advance_paid'], 2) ?></td>
+                            <td><strong><?= htmlspecialchars($g['payment_status']) ?></strong></td>
+                        </tr>
+                    <?php endforeach; endif; ?>
+                </tbody>
+            </table>
+
+        <?php elseif ($activeTab === 'expenses'): ?>
+            <table class="excel-table">
+                <thead>
+                    <tr>
+                        <th>Recorded Date</th>
+                        <th>Allocation Category</th>
+                        <th>Voucher Reference/Item Detail</th>
+                        <th>Amount Disbursed</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php
+                    $expStmt = $pdo->prepare("SELECT * FROM transaction_ledger WHERE MONTH(transaction_date) = :m AND YEAR(transaction_date) = :y AND category IN ('Farm Expense', 'Kitchen Expense', 'Staff Expense') ORDER BY transaction_date DESC");
+                    $expStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
+                    $expRows = $expStmt->fetchAll(PDO::FETCH_ASSOC);
+
+                    if (empty($expRows)): ?>
+                        <tr><td colspan="4" style="text-align: center; color: #94a3b8;">No outgoing costs or voucher logs saved.</td></tr>
+                    <?php else: foreach ($expRows as $e): ?>
+                        <tr>
+                            <td><?= date('d M Y', strtotime($e['transaction_date'])) ?></td>
+                            <td><span class="badge badge-exp"><?= htmlspecialchars($e['category']) ?></span></td>
+                            <td><?= htmlspecialchars($e['description']) ?></td>
+                            <td style="font-weight: 700; color: #ef4444;">₹<?= number_format($e['amount'], 2) ?></td>
+                        </tr>
+                    <?php endforeach; endif; ?>
+                </tbody>
+            </table>
+        <?php endif; ?>
+    </div>
 </div>
 
-<?php
-if (!$is_ajax) {
-    include 'includes/footer.php';
-}
-?>
+<?php if (!$is_ajax) { include 'includes/footer.php'; } ?>
