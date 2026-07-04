@@ -11,7 +11,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 // Compile guest listings directly for the native sidebar dropdown controls
 $current_active_guest = $pdo->query("SELECT * FROM guests WHERE status = 'Active' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 
-// FIXED DROPDOWN FILTER & REMOVED NAME: Pulls ONLY today's arrivals, formatting the number into the original 'guest_name' label element your loops look for
+// FIXED DROPDOWN FILTER: Only displays active or arriving bookings matching today's date
 $todaysStmt = $pdo->prepare("
     SELECT id, CONCAT('📱 (', RIGHT(phone_number, 4), ')') as guest_name 
     FROM guests 
@@ -166,17 +166,18 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
                 <?php else: ?>
                     <div style="margin: 6px 0; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px;">
-                        <div style="margin: 0;">
-                            <select id="sidebarLiveGuestSelectDropdown" required style="width: 100%; padding: 6px; margin-bottom: 6px; border-radius: 6px; border: 1px solid #cbd5e0; font-size: 11px; background: #fff; font-family: inherit;">
+                        <form method="POST" action="checkin.php" style="margin: 0;">
+                            <input type="hidden" name="action_sidebar_activate" value="1">
+                            <select name="sidebar_guest_select" required style="width: 100%; padding: 6px; margin-bottom: 6px; border-radius: 6px; border: 1px solid #cbd5e0; font-size: 11px; background: #fff; font-family: inherit; color: #1e293b;">
                                 <option value="">-- Choose Guest --</option>
                                 <?php foreach ($all_booked_guests as $g): ?>
                                     <option value="<?= $g['id'] ?>"><?= htmlspecialchars($g['guest_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
-                            <button type="button" class="sidebar-action-card sb-btn-inactive" onclick="window.triggerSidebarLedgerActivation()">
+                            <button type="submit" class="sidebar-action-card sb-btn-inactive">
                                 ▶ Activate Ledger
                             </button>
-                        </div>
+                        </form>
                     </div>
                 <?php endif; ?>
 
