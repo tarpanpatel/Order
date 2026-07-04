@@ -252,7 +252,7 @@ window.triggerSidebarLedgerActivation = function() {
     .then(res => res.json())
     .then(data => {
         if (data.success) {
-            location.reload();
+            location.reload();  
         } else {
             alert("Activation error: " + data.error);
         }

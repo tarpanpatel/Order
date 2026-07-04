@@ -1,11 +1,8 @@
-</div> <!-- Close main-content wrapper[cite: 4] -->
-</div> <!-- Close app-container wrapper[cite: 4] -->
-
-<div class="sidebar-backdrop" id="menuOverlayMask" onclick="toggleLeftMenu(false)"></div>[cite: 4]
+</div> </div> <div class="sidebar-backdrop" id="menuOverlayMask" onclick="toggleLeftMenu(false)"></div>
 
 <script>
 // ==========================================================================
-// 1. MOBILE RESPONSIVE DRAWER MECHANICS[cite: 4]
+// 1. MOBILE RESPONSIVE DRAWER MECHANICS
 // ==========================================================================
 function toggleLeftMenu(shouldOpen) {
     const sidebar = document.getElementById("appLeftNavigationMenu");
@@ -21,13 +18,13 @@ function toggleLeftMenu(shouldOpen) {
     }
 }
 
-// Auto-close menu list drawer when clicking any page link inside it[cite: 4]
+// Auto-close menu list drawer when clicking any page link inside it
 document.querySelectorAll('#appLeftNavigationMenu nav a').forEach(link => {
     link.addEventListener('click', () => toggleLeftMenu(false));
 });
 
 // ==========================================================================
-// 2. FIXED SYSTEM-WIDE AJAX SINGLE-PAGE INTERCEPTOR ENGINE[cite: 4]
+// 2. FIXED SYSTEM-WIDE AJAX SINGLE-PAGE INTERCEPTOR ENGINE
 // ==========================================================================
 document.addEventListener('DOMContentLoaded', () => {
     // Initial dynamic state check on fresh page load to update list values immediately
@@ -60,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (oldContent && newContent) {
                     oldContent.innerHTML = newContent.innerHTML;
                     
-                    // Highlight the active selection link inside the navigation drawer menu sidebar[cite: 4]
+                    // Highlight the active selection link inside the navigation drawer menu sidebar
                     document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
                     const targetFileBase = urlStr.split('?')[0];
                     const targetNavLink = document.querySelector(`.nav-link[href^="${targetFileBase}"]`);
@@ -72,7 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         window.refreshSidebarDropdownState();
                     }
 
-                    // FIX: Extract, copy, and evaluate script tags globally so functions exist in window context[cite: 4]
+                    // FIX: Extract, copy, and evaluate script tags globally so functions exist in window context
                     newContent.querySelectorAll('script').forEach(oldScript => {
                         const freshScript = document.createElement('script');
                         Array.from(oldScript.attributes).forEach(attr => freshScript.setAttribute(attr.name, attr.value));
@@ -84,10 +81,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                         
                         document.body.appendChild(freshScript);
-                        freshScript.remove(); // Clean up script node container softly from the DOM tree[cite: 4]
+                        freshScript.remove(); // Clean up script node container softly from the DOM tree
                     });
 
-                    // Keep track of internal workflow paths softly in browser addresses[cite: 4]
+                    // Keep track of internal workflow paths softly in browser addresses
                     history.pushState({ url: urlStr }, '', urlStr);
                     window.scrollTo({ top: 0, behavior: 'instant' });
                 }
