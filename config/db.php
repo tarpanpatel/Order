@@ -11,26 +11,29 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start(); 
 }
 
-$db_host = "localhost";  
-$db_user = "apartment_blue";  
-$db_pass = "tPatel13@";  
-$db_name = "apartment_blue"; 
-
  
 // /home/apartment/artistsfarmjaipur.com/Order/config/db.php
-date_default_timezone_set('Asia/Kolkata');
+date_default_timezone_set('Asia/Kolkata'); //
+
+if (session_status() === PHP_SESSION_NONE) { session_start(); } //
+
+$db_host = "localhost";   //
+$db_user = "apartment_blue";   //
+$db_pass = "tPatel13@";   //
+$db_name = "apartment_blue";  //
 
 try {
-    $pdo = new PDO("mysql:host=localhost;dbname=apartment_blue;charset=utf8mb4", "username", "password", [
-        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION, // Fixed here
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+    // FIXED: Swapped out placeholder strings for your real login variable strings
+    $pdo = new PDO("mysql:host={$db_host};dbname={$db_name};charset=utf8mb4", $db_user, $db_pass, [
+        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION, //
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC //
     ]);
     
     // Force MySQL session synchronization to Indian Standard Time
-    $pdo->exec("SET time_zone = '+05:30';");
+    $pdo->exec("SET time_zone = '+05:30';"); //
 
 } catch (PDOException $e) {
-    die("Database connection failed: " . $e->getMessage());
+    die("Database connection failed: " . $e->getMessage()); //
 }
 
 function logAction($userId, $actionText) {
