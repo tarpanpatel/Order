@@ -10,8 +10,7 @@ $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 30;
 
 if ($tab === 'overview') {
     $bookingIncome = $pdo->query("SELECT COALESCE(SUM(total_charge + decoration_charges + tip_amount), 0) FROM guests WHERE MONTH(checkin_date) = $m AND YEAR(checkin_date) = $y")->fetchColumn();
-    // FIXED COLUMN EXPLICIT SPECIFICATION MATCH
-    $foodIncome = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM orders WHERE MONTH(created_at) = $m AND YEAR(created_at) = $y AND status = 'Served'")->fetchColumn();
+    $foodIncome = $pdo->query("SELECT COALESCE(SUM(total_food), 0) FROM guests WHERE MONTH(checkin_date) = $m AND YEAR(checkin_date) = $y")->fetchColumn();
     $farmTotalRevenue = $bookingIncome + $foodIncome;
 
     $kitchenExpenses = $pdo->query("SELECT COALESCE(SUM(qty * price_per_unit), 0) FROM kitchen_expenses WHERE MONTH(date) = $m AND YEAR(date) = $y")->fetchColumn();
@@ -65,21 +64,18 @@ if ($tab === 'overview') {
     }
 
 } elseif ($tab === 'food_logs') {
-    // FIXED COLUMN ASSIGNMENT SPECIFICATION FOR ORDERS FROM KITCHEN.PHP
-    $stmt = $pdo->prepare("SELECT id, guest_name, created_at, table_no, order_summary, amount, payment_status FROM orders WHERE MONTH(created_at) = :m AND YEAR(created_at) = :y AND status = 'Served' ORDER BY id DESC LIMIT :limit OFFSET :offset");
+    $stmt = $pdo->prepare("SELECT guest_name, phone_number, checkin_date, total_food, food_received_by FROM guests WHERE MONTH(checkin_date) = :m AND YEAR(checkin_date) = :y AND total_food > 0 ORDER BY checkin_date DESC LIMIT :limit OFFSET :offset");
     $stmt->bindValue(':m', $m, PDO::PARAM_INT); $stmt->bindValue(':y', $y, PDO::PARAM_INT);
     $stmt->bindValue(':limit', $limit, PDO::PARAM_INT); $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
     $stmt->execute();
     
-    while ($o = $stmt->fetch(PDO::FETCH_ASSOC)) {
+    while ($g = $stmt->fetch(PDO::FETCH_ASSOC)) {
         echo '<tr>
-            <td>#' . $o['id'] . '</td>
-            <td><strong>' . htmlspecialchars($o['guest_name'] ?: 'Walk-in customer') . '</strong></td>
-            <td>' . date('d M Y h:i A', strtotime($o['created_at'])) . '</td>
-            <td>' . htmlspecialchars($o['table_no'] ?: 'Room Delivery') . '</td>
-            <td style="max-width:300px; white-space:normal; font-size:12px;">' . htmlspecialchars($o['order_summary'] ?: 'Standard items') . '</td>
-            <td style="color:#06b6d4; font-weight:700;">₹' . number_format($o['amount'], 2) . '</td>
-            <td><span class="badge" style="background:#f1f5f9; color:#3b82f6;">' . htmlspecialchars($o['payment_status'] ?: 'Settled') . '</span></td>
+            <td><strong>' . htmlspecialchars($g['guest_name'] ?: 'Unnamed') . '</strong></td>
+            <td>' . htmlspecialchars($g['phone_number'] ?: '0000000000') . '</td>
+            <td>' . ($g['checkin_date'] ? date('d M Y', strtotime($g['checkin_date'])) : '-') . '</td>
+            <td style="color: #06b6d4; font-weight: 700;">₹' . number_format($g['total_food'], 2) . '</td>
+            <td><span class="badge badge-rev">' . htmlspecialchars($g['food_received_by'] ?: 'Unnamed') . '</span></td>
         </tr>';
     }
 

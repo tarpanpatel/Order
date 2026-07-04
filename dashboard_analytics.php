@@ -29,13 +29,13 @@ if (empty($filterDates)) {
     $filterDates[] = ['m' => intval(date('m')), 'y' => intval(date('Y'))];
 }
 
-// 3. COMPUTE EXECUTIVE FINANCIAL METRICS FOR ACTIVE PERIOD VIA SQL
+// 3. COMPUTE FINANCIAL METRICS VIA INDEPENDENT TABLES (CLEAN SQL FIX)
 $bookingIncomeStmt = $pdo->prepare("SELECT COALESCE(SUM(total_charge + decoration_charges + tip_amount), 0) FROM guests WHERE MONTH(checkin_date) = :m AND YEAR(checkin_date) = :y");
 $bookingIncomeStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
 $totalBookingIncome = $bookingIncomeStmt->fetchColumn();
 
-// FIXED SQL: Changed 'total_amount' to 'amount' to match your database schema
-$foodIncomeStmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM orders WHERE MONTH(created_at) = :m AND YEAR(created_at) = :y AND status = 'Served'");
+// SQL RESOLUTION: Pulls total food income sums accurately using the verified 'total_food' field inside your guests profile table
+$foodIncomeStmt = $pdo->prepare("SELECT COALESCE(SUM(total_food), 0) FROM guests WHERE MONTH(checkin_date) = :m AND YEAR(checkin_date) = :y");
 $foodIncomeStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
 $totalFoodIncome = $foodIncomeStmt->fetchColumn();
 
@@ -77,9 +77,9 @@ if (!$is_ajax) { include 'includes/header.php'; }
         
         .excel-tabs-bar { display: flex; border-bottom: 2px solid #e2e8f0; gap: 4px; margin-bottom: 20px; flex-wrap: wrap; }
         .excel-tab-link { padding: 10px 16px; font-size: 13px; font-weight: 600; color: #64748b; text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s ease; }
-        .excel-tab-link:hover { color: #06b6d4; }
         .excel-tab-link.is-active { color: #06b6d4; border-bottom-color: #06b6d4; background: rgba(6, 182, 212, 0.04); border-radius: 6px 6px 0 0; }
 
+        /* HORIZONTAL SCREEN BOUNDING SCROLLER FRAME WRAPPER */
         .excel-table-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow-x: auto; max-width: 100%; display: block; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .excel-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; table-layout: auto; }
         .excel-table th { background: #f8fafc; color: #334155; font-weight: 600; padding: 12px 16px; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
@@ -149,7 +149,7 @@ if (!$is_ajax) { include 'includes/header.php'; }
                     <?php elseif ($activeTab === 'bookings'): ?>
                         <th>Guest Profile</th><th>Booking Source</th><th>Contact No.</th><th>No. of Guest</th><th>Check-In Date</th><th>Check-Out Date</th><th>Total Days</th><th>Per Night Charges</th><th>Total Charge</th><th>Advance Paid</th><th>Received by</th><th>Pending Amount</th><th>Received by</th><th>Decoration</th><th>Tip</th>
                     <?php elseif ($activeTab === 'food_logs'): ?>
-                        <th>Order ID</th><th>Guest Reference</th><th>Order Date & Time</th><th>Table / Room No</th><th>Order Summary Items</th><th>Food Billing Amount</th><th>Payment Status</th>
+                        <th>Guest Profile</th><th>Contact No.</th><th>Check-In Date</th><th>Total Food Revenue</th><th>Received by</th>
                     <?php elseif ($activeTab === 'kitchen_expenses'): ?>
                         <th>Recorded Date</th><th>Category</th><th>Inventory Item Detail</th><th>Vendor</th><th>Quantity</th><th>Unit Price</th><th>Total Outbound Disbursed</th>
                     <?php elseif ($activeTab === 'farm_upkeep'): ?>
