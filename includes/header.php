@@ -1,5 +1,4 @@
 <?php
-// /home/apartment/artistsfarmjaipur.com/Order/includes/header.php
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . "/../config/db.php";
 
@@ -20,8 +19,6 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>POS</title>
     <link rel="stylesheet" href="assets/css/style.css?v=<?= time(); ?>">
-    <!-- Include FontAwesome icons for uniform UI appearance -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         /* ==========================================================================
            RESPONSIVE SIDEBAR NAVIGATION TOGGLE UI MECHANICS
@@ -182,9 +179,6 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
             <a href="requisitions.php" class="nav-link <?= ($current_page === 'requisitions.php') ? 'active' : ''; ?>">📦 Material Requests</a>
 
             <?php if (isset($_SESSION["role"]) && ($_SESSION["role"] === 'Super Admin' || $_SESSION["role"] === 'Admin')): ?>
-                <!-- SYSTEM ANALYTICS LINK ADDITION (Placed outside dropdown for quick priority view) -->
-                <a href="dashboard_analytics.php" class="nav-link <?= ($current_page === 'dashboard_analytics.php') ? 'active' : ''; ?>" style="background: rgba(6, 182, 212, 0.08); color: #0891b2; font-weight: bold; border-left: 3px solid #06b6d4;">📈 Business Analytics</a>
-
                 <div class="admin-settings-wrapper" style="margin-top: 10px; border-top: 1px solid #cbd5e0; padding-top: 10px; width: 100%;">
                     <div onclick="toggleAdminSubMenu()" class="nav-link" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 700; color: #475569; padding: 10px 16px;">
                         <span>🛠️ System Settings</span>
@@ -265,15 +259,4 @@ window.triggerSidebarLedgerActivation = function() {
     })
     .catch(() => alert("Pipeline connection error."));
 };
-
-// Mobile drawer toggle controller script helper
-function toggleLeftMenu(shouldOpen) {
-    const sidebar = document.getElementById("appLeftNavigationMenu");
-    if (!sidebar) return;
-    if (shouldOpen) {
-        sidebar.classList.add("is-drawer-open");
-    } else {
-        sidebar.classList.remove("is-drawer-open");
-    }
-}
 </script>
