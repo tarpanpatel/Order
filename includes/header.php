@@ -131,7 +131,7 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
     <strong style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-main);">POS Dashboard</strong>
 </div>
 
-<div class="app-container" <?= ($is_staff_role && $current_page === 'kitchen.php') ? 'style="grid-template-columns: 1fr;"' : 'style=""'; ?>>    
+<div class="app-container" <?= ($is_staff_role && $current_page === 'kitchen.php') ? 'style="grid-template-columns: 1fr;"' : 'style=""'; ?>>     
     <?php if (!($is_staff_role && $current_page === 'kitchen.php')): ?>
     <div class="sidebar" id="appLeftNavigationMenu">
         
