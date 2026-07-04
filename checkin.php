@@ -9,6 +9,7 @@ if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Admin" && $_SESSION["ro
 }
 
 $message = "";
+$todayString = date('Y-m-d');
 
 // --- 1. HANDLE NEW BOOKING INSERTIONS WITH SIMULTANEOUS MUTEX LOCKS ---
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_register_guest"])) {
@@ -22,7 +23,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_register_guest
     $advance      = floatval($_POST["advance_paid"] ?? 0);
     $pending      = floatval($_POST["pending_amount"] ?? 0);
 
-    if (!empty($checkin) && !empty($checkout) && !empty($phone_number)) {
+    // Front-end sanity alignment check
+    if ($checkin < $todayString) {
+        $message = "❌ Error: Cannot register check-in dates in the past.";
+    } elseif ($checkout <= $checkin) {
+        $message = "❌ Error: Check-out date must be after the check-in date.";
+    } elseif (!empty($checkin) && !empty($checkout) && !empty($phone_number)) {
         
         $pdo->beginTransaction();
         try {
@@ -31,7 +37,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_register_guest
             $check_overlap->execute([$checkin, $checkout]);
             
             if ($check_overlap->fetchColumn() > 0) {
-                $message = "❌ Error: This date is already booked. Only one set of guests can be registered at a time.";
+                $message = "❌ Error: This date range is already booked. Only one set of guests can be registered at a time.";
                 $pdo->rollBack();
             } else {
                 $stmt = $pdo->prepare("INSERT INTO guests (guest_name, phone_number, adults, children, checkin_date, expected_checkout, notes, advance_paid, pending_amount, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Booked')");
@@ -85,10 +91,26 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_booking
     $pending  = floatval($_POST["edit_pending_amount"] ?? 0);
 
     if (!empty($checkin) && !empty($checkout) && !empty($phone)) {
-        $stmt = $pdo->prepare("UPDATE guests SET guest_name = ?, phone_number = ?, adults = ?, children = ?, checkin_date = ?, expected_checkout = ?, notes = ?, advance_paid = ?, pending_amount = ? WHERE id = ?");
-        $stmt->execute([$g_name, $phone, $adults, $children, $checkin, $checkout, $notes, $advance, $pending, $b_id]);
-        header("Location: checkin.php");
-        exit;
+        $pdo->beginTransaction();
+        try {
+            $check_edit_overlap = $pdo->prepare("SELECT COUNT(*) FROM guests WHERE id != ? AND status != 'CheckedOut' AND NOT (expected_checkout <= ? OR checkin_date >= ?) FOR UPDATE");
+            $check_edit_overlap->execute([$b_id, $checkin, $checkout]);
+
+            if ($check_edit_overlap->fetchColumn() > 0) {
+                $pdo->rollBack();
+                echo "<script>alert('❌ Error: These modified parameters conflict with an existing room booking timeline.'); window.location.href = 'checkin.php';</script>";
+                exit;
+            } else {
+                $stmt = $pdo->prepare("UPDATE guests SET guest_name = ?, phone_number = ?, adults = ?, children = ?, checkin_date = ?, expected_checkout = ?, notes = ?, advance_paid = ?, pending_amount = ? WHERE id = ?");
+                $stmt->execute([$g_name, $phone, $adults, $children, $checkin, $checkout, $notes, $advance, $pending, $b_id]);
+                $pdo->commit();
+                header("Location: checkin.php");
+                exit;
+            }
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            $message = "❌ Server error modifying parameter allocations.";
+        }
     }
 }
 
@@ -96,6 +118,19 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_booking
 $current_active_guest = $pdo->query("SELECT * FROM guests WHERE status = 'Active' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 $all_booked_guests = $pdo->query("SELECT id, guest_name FROM guests WHERE status = 'Booked' ORDER BY checkin_date ASC")->fetchAll(PDO::FETCH_ASSOC);
 $bookings = $pdo->query("SELECT id, guest_name, phone_number, adults, children, DATE(checkin_date) as cid, DATE(expected_checkout) as cod, notes, advance_paid, pending_amount, status FROM guests WHERE status != 'CheckedOut'")->fetchAll(PDO::FETCH_ASSOC);
+
+// Parse date ranges into a structured JavaScript array loop format to grey out selections in HTML date inputs
+$disabledDatesArray = [];
+foreach ($bookings as $b) {
+    $start = new DateTime($b['cid']);
+    $end   = new DateTime($b['cod']);
+    $interval = new DateInterval('P1D');
+    $period   = new DatePeriod($start, $interval, $end);
+    foreach ($period as $date) {
+        $disabledDatesArray[] = $date->format('Y-m-d');
+    }
+}
+$disabledDatesJson = json_encode($disabledDatesArray);
 
 include "includes/header.php";
 ?>
@@ -138,8 +173,8 @@ include "includes/header.php";
                     <div class="input-field-group"><label>Children</label><input type="number" name="children" value="0" min="0"></div>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <div class="input-field-group"><label>Check-In Date *</label><input type="date" id="fieldCheckin" name="checkin_date" required onchange="handleDateAutoLock()"></div>
-                    <div class="input-field-group"><label>Expected Check-Out *</label><input type="date" id="fieldCheckout" name="checkout_date" required></div>
+                    <div class="input-field-group"><label>Check-In Date *</label><input type="date" id="fieldCheckin" name="checkin_date" min="<?php echo $todayString; ?>" required onchange="handleDateAutoLock()"></div>
+                    <div class="input-field-group"><label>Expected Check-Out *</label><input type="date" id="fieldCheckout" name="checkout_date" required onchange="validateCheckoutDate(this)"></div>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div class="input-field-group"><label>Advance Paid (₹)</label><input type="number" name="advance_paid" value="0" min="0"></div>
@@ -161,7 +196,6 @@ include "includes/header.php";
                 $year = intval(date('Y')); $month = intval(date('m'));
                 $firstDayUnix = mktime(0, 0, 0, $month, 1, $year);
                 $daysInMonth = intval(date('t', $firstDayUnix)); $dayOfWeek = intval(date('w', $firstDayUnix));
-                $todayString = date('Y-m-d');
 
                 for ($x = 0; $x < $dayOfWeek; $x++) { echo '<div class="calendar-day-cell" style="background:#f9fafb;"><span class="day-number"></span></div>'; }
                 for ($day = 1; $day <= $daysInMonth; $day++) {
@@ -213,7 +247,7 @@ include "includes/header.php";
                         <div><label style="font-size:12px; font-weight:600; color:#4b5563;">Contact Phone *</label><input type="text" name="edit_phone_number" id="txtEditPhone" required style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px;"></div>
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <div><label style="font-size:12px; font-weight:600; color:#4b5563;">Check-In Date *</label><input type="date" name="edit_checkin_date" id="txtEditCheckin" required style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px;"></div>
+                        <div><label style="font-size:12px; font-weight:600; color:#4b5563;">Check-In Date *</label><input type="date" name="edit_checkin_date" id="txtEditCheckin" min="<?php echo $todayString; ?>" required style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px;" onchange="handleEditDateAutoLock()"></div>
                         <div><label style="font-size:12px; font-weight:600; color:#4b5563;">Check-Out Date *</label><input type="date" name="edit_checkout_date" id="txtEditCheckout" required style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px;"></div>
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
@@ -233,6 +267,9 @@ include "includes/header.php";
 </div>
 
 <script>
+// JSON list of currently booked calendar blocks
+const blacklistedBookedDates = <?php echo $disabledDatesJson; ?>;
+
 function setSystemDefaultFormTimestamps() {
     const checkinInput = document.getElementById("fieldCheckin");
     if (!checkinInput.value) {
@@ -246,9 +283,46 @@ function handleDateAutoLock() {
     const checkinInput = document.getElementById("fieldCheckin");
     const checkoutInput = document.getElementById("fieldCheckout");
     if (!checkinInput.value) return;
-    let dateObj = new Date(checkinInput.value);
-    dateObj.setDate(dateObj.getDate() + 1);
-    checkoutInput.value = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+
+    // Requirement Fulfilled: Ensure checkout constraints lock after check-in day selections
+    let baseDate = new Date(checkinInput.value);
+    baseDate.setDate(baseDate.getDate() + 1);
+    
+    const nextDayString = `${baseDate.getFullYear()}-${String(baseDate.getMonth() + 1).padStart(2, '0')}-${String(baseDate.getDate()).padStart(2, '0')}`;
+    checkoutInput.min = nextDayString;
+    checkoutInput.value = nextDayString;
+
+    validateInputSelectionOverlap(checkinInput);
+}
+
+function handleEditDateAutoLock() {
+    const checkinInput = document.getElementById("txtEditCheckin");
+    const checkoutInput = document.getElementById("txtEditCheckout");
+    if (!checkinInput.value) return;
+
+    let baseDate = new Date(checkinInput.value);
+    baseDate.setDate(baseDate.getDate() + 1);
+    
+    const nextDayString = `${baseDate.getFullYear()}-${String(baseDate.getMonth() + 1).padStart(2, '0')}-${String(baseDate.getDate()).padStart(2, '0')}`;
+    checkoutInput.min = nextDayString;
+}
+
+function validateCheckoutDate(checkoutInput) {
+    const checkinVal = document.getElementById("fieldCheckin").value;
+    if (checkoutInput.value <= checkinVal) {
+        alert("❌ Error: Check-out date must be at least 1 day after the check-in date.");
+        handleDateAutoLock();
+        return;
+    }
+    validateInputSelectionOverlap(checkoutInput);
+}
+
+// Requirement Fulfilled: Validate text box input changes to reject any booked ranges
+function validateInputSelectionOverlap(inputEl) {
+    if (blacklistedBookedDates.includes(inputEl.value)) {
+        alert("❌ Warning: The date " + inputEl.value + " is already booked! Please select an alternative free date range block.");
+        inputEl.value = "";
+    }
 }
 
 function openDetailsModal(bookingData) {
@@ -276,6 +350,7 @@ function openDetailsModal(bookingData) {
 }
 
 function closeDetailsModal() { document.getElementById("bookingDetailsModal").style.display = "none"; }
+
 function switchToEditMode() {
     if (!currentActiveSelectedBookingObject) return;
     document.getElementById("txtEditId").value       = currentActiveSelectedBookingObject.id;
@@ -288,9 +363,13 @@ function switchToEditMode() {
     document.getElementById("txtEditNotes").value    = currentActiveSelectedBookingObject.notes;
     document.getElementById("txtEditCheckin").value  = currentActiveSelectedBookingObject.cid.substring(0, 10);
     document.getElementById("txtEditCheckout").value = currentActiveSelectedBookingObject.cod.substring(0, 10);
+    
+    handleEditDateAutoLock();
+    
     document.getElementById("modalReadView").style.display = "none";
     document.getElementById("modalEditView").style.display = "block";
 }
+
 function switchToReadMode() { document.getElementById("modalEditView").style.display = "none"; document.getElementById("modalReadView").style.display = "block"; }
 
 window.addEventListener('DOMContentLoaded', setSystemDefaultFormTimestamps);

@@ -1,9 +1,13 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) { session_start(); }
+if (session_status() === PHP_SESSION_NONE) { 
+    session_start(); 
+}
 require_once "../config/db.php";
+require_once "../config/telegram.php"; // Global telegram dispatch configurations gateway route bridge
 
 header('Content-Type: application/json');
 
+// Read raw inbound JSON string from application fetch parameters
 $inputRaw = file_get_contents("php://input");
 $payload = json_decode($inputRaw, true);
 
@@ -19,20 +23,43 @@ try {
     $insertReq->execute();
     $requisition_id = $pdo->lastInsertId();
 
-    // 2. Insert into child items table matching your exact column structure
+    // 2. Core database parameters execution targeting catalog_id fields
     $insertItem = $pdo->prepare("INSERT INTO requisition_items (requisition_id, catalog_id, quantity) VALUES (?, ?, ?)");
 
+    $telegramMaterialsBlock = "";
+
     foreach ($payload['items'] as $item) {
-        // Double-check your JS payload tags (usually item.id and item.qty)
         $material_id = intval($item['id']);
         $qty = intval($item['qty']);
+        $itemName = trim($item['name'] ?? 'Unknown Item');
 
         if ($qty > 0) {
             $insertItem->execute([$requisition_id, $material_id, $qty]);
+            
+            // Build an informative visual bullet line for the group notification string
+            $telegramMaterialsBlock .= "🔹 *x" . $qty . "* " . $itemName . "\n";
         }
     }
 
     $pdo->commit();
+
+    // 3. TELEGRAM CHANNEL NOTIFICATION DISPATCH ROUTE
+    try {
+        $requisitionMsg = "📦 *NEW MATERIAL REQUISITION REQUEST*\n";
+        $requisitionMsg .= "--------------------------------------\n";
+      //  $requisitionMsg .= "🆔 *Request ID Reference:* #" . $requisition_id . "\n";
+        $requisitionMsg .= "⏰ *Requested At:* " . date('H:i d-m-Y') . "\n";
+        $requisitionMsg .= "--------------------------------------\n\n";
+        $requisitionMsg .= $telegramMaterialsBlock;
+        $requisitionMsg .= "\n--------------------------------------\n";
+       // $requisitionMsg .= "🛠️ _Staff, please verify and fulfill these inventory items from the store dashboard._";
+
+        // Dispatch out to your whitelisted gateway group
+        sendTelegramNotification($requisitionMsg);
+    } catch (Exception $tgEx) {
+        // Safe catch ensures network proxy latency never stalls the checkout workflow UI response
+    }
+
     echo json_encode(['success' => true]);
     exit;
 

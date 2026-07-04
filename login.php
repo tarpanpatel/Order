@@ -7,11 +7,35 @@ $error = "";
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $passcode = trim($_POST['passcode'] ?? '');
 
+    // 1. COLLECT CLIENT NETWORK METADATA ENVIRONMENT DETAILS
+    $client_ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+        $client_ip = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0];
+    }
+    $browser_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown Signature';
+
+    // Parse hardware profile signatures
+    $device = "Desktop Workstation Engine";
+    if (preg_match('/(android|bb\d+|meego).+mobile|iphone|ipad|playbook|silk|palm|phone/i', $browser_agent)) {
+        $device = "Mobile Handset Device";
+    } else if (preg_match('/Macintosh/i', $browser_agent)) {
+        $device = "Apple Mac Operating System";
+    } else if (preg_match('/Windows/i', $browser_agent)) {
+        $device = "Windows Architecture PC";
+    } else if (preg_match('/Linux/i', $browser_agent)) {
+        $device = "Linux Machine Workstation";
+    }
+
+    // 2. RUN TERMINAL AUTHORIZATION AND REGISTRATION ROUTINES
     if ($passcode === "3685") {
         $_SESSION["user_id"] = "admin";
         $_SESSION["username"] = "Super Admin";
         $_SESSION["role"] = "Admin";
         $_SESSION["order_authenticated"] = true;
+
+        $log = $pdo->prepare("INSERT INTO security_login_logs (passcode_entered, user_id, role_assigned, ip_address, browser_agent, device_type, login_status) VALUES (?, 'admin', 'Super Admin', ?, ?, ?, 'Success')");
+        $log->execute([$passcode, $client_ip, $browser_agent, $device]);
+
         header("Location: order.php");
         exit;
     } elseif ($passcode === "1202") {
@@ -19,10 +43,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $_SESSION["username"] = "Chef Terminal";
         $_SESSION["role"] = "Chef";
         $_SESSION["order_authenticated"] = true;
+
+        $log = $pdo->prepare("INSERT INTO security_login_logs (passcode_entered, user_id, role_assigned, ip_address, browser_agent, device_type, login_status) VALUES (?, 'chef', 'Chef Terminal', ?, ?, ?, 'Success')");
+        $log->execute([$passcode, $client_ip, $browser_agent, $device]);
+
         header("Location: kitchen.php");
         exit;
     } else {
         $error = "Incorrect passcode verification profile instance.";
+
+        $log = $pdo->prepare("INSERT INTO security_login_logs (passcode_entered, user_id, role_assigned, ip_address, browser_agent, device_type, login_status) VALUES (?, 'Unknown', 'None', ?, ?, ?, 'Failed')");
+        $log->execute([$passcode, $client_ip, $browser_agent, $device]);
     }
 }
 ?>
@@ -76,7 +107,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <button type="button" class="pin-btn" onclick="pressNum('7')">7</button>
             <button type="button" class="pin-btn" onclick="pressNum('8')">8</button>
             <button type="button" class="pin-btn" onclick="pressNum('9')">9</button>
-            <button type="button" class="pin-btn clear" onclick="clearPin()">C</button>
+            <button type="button" class="pin-btn" onclick="pressNum('C')">C</button>
             <button type="button" class="pin-btn" onclick="pressNum('0')">0</button>
             <button type="submit" class="submit-btn" style="margin-top:0; padding:18px; font-size:16px;">Go</button>
         </div>
@@ -86,12 +117,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <script>
     const field = document.getElementById('passcodeField');
     function pressNum(num) {
-        if(field.value.length < 4) {
-            field.value += num;
-        }
-    }
-    function clearPin() {
-        field.value = '';
+        if(num === 'C') { field.value = ''; return; }
+        if(field.value.length < 4) { field.value += num; }
     }
 </script>
 </body>

@@ -8,7 +8,9 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
 // Compile guest listings directly for the native sidebar dropdown controls
 $current_active_guest = $pdo->query("SELECT * FROM guests WHERE status = 'Active' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
-$all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE status = 'Booked' ORDER BY checkin_date ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+// Dynamically gathers non-checked-out profiles
+$all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE status IN ('Booked', 'Confirmed', 'Pending') AND status != 'CheckedOut' ORDER BY checkin_date ASC")->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -87,12 +89,8 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
         }
 
         @media (min-width: 1024px) {
-            .nav-bar { 
-                top: 0 !important; 
-            }
-            .close-drawer-btn {
-                display: none !important;
-            }
+            .nav-bar { top: 0 !important; }
+            .close-drawer-btn { display: none !important; }
         }
 
         @media (max-width: 1023px) {
@@ -107,11 +105,9 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
                 z-index: 9999;
                 transform: translateX(-100%);
                 transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-                box-shadow: 4px 0 25 rgba(0,0,0,0.08);
+                box-shadow: 4px 0 25px rgba(0,0,0,0.08);
             }
-            .sidebar.is-drawer-open { 
-                transform: translateX(0) !important; 
-            }
+            .sidebar.is-drawer-open { transform: translateX(0) !important; }
             
             .sidebar-backdrop {
                 position: fixed; 
@@ -152,42 +148,115 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
                 <a href="index.php" class="nav-link <?= ($current_page === 'index.php') ? 'active' : ''; ?>">📊 Dashboard</a>
                 
                 <?php if (!empty($current_active_guest)): ?>
-                    <div style="margin: 6px 0;">
+                    <div style="margin: 6px 0; background: #fdfaf7; border: 1px solid #cbd5e0; border-radius: 8px; padding: 8px;">
+                        <div style="font-size:11px; font-weight:bold; color:#0891b2; margin-bottom:5px; text-align:center; text-transform:uppercase;">● Active: <?= htmlspecialchars($current_active_guest['guest_name']) ?></div>
                         <a href="billing.php" class="sidebar-action-card sb-btn-active">
                             ⏸ Checkout Billing
                         </a>
                     </div>
                 <?php else: ?>
                     <div style="margin: 6px 0; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px;">
-                        <form method="POST" action="checkin.php" style="margin: 0;">
-                            <input type="hidden" name="action_sidebar_activate" value="1">
-                            <select name="sidebar_guest_select" required style="width: 100%; padding: 6px; margin-bottom: 6px; border-radius: 6px; border: 1px solid #cbd5e0; font-size: 11px; background: #fff; font-family: inherit;">
+                        <div style="margin: 0;">
+                            <select id="sidebarLiveGuestSelectDropdown" required style="width: 100%; padding: 6px; margin-bottom: 6px; border-radius: 6px; border: 1px solid #cbd5e0; font-size: 11px; background: #fff; font-family: inherit;">
                                 <option value="">-- Choose Guest --</option>
                                 <?php foreach ($all_booked_guests as $g): ?>
                                     <option value="<?= $g['id'] ?>"><?= htmlspecialchars($g['guest_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
-                            <button type="submit" class="sidebar-action-card sb-btn-inactive">
+                            <button type="button" class="sidebar-action-card sb-btn-inactive" onclick="window.triggerSidebarLedgerActivation()">
                                 ▶ Activate Ledger
                             </button>
-                        </form>
+                        </div>
                     </div>
                 <?php endif; ?>
 
                 <a href="checkin.php" class="nav-link <?= ($current_page === 'checkin.php') ? 'active' : ''; ?>">👤 Guest Registration</a>
                 <a href="billing.php" class="nav-link <?= ($current_page === 'billing.php') ? 'active' : ''; ?>">🧾 Settlements & Billing</a>
-                
-                <?php if ($_SESSION["role"] === 'Super Admin'): ?>
-                    <a href="menu_admin.php" class="nav-link <?= ($current_page === 'menu_admin.php') ? 'active' : ''; ?>">⚙️ Menu Setup (Admin)</a>
-                    <a href="materials_admin.php" class="nav-link <?= ($current_page === 'materials_admin.php') ? 'active' : ''; ?>">📦 Material Settings</a>
-                <?php endif; ?>
             <?php endif; ?>
+
             <a href="order.php" class="nav-link <?= ($current_page === 'order.php') ? 'active' : ''; ?>">🍽️ Take Food Order</a>
             <a href="kitchen.php" class="nav-link <?= ($current_page === 'kitchen.php') ? 'active' : ''; ?>">🍳 Kitchen Orders</a>
             <a href="requisitions.php" class="nav-link <?= ($current_page === 'requisitions.php') ? 'active' : ''; ?>">📦 Material Requests</a>
+
+            <?php if (isset($_SESSION["role"]) && ($_SESSION["role"] === 'Super Admin' || $_SESSION["role"] === 'Admin')): ?>
+                <div class="admin-settings-wrapper" style="margin-top: 10px; border-top: 1px solid #cbd5e0; padding-top: 10px; width: 100%;">
+                    <div onclick="toggleAdminSubMenu()" class="nav-link" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 700; color: #475569; padding: 10px 16px;">
+                        <span>🛠️ System Settings</span>
+                        <span id="adminMenuChevron" style="font-size: 10px; transition: transform 0.2s ease;">▶</span>
+                    </div>
+
+                    <div id="adminSubMenuContent" style="display: none; flex-direction: column; gap: 4px; padding-left: 20px; margin-top: 5px;">
+                        <a href="menu_admin.php" class="nav-link <?= ($current_page === 'menu_admin.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">🍽️ Menu Configuration</a>
+                        <a href="materials_admin.php" class="nav-link <?= ($current_page === 'materials_admin.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">📦 Material Registry</a>
+                        <a href="expenses.php" class="nav-link <?= ($current_page === 'expenses.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">📈 Expense & Ledger Sync</a>
+                        <a href="change_passcode.php" class="nav-link <?= ($current_page === 'change_passcode.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">🔐 Passcode Control</a>
+                        <a href="login_logs.php" class="nav-link <?= ($current_page === 'login_logs.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">🖥️ Security Trace Logs</a>
+                    </div>
+                </div>
+
+                <script>
+                function toggleAdminSubMenu() {
+                    const content = document.getElementById("adminSubMenuContent");
+                    const chevron = document.getElementById("adminMenuChevron");
+                    
+                    if (content.style.display === "none" || content.style.display === "") {
+                        content.style.display = "flex";
+                        chevron.style.transform = "rotate(90deg)";
+                        localStorage.setItem("adminPanelExpanded", "true");
+                    } else {
+                        content.style.display = "none";
+                        chevron.style.transform = "rotate(0deg)";
+                        localStorage.setItem("adminPanelExpanded", "false");
+                    }
+                }
+
+                // Ensures drop-down state persists across asynchronous AJAX views
+                document.addEventListener("DOMContentLoaded", () => {
+                    if (localStorage.getItem("adminPanelExpanded") === "true") {
+                        const content = document.getElementById("adminSubMenuContent");
+                        const chevron = document.getElementById("adminMenuChevron");
+                        if (content && chevron) {
+                            content.style.display = "flex";
+                            chevron.style.transform = "rotate(90deg)";
+                        }
+                    }
+                });
+                </script>
+            <?php endif; ?>
+
             <a href="logout.php" class="nav-link" style="margin-top: 30px; color: var(--danger); border-color: transparent; background: transparent; text-align: center;">🔒 Sign Out</a>
         </nav>
     </div>
     <?php endif; ?>
     
     <div class="main-content" style="padding: 12px;">
+
+<script>
+// Expose the script loop handler on root scope window explicitly for the single-page routing engine
+window.triggerSidebarLedgerActivation = function() {
+    const dropdown = document.getElementById("sidebarLiveGuestSelectDropdown");
+    if (!dropdown) return;
+    
+    const selectedGuestId = dropdown.value;
+    if (!selectedGuestId) {
+        alert("Please select a guest profile first.");
+        return;
+    }
+
+    fetch("api/activate_ledger.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ guest_id: selectedGuestId })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            // Soft-reloads structural elements flawlessly without duplicate cache loops
+            location.reload();
+        } else {
+            alert("Activation error: " + data.error);
+        }
+    })
+    .catch(() => alert("Pipeline connection error."));
+};
+</script>

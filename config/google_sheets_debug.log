@@ -1,0 +1,20 @@
+[2026-07-03 21:12:45] ----------------------------------------------------------------------
+[2026-07-03 21:12:45] NEW APPEND ROW TRANSACTION REQUEST INITIALIZED FOR TAB: [Farm Exp ]
+[2026-07-03 21:12:45] Data Payload: | Data: ["","2026-07-03","kkkkkkkk",888888888,"online","Other","Salaries"]
+[2026-07-03 21:12:45] No active spreadsheet registered in MySQL for month row [07-2026]. Triggering generation process.
+[2026-07-03 21:12:45] Attempting to create an authorized monthly workbook titled: Farm_Ledger_Jul_2026
+[2026-07-03 21:12:46] WORKBOOK METADATA CREATION REJECTED: HTTP 403 | Data: {
+  "error": {
+    "code": 403,
+    "message": "The user's Drive storage quota has been exceeded.",
+    "errors": [
+      {
+        "message": "The user's Drive storage quota has been exceeded.",
+        "domain": "usageLimits",
+        "reason": "storageQuotaExceeded"
+      }
+    ]
+  }
+}
+
+[2026-07-03 21:12:46] APPEND CANCELED: Could not resolve target Spreadsheet ID.

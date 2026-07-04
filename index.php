@@ -9,6 +9,36 @@ if (!isset($_SESSION["user_id"])) {
     exit; 
 }
 
+// --- NEW FEATURE: AJAX/POST HANDLER FOR INCOMING DEFICIENT MATERIALS ---
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_receive_deficient_stock"])) {
+    $log_id = intval($_POST["log_id"]);
+    $incoming_qty = intval($_POST["incoming_qty"]);
+
+    if ($log_id > 0 && $incoming_qty > 0) {
+        $pdo->beginTransaction();
+        try {
+            // Fetch current deficit status metrics
+            $stmt = $pdo->prepare("SELECT deficit_qty, delivered_qty FROM deficient_stock_logs WHERE id = ?");
+            $stmt->execute([$log_id]);
+            $log = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($log) {
+                $new_deficit = max(0, $log['deficit_qty'] - $incoming_qty);
+                $new_delivered = $log['delivered_qty'] + min($incoming_qty, $log['deficit_qty']);
+
+                // Recalculate deficit and update delivery totals
+                $update = $pdo->prepare("UPDATE deficient_stock_logs SET delivered_qty = ?, deficit_qty = ? WHERE id = ?");
+                $update->execute([$new_delivered, $new_deficit, $log_id]);
+            }
+            $pdo->commit();
+            header("Location: index.php");
+            exit;
+        } catch (Exception $e) {
+            $pdo->rollBack();
+        }
+    }
+}
+
 // 1. FETCH ACTIVE GUEST CARD DETAILED LEDGER DATA
 $guest = $pdo->query("SELECT * FROM guests WHERE status = 'Active' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 
@@ -22,15 +52,22 @@ $recent_orders = $pdo->query("SELECT o.id, g.guest_name, o.order_time, o.status,
                               JOIN guests g ON o.guest_id = g.id 
                               ORDER BY o.id DESC LIMIT 5")->fetchAll(PDO::FETCH_ASSOC);
 
-/// 3. FETCH LAST 5 PENDING MATERIAL REQUESTS WITH THE CORRECT LIVE MATERIALS TABLE MATCH
+// 3. FETCH LAST 5 PENDING MATERIAL REQUESTS WITH THE CORRECT CATALOG JOIN
 $recent_requisitions = $pdo->query("SELECT r.id, r.requested_at, r.status,
-                                    (SELECT GROUP_CONCAT(CONCAT(m.name, ' (x', ri.quantity, ')') SEPARATOR ', ')
+                                    (SELECT GROUP_CONCAT(CONCAT(rc.item_name, ' (x', ri.quantity, ')') SEPARATOR ', ')
                                      FROM requisition_items ri
-                                     JOIN materials m ON ri.catalog_id = m.id
+                                     JOIN req_catalog rc ON ri.catalog_id = rc.id
                                      WHERE ri.requisition_id = r.id) as material_summary
                                     FROM requisitions r
                                     WHERE r.status = 'Pending' OR r.status = '' 
                                     ORDER BY r.id DESC LIMIT 5")->fetchAll(PDO::FETCH_ASSOC);
+
+// 4. FIXED: FETCH ONLY ACTIVE DEFICIENCIES WHERE DEFICIT QUANTITY IS GREATER THAN 0
+$deficient_items = $pdo->query("SELECT d.*, rc.item_name 
+                                FROM deficient_stock_logs d 
+                                JOIN req_catalog rc ON d.catalog_id = rc.id 
+                                WHERE d.deficit_qty > 0
+                                ORDER BY d.id DESC LIMIT 5")->fetchAll(PDO::FETCH_ASSOC);
 
 include "includes/header.php";
 ?>
@@ -41,7 +78,7 @@ include "includes/header.php";
    ========================================================================== */
 .dashboard-grid-matrix {
     display: grid !important;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)) !important;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important;
     gap: 20px !important;
     width: 100% !important;
     margin-top: 15px;
@@ -153,7 +190,6 @@ include "includes/header.php";
 
     <div class="dashboard-grid-matrix">
 
-        <!-- BOX 1: CURRENT ACTIVE GUEST LEDGER PROFILE -->
         <div class="widget-card" style="border-top: 3px solid #38a169 !important;">
             <div>
                 <h3 class="widget-title">🟢 Active Resident Profile</h3>
@@ -176,11 +212,11 @@ include "includes/header.php";
                         </tr>
                         <tr>
                             <th>Advance Paid:</th>
-                            <td style="color: #38a169; font-weight: 700;">₹<?= number_format($guest["advance_paid"], 0) ?></td>
+                            <td style="color: #38a169; font-weight: 700;">₹<?= number_format($advance_paid ?? $guest["advance_paid"], 0) ?></td>
                         </tr>
                         <tr>
                             <th>Balance Pending:</th>
-                            <td style="color: #e53e3e; font-weight: 700;">₹<?= number_format($guest["pending_amount"], 0) ?></td>
+                            <td style="color: #e53e3e; font-weight: 700;">₹<?= number_format($pending_amount ?? $guest["pending_amount"], 0) ?></td>
                         </tr>
                     </table>
                 <?php else: ?>
@@ -194,7 +230,6 @@ include "includes/header.php";
             <?php endif; ?>
         </div>
 
-        <!-- BOX 2: LAST 5 KITCHEN ORDERS WITH ACTUAL ITEM NAMES -->
         <div class="widget-card" style="border-top: 3px solid #06b6d4 !important;">
             <div>
                 <h3 class="widget-title">🍽️ Recent Kitchen Tickets</h3>
@@ -221,7 +256,6 @@ include "includes/header.php";
             <a href="kitchen.php" class="widget-btn-action">See more Kitchen Orders →</a>
         </div>
 
-        <!-- BOX 3: PENDING MATERIAL REQUESTS WITH ACTUAL MATERIAL NAMES -->
         <div class="widget-card" style="border-top: 3px solid #eab308 !important;">
             <div>
                 <h3 class="widget-title">📦 Open Material Requisitions</h3>
@@ -246,6 +280,42 @@ include "includes/header.php";
                 </ul>
             </div>
             <a href="requisitions.php" class="widget-btn-action">See more Material Requests →</a>
+        </div>
+
+        <div class="widget-card" style="border-top: 3px solid #e53e3e !important;">
+            <div>
+                <h3 class="widget-title" style="color: #e53e3e;">⚠️ Stock Deficiencies</h3>
+                <ul class="widget-data-list">
+                    <?php if (!empty($deficient_items)): foreach ($deficient_items as $dItem): ?>
+                        <li class="widget-data-item" style="flex-direction: column; align-items: flex-start; gap: 6px;">
+                            <div style="width: 100%; display: flex; justify-content: space-between; align-items: start;">
+                                <div style="min-width: 0; flex: 1;">
+                                    <strong style="color: #b91c1c; font-size: 13px; display: block;">
+                                        <?= htmlspecialchars($dItem['item_name']) ?> (Short: <span style="font-size:14px;">x<?= $dItem['deficit_qty'] ?></span>)
+                                    </strong>
+                                    <span style="color: #6b7280; font-size: 11px; display: block; margin-top: 2px;">
+                                        Req #<?= $dItem['requisition_id'] ?> • Asked: <?= $dItem['ordered_qty'] ?> | Recv: <?= $dItem['delivered_qty'] ?>
+                                    </span>
+                                </div>
+                                <span style="font-size: 11px; color: #718096; white-space: nowrap;">
+                                    <?= date('d M', strtotime($dItem['logged_at'])) ?>
+                                </span>
+                            </div>
+                            
+                            <form method="POST" action="index.php" style="margin: 0; width: 100%; display: flex; gap: 6px; align-items: center; background: #fff5f5; padding: 6px; border-radius: 6px; border: 1px solid #fee2e2;">
+                                <input type="hidden" name="action_receive_deficient_stock" value="1">
+                                <input type="hidden" name="log_id" value="<?= $dItem['id'] ?>">
+                                <span style="font-size: 11px; font-weight: bold; color: #991b1b;">Log Arrival:</span>
+                                <input type="number" name="incoming_qty" value="<?= $dItem['deficit_qty'] ?>" max="<?= $dItem['deficit_qty'] ?>" min="1" required style="width: 50px; padding: 4px; font-size: 11px; text-align: center; border: 1px solid #fca5a5; border-radius: 4px; margin: 0;">
+                                <button type="submit" class="btn btn-start" style="padding: 4px 8px; font-size: 10px; font-weight: bold; border-radius: 4px; width: auto; background: #ef4444; border-color: #ef4444; margin: 0;">Receive</button>
+                            </form>
+                        </li>
+                    <?php endforeach; else: ?>
+                        <p style="color: #9ca3af; font-size: 13px; font-style: italic; padding: 45px 0; text-align: center;">No stock deficiencies recorded. Supply lines are matching requests!</p>
+                    <?php endif; ?>
+                </ul>
+            </div>
+            <span class="widget-btn-action" style="background:#fafafa; color:#9ca3af; cursor:default; margin-top: 10px;">Automated Deficiency Audit Trail Log</span>
         </div>
 
     </div>

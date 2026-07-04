@@ -64,13 +64,10 @@ try {
     try {
         $kitchenMsg = "🍳 *NEW KITCHEN ORDER RECEIVED*\n";
         $kitchenMsg .= "--------------------------------------\n";
-      //  $kitchenMsg .= "👤 *Guest Name:* " . $guest_name . "\n";
-      //  $kitchenMsg .= "🆔 *Order ID Reference:* #" . $order_id . "\n";
         $kitchenMsg .= "⏰ *Received Time:* " . date('H:i d-m-Y') . "\n";
         $kitchenMsg .= "--------------------------------------\n\n";
         $kitchenMsg .= $telegramItemsBlock;
         $kitchenMsg .= "\n--------------------------------------\n";
-      //  $kitchenMsg .= "🧑‍🍳 _Please prepare items immediately. Track status live on kitchen.php_";
 
         // Push out to your whitelisted proxy script gateway route
         sendTelegramNotification($kitchenMsg);
