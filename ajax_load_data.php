@@ -10,7 +10,8 @@ $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 30;
 
 if ($tab === 'overview') {
     $bookingIncome = $pdo->query("SELECT COALESCE(SUM(total_charge + decoration_charges + tip_amount), 0) FROM guests WHERE MONTH(checkin_date) = $m AND YEAR(checkin_date) = $y")->fetchColumn();
-    $foodIncome = $pdo->query("SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE MONTH(created_at) = $m AND YEAR(created_at) = $y AND status = 'Served'")->fetchColumn();
+    // FIXED COLUMN EXPLICIT SPECIFICATION MATCH
+    $foodIncome = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM orders WHERE MONTH(created_at) = $m AND YEAR(created_at) = $y AND status = 'Served'")->fetchColumn();
     $farmTotalRevenue = $bookingIncome + $foodIncome;
 
     $kitchenExpenses = $pdo->query("SELECT COALESCE(SUM(qty * price_per_unit), 0) FROM kitchen_expenses WHERE MONTH(date) = $m AND YEAR(date) = $y")->fetchColumn();
@@ -64,7 +65,8 @@ if ($tab === 'overview') {
     }
 
 } elseif ($tab === 'food_logs') {
-    $stmt = $pdo->prepare("SELECT id, guest_name, created_at, table_no, order_summary, total_amount, payment_status FROM orders WHERE MONTH(created_at) = :m AND YEAR(created_at) = :y AND status = 'Served' ORDER BY id DESC LIMIT :limit OFFSET :offset");
+    // FIXED COLUMN ASSIGNMENT SPECIFICATION FOR ORDERS FROM KITCHEN.PHP
+    $stmt = $pdo->prepare("SELECT id, guest_name, created_at, table_no, order_summary, amount, payment_status FROM orders WHERE MONTH(created_at) = :m AND YEAR(created_at) = :y AND status = 'Served' ORDER BY id DESC LIMIT :limit OFFSET :offset");
     $stmt->bindValue(':m', $m, PDO::PARAM_INT); $stmt->bindValue(':y', $y, PDO::PARAM_INT);
     $stmt->bindValue(':limit', $limit, PDO::PARAM_INT); $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
     $stmt->execute();
@@ -76,7 +78,7 @@ if ($tab === 'overview') {
             <td>' . date('d M Y h:i A', strtotime($o['created_at'])) . '</td>
             <td>' . htmlspecialchars($o['table_no'] ?: 'Room Delivery') . '</td>
             <td style="max-width:300px; white-space:normal; font-size:12px;">' . htmlspecialchars($o['order_summary'] ?: 'Standard items') . '</td>
-            <td style="color:#06b6d4; font-weight:700;">₹' . number_format($o['total_amount'], 2) . '</td>
+            <td style="color:#06b6d4; font-weight:700;">₹' . number_format($o['amount'], 2) . '</td>
             <td><span class="badge" style="background:#f1f5f9; color:#3b82f6;">' . htmlspecialchars($o['payment_status'] ?: 'Settled') . '</span></td>
         </tr>';
     }

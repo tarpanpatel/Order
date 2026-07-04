@@ -29,13 +29,13 @@ if (empty($filterDates)) {
     $filterDates[] = ['m' => intval(date('m')), 'y' => intval(date('Y'))];
 }
 
-// 3. COMPUTE EXECUTIVE FINANCIAL METRICS FOR ACTIVE PERIOD
+// 3. COMPUTE EXECUTIVE FINANCIAL METRICS FOR ACTIVE PERIOD VIA SQL
 $bookingIncomeStmt = $pdo->prepare("SELECT COALESCE(SUM(total_charge + decoration_charges + tip_amount), 0) FROM guests WHERE MONTH(checkin_date) = :m AND YEAR(checkin_date) = :y");
 $bookingIncomeStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
 $totalBookingIncome = $bookingIncomeStmt->fetchColumn();
 
-// Pulling food income dynamically from the live kitchen orders table profile count
-$foodIncomeStmt = $pdo->prepare("SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE MONTH(created_at) = :m AND YEAR(created_at) = :y AND status = 'Served'");
+// FIXED SQL: Changed 'total_amount' to 'amount' to match your database schema
+$foodIncomeStmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM orders WHERE MONTH(created_at) = :m AND YEAR(created_at) = :y AND status = 'Served'");
 $foodIncomeStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
 $totalFoodIncome = $foodIncomeStmt->fetchColumn();
 
@@ -80,7 +80,6 @@ if (!$is_ajax) { include 'includes/header.php'; }
         .excel-tab-link:hover { color: #06b6d4; }
         .excel-tab-link.is-active { color: #06b6d4; border-bottom-color: #06b6d4; background: rgba(6, 182, 212, 0.04); border-radius: 6px 6px 0 0; }
 
-        /* FIXED RESPONSIVE SCROLLER BOX SYSTEM */
         .excel-table-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow-x: auto; max-width: 100%; display: block; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .excel-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; table-layout: auto; }
         .excel-table th { background: #f8fafc; color: #334155; font-weight: 600; padding: 12px 16px; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
@@ -126,7 +125,7 @@ if (!$is_ajax) { include 'includes/header.php'; }
             <h3>Farm Total Revenue</h3>
             <div class="value">₹<?= number_format($farmTotalRevenue, 2) ?></div>
         </div>
-        <div class="metric-card style="border-left-color: #3b82f6;">
+        <div class="metric-card" style="border-left-color: #3b82f6;">
             <h3>Total Operational Expenses</h3>
             <div class="value">₹<?= number_format($totalExpenses, 2) ?></div>
         </div>
