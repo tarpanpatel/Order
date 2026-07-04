@@ -1,0 +1,4 @@
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/apartment/artistsfarmjaipur.com/Order/
+    - /bin/cp -R * $DEPLOYPATH
