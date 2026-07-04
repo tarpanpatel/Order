@@ -12,24 +12,23 @@ if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Admin" && $_SESSION["ro
 $message = "";
 $todayString = date('Y-m-d');
 
-// --- 1. HANDLE NEW BOOKING INSERTIONS WITH NATIVE ALIGNED SCHEMA ---
+// --- 1. HANDLE NEW BOOKING INSERTIONS ---
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_register_guest"])) {
-    $guest_name   = trim($_POST["guest_name"] ?? '') ?: "Walk-In Guest";
     $phone_number = trim($_POST["phone_number"] ?? '');
-    $adults       = intval($_POST["adults"] ?? 1);
-    $children     = intval($_POST["children"] ?? 0);
     $checkin      = trim($_POST["checkin_date"] ?? '');
     $checkout     = trim($_POST["checkout_date"] ?? '');
     $notes        = trim($_POST["guest_notes"] ?? '');
     $advance      = floatval($_POST["advance_paid"] ?? 0);
     $pending      = floatval($_POST["pending_amount"] ?? 0);
     
-    // Custom Excel Reconciliation Variables
     $booking_source      = trim($_POST["booking_source"] ?? 'Offline');
     $no_of_guests        = intval($_POST["no_of_guests"] ?? 1);
-    $per_night_charges   = floatval($_POST["per_night_charges"] ?? 0);
+    $per_night_charges   = floatval($_POST["per_night_charges"] ?? 0); // Holds Total Tariff
     $advance_received_by = trim($_POST["advance_received_by"] ?? 'Unnamed');
     $pending_received_by = trim($_POST["pending_received_by"] ?? 'Unnamed');
+
+    // Automated fallback layout tracking instead of primary guest names
+    $guest_name = $booking_source . " (" . substr($phone_number, -4) . ")";
 
     if ($checkin < $todayString) {
         $message = "❌ Error: Cannot register check-in dates in the past.";
@@ -39,23 +38,22 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_register_guest
         
         $pdo->beginTransaction();
         try {
-            $check_overlap = $pdo->prepare("SELECT COUNT(*) FROM guests WHERE status != 'CheckedOut' AND NOT (expected_checkout <= ? OR checkin_date >= ?) FOR UPDATE");
+            // Strict inequality checks ensure check-out days remain fully available for next bookings
+            $check_overlap = $pdo->prepare("SELECT COUNT(*) FROM guests WHERE status != 'CheckedOut' AND NOT (expected_checkout <= CONCAT(?, ' 11:00:00') OR checkin_date >= ?) FOR UPDATE");
             $check_overlap->execute([$checkin, $checkout]);
             
             if ($check_overlap->fetchColumn() > 0) {
                 $message = "❌ Error: This date range conflicts with an active registry profile.";
                 $pdo->rollBack();
             } else {
-                // Aligned to match your native altered schema metrics perfectly
                 $sql = "INSERT INTO guests (guest_name, phone_number, adults, children, checkin_date, checkout_date, expected_checkout, notes, advance_paid, pending_amount, booking_source, no_of_guests, per_night_charges, total_charge, base_room_rent, advance_received_by, pending_received_by, status) 
-                        VALUES (?, ?, ?, ?, ?, ?, CONCAT(?, ' 11:00:00'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Booked')";
+                        VALUES (?, ?, 1, 0, ?, ?, CONCAT(?, ' 11:00:00'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Booked')";
                 
-                $total_charge = $per_night_charges; // Standard single night default
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
-                    $guest_name, $phone_number, $adults, $children, $checkin, $checkout, $checkout, 
+                    $guest_name, $phone_number, $checkin, $checkout, $checkout, 
                     $notes, $advance, $pending, $booking_source, $no_of_guests, $per_night_charges, 
-                    $total_charge, $total_charge, $advance_received_by, $pending_received_by
+                    $per_night_charges, $per_night_charges, $advance_received_by, $pending_received_by
                 ]);
                 $pdo->commit();
                 $message = "✔ Guest reservation added to calendar database.";
@@ -91,30 +89,28 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_sidebar_activa
     }
 }
 
-// --- 3. HANDLE INLINE BOOKING UPDATES (Fully Editable Parameters Matrix) ---
+// --- 3. HANDLE INLINE BOOKING UPDATES ---
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_booking"])) {
     $b_id     = intval($_POST["edit_booking_id"]);
-    $g_name   = trim($_POST["edit_guest_name"] ?? '') ?: "Walk-In Guest";
     $phone    = trim($_POST["edit_phone_number"] ?? '');
-    $adults   = intval($_POST["edit_adults"] ?? 1);
-    $children = intval($_POST["edit_children"] ?? 0);
     $checkin  = trim($_POST["edit_checkin_date"] ?? '');
     $checkout = trim($_POST["edit_checkout_date"] ?? '');
     $notes    = trim($_POST["edit_guest_notes"] ?? '');
     $advance  = floatval($_POST["edit_advance_paid"] ?? 0);
     $pending  = floatval($_POST["edit_pending_amount"] ?? 0);
     
-    // Editable back-office elements
     $booking_source      = trim($_POST["edit_booking_source"] ?? 'Offline');
     $no_of_guests        = intval($_POST["edit_no_of_guests"] ?? 1);
     $per_night_charges   = floatval($_POST["edit_per_night_charges"] ?? 0);
     $advance_received_by = trim($_POST["edit_advance_received_by"] ?? 'Unnamed');
     $pending_received_by = trim($_POST["edit_pending_received_by"] ?? 'Unnamed');
 
+    $guest_name = $booking_source . " (" . substr($phone, -4) . ")";
+
     if (!empty($checkin) && !empty($checkout) && !empty($phone)) {
         $pdo->beginTransaction();
         try {
-            $check_edit_overlap = $pdo->prepare("SELECT COUNT(*) FROM guests WHERE id != ? AND status != 'CheckedOut' AND NOT (expected_checkout <= ? OR checkin_date >= ?) FOR UPDATE");
+            $check_edit_overlap = $pdo->prepare("SELECT COUNT(*) FROM guests WHERE id != ? AND status != 'CheckedOut' AND NOT (expected_checkout <= CONCAT(?, ' 11:00:00') OR checkin_date >= ?) FOR UPDATE");
             $check_edit_overlap->execute([$b_id, $checkin, $checkout]);
 
             if ($check_edit_overlap->fetchColumn() > 0) {
@@ -122,14 +118,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_booking
                 echo "<script>alert('❌ Error: These modified parameters conflict with an existing room booking timeline.'); window.location.href = 'checkin.php';</script>";
                 exit;
             } else {
-                $total_charge = $per_night_charges; // Calculates standard allocation logs
-                
-                $sql = "UPDATE guests SET guest_name = ?, phone_number = ?, adults = ?, children = ?, checkin_date = ?, checkout_date = ?, expected_checkout = CONCAT(?, ' 11:00:00'), notes = ?, advance_paid = ?, pending_amount = ?, booking_source = ?, no_of_guests = ?, per_night_charges = ?, total_charge = ?, base_room_rent = ?, advance_received_by = ?, pending_received_by = ? WHERE id = ?";
+                $sql = "UPDATE guests SET guest_name = ?, phone_number = ?, checkin_date = ?, checkout_date = ?, expected_checkout = CONCAT(?, ' 11:00:00'), notes = ?, advance_paid = ?, pending_amount = ?, booking_source = ?, no_of_guests = ?, per_night_charges = ?, total_charge = ?, base_room_rent = ?, advance_received_by = ?, pending_received_by = ? WHERE id = ?";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
-                    $g_name, $phone, $adults, $children, $checkin, $checkout, $checkout, $notes, 
+                    $guest_name, $phone, $checkin, $checkout, $checkout, $notes, 
                     $advance, $pending, $booking_source, $no_of_guests, $per_night_charges, 
-                    $total_charge, $total_charge, $advance_received_by, $pending_received_by, $b_id
+                    $per_night_charges, $per_night_charges, $advance_received_by, $pending_received_by, $b_id
                 ]);
                 $pdo->commit();
                 header("Location: checkin.php");
@@ -144,10 +138,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_booking
 
 // --- 4. DATA COMPILATION FOR UI RENDERING ---
 $current_active_guest = $pdo->query("SELECT * FROM guests WHERE status = 'Active' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
-$all_booked_guests = $pdo->query("SELECT id, guest_name FROM guests WHERE status = 'Booked' ORDER BY checkin_date ASC")->fetchAll(PDO::FETCH_ASSOC);
+$all_booked_guests = $pdo->query("SELECT id, CONCAT(booking_source, ' (', RIGHT(phone_number, 4), ')') as guest_name FROM guests WHERE status = 'Booked' ORDER BY checkin_date ASC")->fetchAll(PDO::FETCH_ASSOC);
 $bookings = $pdo->query("SELECT *, DATE(checkin_date) as cid, DATE(checkout_date) as cod FROM guests WHERE status != 'CheckedOut'")->fetchAll(PDO::FETCH_ASSOC);
 
-// Parse dates into JSON array string matrices
+// Parse dates into JSON array strings for calendar availability configurations
 $disabledDatesArray = [];
 foreach ($bookings as $b) {
     if (!empty($b['cid']) && !empty($b['cod'])) {
@@ -192,13 +186,11 @@ include "includes/header.php";
     <?php endif; ?>
 
     <div class="split-registration-container">
-        <!-- FORM CONTROL PANEL -->
         <div class="form-registration-panel">
             <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; color: #111827; text-align: left; padding-bottom: 8px; border-bottom: 1px dashed #e2e8f0; margin-bottom: 15px;">Add Guest Booking</h3>
             <form method="POST" action="checkin.php" style="margin: 0;">
                 <input type="hidden" name="action_register_guest" value="1">
                 
-                <div class="input-field-group"><label>Primary Guest Name</label><input type="text" name="guest_name" placeholder="Walk-In Guest"></div>
                 <div class="input-field-group"><label>Contact Phone Number *</label><input type="text" name="phone_number" required placeholder="Enter mobile number"></div>
                 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
@@ -217,10 +209,10 @@ include "includes/header.php";
                     <div class="input-field-group"><label>Check-Out Date *</label><input type="date" id="fieldCheckout" name="checkout_date" required onchange="validateCheckoutDate(this)"></div>
                 </div>
                 
-                <div class="input-field-group"><label>Per Night Tariff (₹)</label><input type="number" name="per_night_charges" value="0" min="0"></div>
+                <div class="input-field-group"><label>Total Tariff (₹)</label><input type="number" id="fieldTotalTariff" name="per_night_charges" value="0" min="0" oninput="autoCalculatePendingBalance('field')"></div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <div class="input-field-group"><label>Advance Paid (₹)</label><input type="number" name="advance_paid" value="0" min="0"></div>
+                    <div class="input-field-group"><label>Advance Paid (₹)</label><input type="number" id="fieldAdvancePaid" name="advance_paid" value="0" min="0" oninput="autoCalculatePendingBalance('field')"></div>
                     <div class="input-field-group">
                         <label>Advance Received By</label>
                         <select name="advance_received_by">
@@ -238,7 +230,7 @@ include "includes/header.php";
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <div class="input-field-group"><label>Pending Balance (₹)</label><input type="number" name="pending_amount" value="0" min="0"></div>
+                    <div class="input-field-group"><label>Pending Balance (₹)</label><input type="number" id="fieldPendingBalance" name="pending_amount" value="0" min="0"></div>
                     <div class="input-field-group">
                         <label>Pending Received By</label>
                         <select name="pending_received_by">
@@ -256,11 +248,10 @@ include "includes/header.php";
                 </div>
 
                 <div class="input-field-group" style="margin-bottom: 20px;"><label>Guest Notes</label><textarea name="guest_notes" rows="2" placeholder="Dietary adjustments..."></textarea></div>
-                <button type="submit" class="btn btn-start" style="width: 100%; padding: 14px; font-size: 13px; font-weight: bold; border-radius: 8px;">Save Guest & Add to Calendar</button>
+                <button type="submit" class="btn btn-start" style="width: 100%; padding: 14px; font-size: 13px; font-weight: bold; border-radius: 8px;">Save Guest Booking</button>
             </form>
         </div>
 
-        <!-- VISUAL GRID STACK -->
         <div class="calendar-display-panel">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h3 style="font-size: 15px; font-weight: 700; text-transform: uppercase; color: #111827; margin: 0;"><?= date('F Y') ?></h3>
@@ -279,10 +270,11 @@ include "includes/header.php";
                     $isToday = ($currentDateLoopStr === $todayString) ? 'today-accent' : '';
                     echo '<div class="calendar-day-cell current-month ' . $isToday . '"><span class="day-number">' . $day . '</span>';
                     foreach ($bookings as $b) {
-                        if ($currentDateLoopStr >= $b['cid'] && $currentDateLoopStr <= $b['cod']) {
+                        // RE-ENGINEERED CALENDAR LOGIC: Stops strictly BEFORE checkout date (<) to leave checkout days free for bookings
+                        if ($currentDateLoopStr >= $b['cid'] && $currentDateLoopStr < $b['cod']) {
                             $jsonCleanStr = htmlspecialchars(json_encode($b), ENT_QUOTES, 'UTF-8');
                             $activeClass = ($b['status'] === 'Active') ? 'live-active' : '';
-                            echo '<span class="booking-strip-tag ' . $activeClass . '" onclick=\'openDetailsModal(' . $jsonCleanStr . ')\'>🛎 ' . htmlspecialchars($b['guest_name'] ?: 'Unnamed') . '</span>';
+                            echo '<span class="booking-strip-tag ' . $activeClass . '" onclick=\'openDetailsModal(' . $jsonCleanStr . ')\'>🛎 ' . htmlspecialchars($b['booking_source'] ?: 'Offline') . ' (' . substr($b['phone_number'], -4) . ')</span>';
                         }
                     }
                     echo '</div>';
@@ -293,7 +285,6 @@ include "includes/header.php";
     </div>
 </div>
 
-<!-- POPUP COMPONENT INTERFACE -->
 <div id="bookingDetailsModal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
     <div class="modal-content" style="background: white; max-width: 520px; width: 90%; border-radius: 12px; padding: 25px; position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.15); color: #111827;">
         <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="closeDetailsModal()">✕</span>
@@ -301,12 +292,11 @@ include "includes/header.php";
         <div id="modalReadView">
             <h3 style="font-size: 16px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px;">Residency Tracking Sheet</h3>
             <table style="width: 100%; font-size: 14px; text-align: left; border-collapse: collapse; margin-bottom: 20px;">
-                <tr><th style="padding: 4px 0; color: #4b5563;">Guest Profile:</th><td><strong id="lblGuestName"></strong> <span id="lblStatusBadge"></span></td></tr>
                 <tr><th style="padding: 4px 0; color: #4b5563;">Channel Source:</th><td id="lblSource"></td></tr>
                 <tr><th style="padding: 4px 0; color: #4b5563;">Contact Phone:</th><td id="lblPhone"></td></tr>
                 <tr><th style="padding: 4px 0; color: #4b5563;">Headcount Group:</th><td><span id="lblGuestsCount"></span> Persons</td></tr>
                 <tr><th style="padding: 4px 0; color: #4b5563;">Duration Stay:</th><td><span id="lblCheckin" style="font-weight:600;"></span> to <span id="lblCheckout" style="font-weight:600;"></span></td></tr>
-                <tr><th style="padding: 4px 0; color: #4b5563;">Nightly Tariff:</th><td>₹<span id="lblRate"></span></td></tr>
+                <tr><th style="padding: 4px 0; color: #4b5563;">Total Tariff:</th><td>₹<span id="lblRate"></span></td></tr>
                 <tr><th style="padding: 4px 0; color: #4b5563;">Advance Ledger:</th><td><span style="color:#38a169; font-weight:700;">₹<span id="lblAdvance"></span></span> (<span id="lblAdvanceBy"></span>)</td></tr>
                 <tr><th style="padding: 4px 0; color: #4b5563;">Pending Ledger:</th><td><span style="color:#e53e3e; font-weight:700;">₹<span id="lblPending"></span></span> (<span id="lblPendingBy"></span>)</td></tr>
                 <tr><th style="padding: 4px 0; color: #4b5563; vertical-align: top;">Guest Notes:</th><td id="lblNotes" style="font-style: italic; color:#4a5568;"></td></tr>
@@ -323,10 +313,7 @@ include "includes/header.php";
                 <input type="hidden" name="action_update_booking" value="1"><input type="hidden" name="edit_booking_id" id="txtEditId">
                 <div style="display: flex; flex-direction: column; gap: 12px; max-height: 60vh; overflow-y: auto; padding-right: 4px;" class="input-field-group">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <div><label>Guest Name</label><input type="text" name="edit_guest_name" id="txtEditName"></div>
                         <div><label>Contact Phone *</label><input type="text" name="edit_phone_number" id="txtEditPhone" required></div>
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                         <div>
                             <label>Booking Source</label>
                             <select name="edit_booking_source" id="txtEditSource">
@@ -334,15 +321,17 @@ include "includes/header.php";
                                 <option value="Airbnb">Airbnb</option>
                             </select>
                         </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                         <div><label>No. of Guests</label><input type="number" name="edit_no_of_guests" id="txtEditGuestsCount" min="1"></div>
+                        <div><label>Total Tariff (₹)</label><input type="number" name="edit_per_night_charges" id="txtEditRate" min="0" oninput="autoCalculatePendingBalance('edit')"></div>
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                         <div><label>Check-In Date *</label><input type="date" name="edit_checkin_date" id="txtEditCheckin" min="<?php echo $todayString; ?>" required onchange="handleEditDateAutoLock()"></div>
                         <div><label>Check-Out Date *</label><input type="date" name="edit_checkout_date" id="txtEditCheckout" required></div>
                     </div>
-                    <div><label>Per Night Tariff (₹)</label><input type="number" name="edit_per_night_charges" id="txtEditRate" min="0"></div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <div><label>Advance Paid (₹)</label><input type="number" name="edit_advance_paid" id="txtEditAdvance"></div>
+                        <div><label>Advance Paid (₹)</label><input type="number" name="edit_advance_paid" id="txtEditAdvance" oninput="autoCalculatePendingBalance('edit')"></div>
                         <div>
                             <label>Advance Received By</label>
                             <select name="edit_advance_received_by" id="txtEditAdvanceBy">
@@ -359,7 +348,7 @@ include "includes/header.php";
                         </div>
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <div><label>Pending (₹)</label><input type="number" name="edit_pending_amount" id="txtEditPending"></div>
+                        <div><label>Pending Balance (₹)</label><input type="number" name="edit_pending_amount" id="txtEditPending" min="0"></div>
                         <div>
                             <label>Pending Received By</label>
                             <select name="edit_pending_received_by" id="txtEditPendingBy">
@@ -396,6 +385,7 @@ function setSystemDefaultFormTimestamps() {
     handleDateAutoLock();
 }
 
+// Rule 1 Fixed: Auto-sets next day as standard baseline check-out date
 function handleDateAutoLock() {
     const checkinInput = document.getElementById("fieldCheckin");
     const checkoutInput = document.getElementById("fieldCheckout");
@@ -423,6 +413,15 @@ function handleEditDateAutoLock() {
     checkoutInput.min = nextDayString;
 }
 
+// Rule 2 Fixed: Calculates explicit pending balance based on the revised formula (Z = X - Y)
+function autoCalculatePendingBalance(prefix) {
+    const tariff = parseFloat(document.getElementById(prefix === 'field' ? 'fieldTotalTariff' : 'txtEditRate').value) || 0;
+    const advance = parseFloat(document.getElementById(prefix === 'field' ? 'fieldAdvancePaid' : 'txtEditAdvance').value) || 0;
+    const balanceField = document.getElementById(prefix === 'field' ? 'fieldPendingBalance' : 'txtEditPending');
+    
+    balanceField.value = tariff - advance;
+}
+
 function validateCheckoutDate(checkoutInput) {
     const checkinVal = document.getElementById("fieldCheckin").value;
     if (checkoutInput.value <= checkinVal) {
@@ -435,24 +434,23 @@ function validateCheckoutDate(checkoutInput) {
 
 function validateInputSelectionOverlap(inputEl) {
     if (blacklistedBookedDates.includes(inputEl.value)) {
-        alert("❌ Warning: The date " + inputEl.value + " is already booked! Please select an alternative free date range block.");
+        alert("❌ Warning: The date " + inputEl.value + " is already booked!");
         inputEl.value = "";
     }
 }
 
 function openDetailsModal(bookingData) {
     currentActiveSelectedBookingObject = bookingData;
-    document.getElementById("lblGuestName").innerText   = bookingData.guest_name ?: 'Unnamed';
-    document.getElementById("lblSource").innerText      = bookingData.booking_source ?: 'Offline';
-    document.getElementById("lblPhone").innerText       = bookingData.phone_number ?: '0000000000';
-    document.getElementById("lblGuestsCount").innerText = bookingData.no_of_guests ?: 1;
+    document.getElementById("lblSource").innerText      = bookingData.booking_source || 'Offline';
+    document.getElementById("lblPhone").innerText       = bookingData.phone_number || '0000000000';
+    document.getElementById("lblGuestsCount").innerText = bookingData.no_of_guests || 1;
     document.getElementById("lblCheckin").innerText     = bookingData.cid;
     document.getElementById("lblCheckout").innerText    = bookingData.cod;
     document.getElementById("lblRate").innerText        = parseFloat(bookingData.per_night_charges || 0).toFixed(2);
     document.getElementById("lblAdvance").innerText     = parseFloat(bookingData.advance_paid || 0).toFixed(2);
-    document.getElementById("lblAdvanceBy").innerText   = bookingData.advance_received_by ?: 'Unnamed';
+    document.getElementById("lblAdvanceBy").innerText   = bookingData.advance_received_by || 'Unnamed';
     document.getElementById("lblPending").innerText     = parseFloat(bookingData.pending_amount || 0).toFixed(2);
-    document.getElementById("lblPendingBy").innerText   = bookingData.pending_received_by ?: 'Unnamed';
+    document.getElementById("lblPendingBy").innerText   = bookingData.pending_received_by || 'Unnamed';
     document.getElementById("lblNotes").innerText       = bookingData.notes ? bookingData.notes : "None";
 
     const badge = document.getElementById("lblStatusBadge");
@@ -472,7 +470,6 @@ function closeDetailsModal() { document.getElementById("bookingDetailsModal").st
 function switchToEditMode() {
     if (!currentActiveSelectedBookingObject) return;
     document.getElementById("txtEditId").value          = currentActiveSelectedBookingObject.id;
-    document.getElementById("txtEditName").value        = currentActiveSelectedBookingObject.guest_name;
     document.getElementById("txtEditPhone").value       = currentActiveSelectedBookingObject.phone_number;
     document.getElementById("txtEditSource").value      = currentActiveSelectedBookingObject.booking_source || 'Offline';
     document.getElementById("txtEditGuestsCount").value = currentActiveSelectedBookingObject.no_of_guests || 1;
