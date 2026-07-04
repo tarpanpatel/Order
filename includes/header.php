@@ -2,6 +2,8 @@
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . "/../config/db.php";
 
+$todayString = date('Y-m-d');
+
 $has_active_guest = $pdo->query("SELECT COUNT(*) FROM guests WHERE status = 'Active'")->fetchColumn() > 0;
 $is_staff_role = isset($_SESSION['role']) && $_SESSION['role'] === 'Staff';
 $current_page = basename($_SERVER['PHP_SELF']);
@@ -9,8 +11,15 @@ $current_page = basename($_SERVER['PHP_SELF']);
 // Compile guest listings directly for the native sidebar dropdown controls
 $current_active_guest = $pdo->query("SELECT * FROM guests WHERE status = 'Active' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 
-// Dynamically gathers non-checked-out profiles
-$all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE status IN ('Booked', 'Confirmed', 'Pending') AND status != 'CheckedOut' ORDER BY checkin_date ASC")->fetchAll(PDO::FETCH_ASSOC);
+// FIXED DROPDOWN FILTER: Only displays active or arriving bookings matching today's date
+$todaysStmt = $pdo->prepare("
+    SELECT id, CONCAT('📱 (', RIGHT(phone_number, 4), ')') as guest_name 
+    FROM guests 
+    WHERE status = 'Booked' AND :today >= checkin_date AND :today2 < checkout_date
+    ORDER BY id ASC
+");
+$todaysStmt->execute([':today' => $todayString, ':today2' => $todayString]);
+$all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -150,7 +159,7 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
                 
                 <?php if (!empty($current_active_guest)): ?>
                     <div style="margin: 6px 0; background: #fdfaf7; border: 1px solid #cbd5e0; border-radius: 8px; padding: 8px;">
-                        <div style="font-size:11px; font-weight:bold; color:#0891b2; margin-bottom:5px; text-align:center; text-transform:uppercase;">● Active: <?= htmlspecialchars($current_active_guest['guest_name']) ?></div>
+                        <div style="font-size:11px; font-weight:bold; color:#0891b2; margin-bottom:5px; text-align:center; text-transform:uppercase;">● Active: 📱 (<?= substr($current_active_guest['phone_number'], -4) ?>)</div>
                         <a href="billing.php" class="sidebar-action-card sb-btn-active">
                             ⏸ Checkout Billing
                         </a>
@@ -231,4 +240,4 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
     </div>
     <?php endif; ?>
     
-    <div class="main-content" style="padding: 12px;">
+    <div class="main-content">
