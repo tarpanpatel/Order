@@ -1,6 +1,6 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
-//require_once __DIR__ . "/../config/db.php";
+////require_once __DIR__ . "/../config/db.php";
 
 $has_active_guest = $pdo->query("SELECT COUNT(*) FROM guests WHERE status = 'Active'")->fetchColumn() > 0;
 $is_staff_role = isset($_SESSION['role']) && $_SESSION['role'] === 'Staff';
