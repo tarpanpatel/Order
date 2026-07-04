@@ -66,20 +66,46 @@ if (!$is_ajax) { include 'includes/header.php'; }
 </div>
 
 <script>
-// Column Toggle Logic
-const table = document.getElementById("analyticsTable");
-const container = document.getElementById("columnToggleContainer");
-table.querySelectorAll("thead th").forEach((th, i) => {
-    let label = document.createElement("label");
-    let cb = document.createElement("input");
-    cb.type = "checkbox"; cb.checked = true;
-    cb.onchange = () => {
-        th.style.display = cb.checked ? "" : "none";
-        table.querySelectorAll(`tbody tr td:nth-child(${i + 1})`).forEach(td => td.style.display = cb.checked ? "" : "none");
-    };
-    label.append(cb, " " + th.innerText);
-    container.appendChild(label);
+document.addEventListener("DOMContentLoaded", function() {
+    const table = document.getElementById("analyticsTable");
+    const container = document.getElementById("columnToggleContainer");
+    
+    // Safety check: if table doesn't exist, don't break the page
+    if (!table || !container) return;
+
+    // Build toggles
+    table.querySelectorAll("thead th").forEach((th, i) => {
+        let label = document.createElement("label");
+        label.style.cursor = "pointer";
+        let cb = document.createElement("input");
+        cb.type = "checkbox"; 
+        cb.checked = true;
+        cb.style.marginRight = "5px";
+        
+        cb.onchange = function() {
+            const display = this.checked ? "" : "none";
+            th.style.display = display;
+            table.querySelectorAll(`tbody tr td:nth-child(${i + 1})`).forEach(td => td.style.display = display);
+        };
+        
+        label.append(cb, " " + th.innerText);
+        container.appendChild(label);
+    });
 });
+
+// Load More Logic (Keep your existing AJAX code below this)
+document.getElementById("loadMoreBtn").onclick = function() {
+    let offset = this.getAttribute("data-offset");
+    fetch(`ajax_load_data.php?tab=<?=$activeTab?>&month=<?=$selectedMonth?>&year=<?=$selectedYear?>&offset=${offset}`)
+        .then(r => r.text())
+        .then(html => {
+            if(html.trim() == "") { this.innerText = "No more data"; this.disabled = true; }
+            else { 
+                document.getElementById("tableBody").insertAdjacentHTML('beforeend', html);
+                this.setAttribute("data-offset", parseInt(offset) + 30);
+            }
+        });
+};
 </script>
 
 <?php if (!$is_ajax) { include 'includes/footer.php'; } ?>
