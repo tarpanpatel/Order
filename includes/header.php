@@ -19,7 +19,6 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>POS</title>
     <link rel="stylesheet" href="assets/css/style.css?v=<?= time(); ?>">
-    <!-- Include FontAwesome icons for uniform UI appearance -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         /* ==========================================================================
@@ -93,9 +92,6 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
         @media (min-width: 1024px) {
             .nav-bar { top: 0 !important; }
             .close-drawer-btn { display: none !important; }
-            /* Prevent main viewport from shifting over click targets */
-            .main-content { position: relative; z-index: 1; }
-            .sidebar { position: relative; z-index: 10; }
         }
 
         @media (max-width: 1023px) {
@@ -149,10 +145,9 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
         </div>
         
         <nav style="display: flex; flex-direction: column; gap: 4px;">
-            <!-- Core Dashboard Visibility Link -->
-            <a href="index.php" class="nav-link <?= ($current_page === 'index.php') ? 'active' : ''; ?>">📊 Dashboard</a>
-            
             <?php if (isset($_SESSION["role"]) && ($_SESSION["role"] === 'Admin' || $_SESSION["role"] === 'Super Admin')): ?>
+                <a href="index.php" class="nav-link <?= ($current_page === 'index.php') ? 'active' : ''; ?>">📊 Dashboard</a>
+                
                 <?php if (!empty($current_active_guest)): ?>
                     <div style="margin: 6px 0; background: #fdfaf7; border: 1px solid #cbd5e0; border-radius: 8px; padding: 8px;">
                         <div style="font-size:11px; font-weight:bold; color:#0891b2; margin-bottom:5px; text-align:center; text-transform:uppercase;">● Active: <?= htmlspecialchars($current_active_guest['guest_name']) ?></div>
@@ -180,15 +175,13 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
                 <a href="billing.php" class="nav-link <?= ($current_page === 'billing.php') ? 'active' : ''; ?>">🧾 Settlements & Billing</a>
             <?php endif; ?>
 
-            <!-- Public & Globally Shared App Route Links -->
             <a href="order.php" class="nav-link <?= ($current_page === 'order.php') ? 'active' : ''; ?>">🍽️ Take Food Order</a>
             <a href="kitchen.php" class="nav-link <?= ($current_page === 'kitchen.php') ? 'active' : ''; ?>">🍳 Kitchen Orders</a>
             <a href="requisitions.php" class="nav-link <?= ($current_page === 'requisitions.php') ? 'active' : ''; ?>">📦 Material Requests</a>
 
-            <!-- NEW BUSINESS ANALYTICS LINK -->
-            <a href="dashboard_analytics.php" class="nav-link <?= ($current_page === 'dashboard_analytics.php') ? 'active' : ''; ?>">📈 Business Analytics</a>
-
             <?php if (isset($_SESSION["role"]) && ($_SESSION["role"] === 'Super Admin' || $_SESSION["role"] === 'Admin')): ?>
+                <a href="dashboard_analytics.php" class="nav-link <?= ($current_page === 'dashboard_analytics.php') ? 'active' : ''; ?>">📈 Business Analytics</a>
+
                 <div class="admin-settings-wrapper" style="margin-top: 10px; border-top: 1px solid #cbd5e0; padding-top: 10px; width: 100%;">
                     <div onclick="toggleAdminSubMenu()" class="nav-link" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 700; color: #475569; padding: 10px 16px;">
                         <span>🛠️ System Settings</span>
@@ -220,6 +213,7 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
                     }
                 }
 
+                // Ensures drop-down state persists across asynchronous AJAX views
                 document.addEventListener("DOMContentLoaded", () => {
                     if (localStorage.getItem("adminPanelExpanded") === "true") {
                         const content = document.getElementById("adminSubMenuContent");
@@ -241,6 +235,7 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
     <div class="main-content" style="padding: 12px;">
 
 <script>
+// Expose the script loop handler on root scope window explicitly for the single-page routing engine
 window.triggerSidebarLedgerActivation = function() {
     const dropdown = document.getElementById("sidebarLiveGuestSelectDropdown");
     if (!dropdown) return;
@@ -259,6 +254,7 @@ window.triggerSidebarLedgerActivation = function() {
     .then(res => res.json())
     .then(data => {
         if (data.success) {
+            // Soft-reloads structural elements flawlessly without duplicate cache loops
             location.reload();
         } else {
             alert("Activation error: " + data.error);
@@ -267,6 +263,7 @@ window.triggerSidebarLedgerActivation = function() {
     .catch(() => alert("Pipeline connection error."));
 };
 
+// Drawer toggle script
 function toggleLeftMenu(shouldOpen) {
     const sidebar = document.getElementById("appLeftNavigationMenu");
     if (!sidebar) return;
