@@ -8,6 +8,47 @@ $selectedMonth = isset($_GET['month']) ? intval($_GET['month']) : intval(date('m
 $selectedYear  = isset($_GET['year']) ? intval($_GET['year']) : intval(date('Y'));
 $activeTab     = isset($_GET['tab']) ? $_GET['tab'] : 'overview';
 
+// --- AJAX PAGINATION INTERCEPTOR PIpipeline ---
+if (isset($_GET['action_ajax_load_more'])) {
+    $offset = isset($_GET['offset']) ? intval($_GET['offset']) : 31;
+    $limit  = 30;
+
+    if ($activeTab === 'bookings') {
+        $guestStmt = $pdo->prepare("SELECT * FROM guests WHERE MONTH(checkin_date) = :m AND YEAR(checkin_date) = :y ORDER BY checkin_date DESC LIMIT :limit OFFSET :offset");
+        $guestStmt->bindValue(':m', $selectedMonth, PDO::PARAM_INT);
+        $guestStmt->bindValue(':y', $selectedYear, PDO::PARAM_INT);
+        $guestStmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $guestStmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $guestStmt->execute();
+        $nextGuestRows = $guestStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (!empty($nextGuestRows)) {
+            foreach ($nextGuestRows as $g) {
+                echo '<tr>
+                    <td><strong>' . htmlspecialchars($g['guest_name'] ?: 'Unnamed') . '</strong></td>
+                    <td>' . htmlspecialchars($g['booking_source'] ?: 'Offline') . '</td>
+                    <td>' . htmlspecialchars($g['phone_number'] ?: '0000000000') . '</td>
+                    <td style="text-align: center;">' . intval($g['no_of_guests']) . '</td>
+                    <td>' . ($g['checkin_date'] ? date('d M Y', strtotime($g['checkin_date'])) : '-') . '</td>
+                    <td>' . ($g['checkout_date'] ? date('d M Y', strtotime($g['checkout_date'])) : '-') . '</td>
+                    <td style="text-align: center;">' . intval($g['total_days']) . '</td>
+                    <td>₹' . number_format($g['per_night_charges'], 2) . '</td>
+                    <td style="font-weight: 600;">₹' . number_format($g['total_charge'], 2) . '</td>
+                    <td style="color: #10b981; font-weight: 600;">₹' . number_format($g['advance_paid'], 2) . '</td>
+                    <td><span class="badge" style="background: #f1f5f9; color: #475569;">' . htmlspecialchars($g['advance_received_by'] ?: 'Unnamed') . '</span></td>
+                    <td style="color: #ef4444; font-weight: 600;">₹' . number_format($g['pending_amount'], 2) . '</td>
+                    <td><span class="badge" style="background: #f1f5f9; color: #475569;">' . htmlspecialchars($g['pending_received_by'] ?: 'Unnamed') . '</span></td>
+                    <td style="color: #06b6d4; font-weight: 700;">₹' . number_format($g['total_food'], 2) . '</td>
+                    <td><span class="badge badge-rev">' . htmlspecialchars($g['food_received_by'] ?: 'Unnamed') . '</span></td>
+                    <td>₹' . number_format($g['decoration_charges'], 2) . '</td>
+                    <td style="color: #f59e0b; font-weight: 600;">₹' . number_format($g['tip_amount'], 2) . '</td>
+                </tr>';
+            }
+        }
+    }
+    exit; // Terminate script execution immediately for AJAX output fragments
+}
+
 // 2. Fetch Available Date Ranges Dynamically across tables to build filters
 $filterDates = $pdo->query("
     SELECT DISTINCT MONTH(checkin_date) as m, YEAR(checkin_date) as y FROM guests WHERE checkin_date IS NOT NULL
@@ -23,7 +64,6 @@ if (empty($filterDates)) {
 }
 
 // 3. COMPUTE METRICS FOR THE CHOSEN PERIOD FROM INDIVIDUAL PRODUCTION TABLES
-// Gross Revenue = Total Room Charges + Total Food Bills + Decoration + Tips
 $revenueStmt = $pdo->prepare("
     SELECT COALESCE(SUM(total_charge + total_food + decoration_charges + tip_amount), 0) 
     FROM guests 
@@ -32,7 +72,6 @@ $revenueStmt = $pdo->prepare("
 $revenueStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
 $grossRevenue = $revenueStmt->fetchColumn();
 
-// Kitchen Expenses
 $kitExpStmt = $pdo->prepare("
     SELECT COALESCE(SUM(qty * price_per_unit), 0) 
     FROM kitchen_expenses 
@@ -41,7 +80,6 @@ $kitExpStmt = $pdo->prepare("
 $kitExpStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
 $kitchenExpensesSum = $kitExpStmt->fetchColumn();
 
-// Farm Expenses (including staff, utilities, maintenance)
 $farmExpStmt = $pdo->prepare("
     SELECT COALESCE(SUM(amount), 0) 
     FROM farm_expenses 
@@ -58,7 +96,7 @@ $is_ajax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HT
 if (!$is_ajax) { include 'includes/header.php'; }
 ?>
 
-<div class="main-content" style="padding: 12px; width: 100%; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
+<div class="main-content" style="padding: 12px; width: 100%; font-family: 'Segoe UI', Helvetica, Arial, sans-serif; box-sizing: border-box;">
     
     <style>
         .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
@@ -68,7 +106,6 @@ if (!$is_ajax) { include 'includes/header.php'; }
         .filter-form button { padding: 6px 14px; background: #06b6d4; color: #fff; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px; }
         .filter-form button:hover { background: #0891b2; }
         
-        /* Dashboard Metric Cards */
         .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 24px; }
         .metric-card { background: #fff; padding: 16px; border-radius: 10px; border: 1px solid #e2e8f0; border-left: 4px solid #cbd5e0; }
         .metric-card h3 { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin: 0 0 8px 0; letter-spacing: 0.5px; }
@@ -80,14 +117,13 @@ if (!$is_ajax) { include 'includes/header.php'; }
         .card-profit { border-left-color: #06b6d4; }
         .card-profit .value { color: #06b6d4; }
 
-        /* Excel View Tabs Setup */
         .excel-tabs-bar { display: flex; border-bottom: 2px solid #e2e8f0; gap: 4px; margin-bottom: 20px; }
         .excel-tab-link { padding: 10px 16px; font-size: 13px; font-weight: 600; color: #64748b; text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s ease; }
         .excel-tab-link:hover { color: #06b6d4; }
         .excel-tab-link.is-active { color: #06b6d4; border-bottom-color: #06b6d4; background: rgba(6, 182, 212, 0.04); border-radius: 6px 6px 0 0; }
 
-        /* Ledger Sheets Matrix Tables */
-        .excel-table-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        /* FIX 1: Handled matrix containers overflow parameters safely */
+        .excel-table-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow-x: auto; width: 100%; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .excel-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
         .excel-table th { background: #f8fafc; color: #334155; font-weight: 600; padding: 12px 16px; border-bottom: 2px solid #e2e8f0; }
         .excel-table td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; color: #475569; }
@@ -95,6 +131,12 @@ if (!$is_ajax) { include 'includes/header.php'; }
         .badge { padding: 2px 8px; font-size: 11px; font-weight: 600; border-radius: 4px; }
         .badge-rev { background: rgba(16, 185, 129, 0.1); color: #10b981; }
         .badge-exp { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+
+        .column-visibility-widget { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 15px; text-align: left; }
+        .column-visibility-widget summary { font-size: 13px; font-weight: 600; color: #475569; cursor: pointer; outline: none; }
+        .toggle-flex-wrap { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; border-top: 1px dashed #e2e8f0; padding-top: 8px; }
+        .toggle-checkbox-label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #334155; cursor: pointer; }
+        .toggle-checkbox-label input { accent-color: #06b6d4; }
     </style>
 
     <div class="page-header">
@@ -145,9 +187,14 @@ if (!$is_ajax) { include 'includes/header.php'; }
         <a href="dashboard_analytics.php?tab=expenses&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" class="excel-tab-link <?= $activeTab === 'expenses' ? 'is-active' : '' ?>">💸 Outgoing Expense Register</a>
     </div>
 
+    <details class="column-visibility-widget" open>
+        <summary><i class="fa-solid fa-filter" style="color:#06b6d4; margin-right:4px;"></i> Hide / Show Columns Selector</summary>
+        <div class="toggle-flex-wrap" id="liveColumnToggleWrapperPanel"></div>
+    </details>
+
     <div class="excel-table-box">
         <?php if ($activeTab === 'overview'): ?>
-            <table class="excel-table">
+            <table class="excel-table" id="analyticsPrimaryTargetMatrix">
                 <thead>
                     <tr>
                         <th>Date</th>
@@ -159,7 +206,6 @@ if (!$is_ajax) { include 'includes/header.php'; }
                 </thead>
                 <tbody>
                     <?php
-                    // Union statement to pull cashflow highlights sequentially into an overview statement
                     $unionQuery = "
                         SELECT checkin_date AS date, 'Room Revenue' AS type, CONCAT('Booking charge collected for group') AS notes, guest_name AS entity, total_charge AS amt, 1 AS is_rev FROM guests WHERE MONTH(checkin_date) = :m1 AND YEAR(checkin_date) = :y1
                         UNION ALL
@@ -193,8 +239,8 @@ if (!$is_ajax) { include 'includes/header.php'; }
             </table>
 
         <?php elseif ($activeTab === 'bookings'): ?>
-            <div style="overflow-x: auto; width: 100%;">
-                <table class="excel-table" style="white-space: nowrap; min-width: 1600px;">
+            <div style="width: 100%;">
+                <table class="excel-table" id="analyticsPrimaryTargetMatrix" style="white-space: nowrap;">
                     <thead>
                         <tr>
                             <th>Guest Profile</th>
@@ -216,9 +262,10 @@ if (!$is_ajax) { include 'includes/header.php'; }
                             <th>Tip</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="ajaxPaginatedTableStream">
                         <?php
-                        $guestStmt = $pdo->prepare("SELECT * FROM guests WHERE MONTH(checkin_date) = :m AND YEAR(checkin_date) = :y ORDER BY checkin_date DESC");
+                        // FIX 3: Implemented layout limit constraints capped at exactly 31 rows initially
+                        $guestStmt = $pdo->prepare("SELECT * FROM guests WHERE MONTH(checkin_date) = :m AND YEAR(checkin_date) = :y ORDER BY checkin_date DESC LIMIT 31");
                         $guestStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
                         $guestRows = $guestStmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -248,9 +295,15 @@ if (!$is_ajax) { include 'includes/header.php'; }
                     </tbody>
                 </table>
             </div>
+            
+            <?php if (count($guestRows) >= 31): ?>
+                <div style="padding: 15px; text-align: center; background: #fff; border-top: 1px solid #e2e8f0;">
+                    <button type="button" id="btnTriggerLiveFetch" data-current-offset="31" style="padding: 10px 24px; background: #06b6d4; color: #fff; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px; transition: background 0.2s;">Load More Bookings...</button>
+                </div>
+            <?php endif; ?>
 
         <?php elseif ($activeTab === 'expenses'): ?>
-            <table class="excel-table">
+            <table class="excel-table" id="analyticsPrimaryTargetMatrix">
                 <thead>
                     <tr>
                         <th>Recorded Date</th>
@@ -288,5 +341,97 @@ if (!$is_ajax) { include 'includes/header.php'; }
         <?php endif; ?>
     </div>
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const tableTarget = document.getElementById("analyticsPrimaryTargetMatrix");
+    const containerPanel = document.getElementById("liveColumnToggleWrapperPanel");
+    
+    // 1. Column Hide/Show Controller Script Engine
+    if (tableTarget && containerPanel) {
+        const structuralHeaders = tableTarget.querySelectorAll("thead th");
+        
+        structuralHeaders.forEach((thCell, index) => {
+            const rawTitle = thCell.innerText.trim();
+            
+            const labelNode = document.createElement("label");
+            labelNode.className = "toggle-checkbox-label";
+            
+            const checkControl = document.createElement("input");
+            checkControl.type = "checkbox";
+            checkControl.checked = true;
+            checkControl.dataset.targetColumnIndex = index;
+            
+            checkControl.addEventListener("change", function() {
+                const targetIdx = this.dataset.targetColumnIndex;
+                const evaluatedDisplayValue = this.checked ? "" : "none";
+                
+                thCell.style.display = evaluatedDisplayValue;
+                
+                const tableBodyRows = tableTarget.querySelectorAll("tbody tr");
+                tableBodyRows.forEach(row => {
+                    const dataCell = row.cells[targetIdx];
+                    if (dataCell) {
+                        dataCell.style.display = evaluatedDisplayValue;
+                    }
+                });
+            });
+            
+            labelNode.appendChild(checkControl);
+            labelNode.appendChild(document.createTextNode(rawTitle));
+            containerPanel.appendChild(labelNode);
+        });
+    }
+
+    // 2. Continuous AJAX Pagination Stream Core
+    const actionFetchButton = document.getElementById("btnTriggerLiveFetch");
+    if (actionFetchButton) {
+        actionFetchButton.addEventListener("click", function() {
+            const currentOffset = parseInt(this.getAttribute("data-current-offset"));
+            this.innerText = "Loading data stream...";
+            this.disabled = true;
+
+            const requestUrl = `dashboard_analytics.php?action_ajax_load_more=1&tab=<?= $activeTab ?>&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>&offset=${currentOffset}`;
+
+            fetch(requestUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(responseResponse => responseResponse.text())
+                .then(bodyHtmlString => {
+                    if (bodyHtmlString.trim() === "") {
+                        this.innerText = "All row allocations pulled completely";
+                        this.style.background = "#94a3b8";
+                    } else {
+                        const targetDataContainer = document.getElementById("ajaxPaginatedTableStream");
+                        targetDataContainer.insertAdjacentHTML('beforeend', bodyHtmlString);
+                        
+                        const runningUpdatedOffset = currentOffset + 30;
+                        this.setAttribute("data-current-offset", runningUpdatedOffset);
+                        this.innerText = "Load More Bookings...";
+                        this.disabled = false;
+                        
+                        // Re-evaluate visibility mask properties on live injected elements
+                        if (tableTarget) {
+                            const visibilityCheckboxes = containerPanel.querySelectorAll("input[type='checkbox']");
+                            visibilityCheckboxes.forEach(cb => {
+                                if (!cb.checked) {
+                                    const uncheckedIdx = cb.dataset.targetColumnIndex;
+                                    const brokenRows = targetDataContainer.querySelectorAll("tr");
+                                    brokenRows.forEach(r => {
+                                        const singleCell = r.cells[uncheckedIdx];
+                                        if (singleCell) singleCell.style.display = "none";
+                                    });
+                                }
+                            });
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error("Pipeline pipeline breakdown processing chunk parameters:", error);
+                    this.innerText = "Network pipeline error. Retry.";
+                    this.disabled = false;
+                });
+        });
+    }
+});
+</script>
 
 <?php if (!$is_ajax) { include 'includes/footer.php'; } ?>
