@@ -1,1 +1,24 @@
+name: Deploy Website via FTP
 
+on:
+  push:
+    branches:
+      - main  # Triggers the deployment only when you push to the main branch
+
+jobs:
+  web-deploy:
+    name: Deploy Live
+    runs-on: ubuntu-latest
+    steps:
+    - name: Get Latest Code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Sync Files to cPanel Server
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+      with:
+        server: ${{ secrets.FTP_SERVER }}
+        username: ${{ secrets.FTP_USERNAME }}
+        password: ${{ secrets.FTP_PASSWORD }}
+        server-dir: Order/  # Points directly to your sub-folder on artistsfarmjaipur.com
