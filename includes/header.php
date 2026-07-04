@@ -93,6 +93,9 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
         @media (min-width: 1024px) {
             .nav-bar { top: 0 !important; }
             .close-drawer-btn { display: none !important; }
+            /* Prevent main viewport from shifting over click targets */
+            .main-content { position: relative; z-index: 1; }
+            .sidebar { position: relative; z-index: 10; }
         }
 
         @media (max-width: 1023px) {
@@ -182,8 +185,8 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
             <a href="kitchen.php" class="nav-link <?= ($current_page === 'kitchen.php') ? 'active' : ''; ?>">🍳 Kitchen Orders</a>
             <a href="requisitions.php" class="nav-link <?= ($current_page === 'requisitions.php') ? 'active' : ''; ?>">📦 Material Requests</a>
 
-            <!-- NEW BUSINESS ANALYTICS SYSTEM ROOT ROUTE (Placed safely outside conditional restrictions) -->
-            <a href="dashboard_analytics.php" class="nav-link <?= ($current_page === 'dashboard_analytics.php') ? 'active' : ''; ?>" style="background: rgba(6, 182, 212, 0.08); color: #0891b2; font-weight: bold; border-left: 3px solid #06b6d4; margin-top: 5px;">📈 Business Analytics</a>
+            <!-- NEW BUSINESS ANALYTICS LINK -->
+            <a href="dashboard_analytics.php" class="nav-link <?= ($current_page === 'dashboard_analytics.php') ? 'active' : ''; ?>">📈 Business Analytics</a>
 
             <?php if (isset($_SESSION["role"]) && ($_SESSION["role"] === 'Super Admin' || $_SESSION["role"] === 'Admin')): ?>
                 <div class="admin-settings-wrapper" style="margin-top: 10px; border-top: 1px solid #cbd5e0; padding-top: 10px; width: 100%;">
