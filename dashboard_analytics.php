@@ -413,4 +413,4 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 </script>
 
-<?php if (!$is_ajax) { include 'includes/footer.php'; } ?>
+<?php //if (!$is_ajax) { include 'includes/footer.php'; } ?>
