@@ -122,7 +122,6 @@ if (!$is_ajax) { include 'includes/header.php'; }
         .excel-tab-link:hover { color: #06b6d4; }
         .excel-tab-link.is-active { color: #06b6d4; border-bottom-color: #06b6d4; background: rgba(6, 182, 212, 0.04); border-radius: 6px 6px 0 0; }
 
-        /* FIX 1: Table Stretching Resolved via Scroller Frame Container */
         .excel-table-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow-x: auto; width: 100%; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .excel-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
         .excel-table th { background: #f8fafc; color: #334155; font-weight: 600; padding: 12px 16px; border-bottom: 2px solid #e2e8f0; }
@@ -264,7 +263,6 @@ if (!$is_ajax) { include 'includes/header.php'; }
                     </thead>
                     <tbody id="ajaxPaginatedTableStream">
                         <?php
-                        // FIX 3: Initial loading bound at 31 items
                         $_GET['offset'] = 0;
                         $_GET['tab'] = 'bookings';
                         $_GET['month'] = $selectedMonth;
@@ -325,7 +323,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const tableTarget = document.getElementById("analyticsPrimaryTargetMatrix");
     const containerPanel = document.getElementById("liveColumnToggleWrapperPanel");
     
-    // 1. Synchronized Show/Hide Column Processor Logic
+    // 1. Column Hide/Show Controller Script Engine (Runs perfectly on all tabs)
     if (tableTarget && containerPanel) {
         const structuralHeaders = tableTarget.querySelectorAll("thead th");
         
@@ -361,7 +359,7 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
-    // 2. Synchronized Loop Loader Module
+    // 2. AJAX Load More Button Framework
     const actionFetchButton = document.getElementById("btnTriggerLiveFetch");
     if (actionFetchButton) {
         actionFetchButton.addEventListener("click", function() {
@@ -381,12 +379,13 @@ document.addEventListener("DOMContentLoaded", function() {
                         const targetDataContainer = document.getElementById("ajaxPaginatedTableStream");
                         targetDataContainer.insertAdjacentHTML('beforeend', bodyHtmlString);
                         
+                        // Updates offset cleanly for the next 31-line pagination boundary
                         const runningUpdatedOffset = currentOffset + 30;
                         this.setAttribute("data-current-offset", runningUpdatedOffset);
                         this.innerText = "Load More Bookings...";
                         this.disabled = false;
                         
-                        // Enforce hidden mask visibility layers over dynamically loaded elements
+                        // Enforce active hidden mask properties over new AJAX items
                         if (tableTarget) {
                             const visibilityCheckboxes = containerPanel.querySelectorAll("input[type='checkbox']");
                             visibilityCheckboxes.forEach(cb => {
