@@ -5,7 +5,9 @@
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
-
+ 
+// Force the application layer to use Indian Standard Time
+date_default_timezone_set('Asia/Kolkata');
 // Your existing PDO database connection code continues below...
 if (session_status() === PHP_SESSION_NONE) { 
     session_start(); 
