@@ -27,33 +27,33 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_register_guest
     $advance_received_by = trim($_POST["advance_received_by"] ?? 'Unnamed');
     $pending_received_by = trim($_POST["pending_received_by"] ?? 'Unnamed');
 
-    // Automated fallback layout tracking instead of primary guest names
-    $guest_name = $booking_source . " (" . substr($phone_number, -4) . ")";
-
-    if ($checkin < $todayString) {
-        $message = "❌ Error: Cannot register check-in dates in the past.";
-    } elseif ($checkout <= $checkin) {
+    if ($checkout <= $checkin) {
         $message = "❌ Error: Check-out date must be after the check-in date.";
     } elseif (!empty($checkin) && !empty($checkout) && !empty($phone_number)) {
         
         $pdo->beginTransaction();
         try {
-            // Strict inequality checks ensure check-out days remain fully available for next bookings
-            $check_overlap = $pdo->prepare("SELECT COUNT(*) FROM guests WHERE status != 'CheckedOut' AND NOT (expected_checkout <= CONCAT(?, ' 11:00:00') OR checkin_date >= ?) FOR UPDATE");
+            // FIXED OVERLAP CHECK: Evaluates strict bound overlaps to correctly free up open days (like the 9th)
+            $check_overlap = $pdo->prepare("
+                SELECT COUNT(*) FROM guests 
+                WHERE status != 'CheckedOut' 
+                AND NOT (expected_checkout <= CONCAT(?, ' 11:00:00') OR checkin_date >= ?)
+                FOR UPDATE
+            ");
             $check_overlap->execute([$checkin, $checkout]);
             
             if ($check_overlap->fetchColumn() > 0) {
                 $message = "❌ Error: This date range conflicts with an active registry profile.";
                 $pdo->rollBack();
             } else {
-                $sql = "INSERT INTO guests (guest_name, phone_number, adults, children, checkin_date, checkout_date, expected_checkout, notes, advance_paid, pending_amount, booking_source, no_of_guests, per_night_charges, total_charge, base_room_rent, advance_received_by, pending_received_by, status) 
-                        VALUES (?, ?, 1, 0, ?, ?, CONCAT(?, ' 11:00:00'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Booked')";
+                $sql = "INSERT INTO guests (phone_number, adults, children, checkin_date, checkout_date, expected_checkout, notes, advance_paid, pending_amount, booking_source, no_of_guests, per_night_charges, total_charge, base_room_rent, advance_received_by, pending_received_by, status) 
+                        VALUES (?, 1, 0, ?, ?, CONCAT(?, ' 11:00:00'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Booked')";
                 
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
-                    $guest_name, $phone_number, $checkin, $checkout, $checkout, 
-                    $notes, $advance, $pending, $booking_source, $no_of_guests, $per_night_charges, 
-                    $per_night_charges, $per_night_charges, $advance_received_by, $pending_received_by
+                    $phone_number, $checkin, $checkout, $checkout, $notes, $advance, $pending, 
+                    $booking_source, $no_of_guests, $per_night_charges, $per_night_charges, 
+                    $per_night_charges, $advance_received_by, $pending_received_by
                 ]);
                 $pdo->commit();
                 $message = "✔ Guest reservation added to calendar database.";
@@ -105,8 +105,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_booking
     $advance_received_by = trim($_POST["edit_advance_received_by"] ?? 'Unnamed');
     $pending_received_by = trim($_POST["edit_pending_received_by"] ?? 'Unnamed');
 
-    $guest_name = $booking_source . " (" . substr($phone, -4) . ")";
-
     if (!empty($checkin) && !empty($checkout) && !empty($phone)) {
         $pdo->beginTransaction();
         try {
@@ -118,12 +116,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_booking
                 echo "<script>alert('❌ Error: These modified parameters conflict with an existing room booking timeline.'); window.location.href = 'checkin.php';</script>";
                 exit;
             } else {
-                $sql = "UPDATE guests SET guest_name = ?, phone_number = ?, checkin_date = ?, checkout_date = ?, expected_checkout = CONCAT(?, ' 11:00:00'), notes = ?, advance_paid = ?, pending_amount = ?, booking_source = ?, no_of_guests = ?, per_night_charges = ?, total_charge = ?, base_room_rent = ?, advance_received_by = ?, pending_received_by = ? WHERE id = ?";
+                $sql = "UPDATE guests SET phone_number = ?, checkin_date = ?, checkout_date = ?, expected_checkout = CONCAT(?, ' 11:00:00'), notes = ?, advance_paid = ?, pending_amount = ?, booking_source = ?, no_of_guests = ?, per_night_charges = ?, total_charge = ?, base_room_rent = ?, advance_received_by = ?, pending_received_by = ? WHERE id = ?";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
-                    $guest_name, $phone, $checkin, $checkout, $checkout, $notes, 
-                    $advance, $pending, $booking_source, $no_of_guests, $per_night_charges, 
-                    $per_night_charges, $per_night_charges, $advance_received_by, $pending_received_by, $b_id
+                    $phone, $checkin, $checkout, $checkout, $notes, $advance, $pending, 
+                    $booking_source, $no_of_guests, $per_night_charges, $per_night_charges, 
+                    $per_night_charges, $advance_received_by, $pending_received_by, $b_id
                 ]);
                 $pdo->commit();
                 header("Location: checkin.php");
@@ -138,7 +136,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_booking
 
 // --- 4. DATA COMPILATION FOR UI RENDERING ---
 $current_active_guest = $pdo->query("SELECT * FROM guests WHERE status = 'Active' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
-$all_booked_guests = $pdo->query("SELECT id, CONCAT(booking_source, ' (', RIGHT(phone_number, 4), ')') as guest_name FROM guests WHERE status = 'Booked' ORDER BY checkin_date ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+// REQUIREMENT FULFILLED: Dropdown now filters dynamically to automatically display only todays guests
+$todaysStmt = $pdo->prepare("
+    SELECT id, CONCAT('Phone: (', RIGHT(phone_number, 4), ')') as guest_label 
+    FROM guests 
+    WHERE status = 'Booked' AND :today >= checkin_date AND :today2 < checkout_date
+    ORDER BY id ASC
+");
+$todaysStmt->execute([':today' => $todayString, ':today2' => $todayString]);
+$todays_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
+
 $bookings = $pdo->query("SELECT *, DATE(checkin_date) as cid, DATE(checkout_date) as cod FROM guests WHERE status != 'CheckedOut'")->fetchAll(PDO::FETCH_ASSOC);
 
 // Parse dates into JSON array strings for calendar availability configurations
@@ -179,7 +187,29 @@ include "includes/header.php";
 </style>
 
 <div class="app-body" style="max-width: 100% !important; width: 100% !important; display: block !important;">
-    <div class="category-section" style="margin-bottom: 20px;"><h2 class="category-title" style="text-transform: none;">📝 Guest Registration Suite</h2></div>
+    
+    <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <div style="text-align: left;">
+            <span style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #64748b; letter-spacing: 0.5px;">Active Session Context</span>
+            <div style="font-size: 14px; font-weight: 600; color: #0f172a; margin-top: 2px;">
+                Current Active: <?php echo $current_active_guest ? "📱 (" . substr($current_active_guest['phone_number'], -4) . ")" : "<span style='color:#94a3b8;'>None Selected</span>"; ?>
+            </div>
+        </div>
+        <form method="POST" action="checkin.php" style="display: flex; gap: 10px; margin: 0; align-items: center;">
+            <input type="hidden" name="action_sidebar_activate" value="1">
+            <select name="sidebar_guest_select" style="padding: 6px 10px; font-size: 13px; border-radius: 6px; border: 1px solid #cbd5e0; background: #fff; min-width: 180px;">
+                <?php if (empty($todays_booked_guests)): ?>
+                    <option value="0">No bookings arriving today</option>
+                <?php else: ?>
+                    <option value="0">Select Today's Arrival</option>
+                    <?php foreach ($todays_booked_guests as $tg): ?>
+                        <option value="<?= $tg['id'] ?>"><?= htmlspecialchars($tg['guest_label']) ?></option>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </select>
+            <button type="submit" style="padding: 6px 12px; background: #38a169; color: #fff; border: none; font-weight: 600; border-radius: 6px; font-size: 13px; cursor: pointer;">Activate Ledger</button>
+        </form>
+    </div>
 
     <?php if(!empty($message)): ?>
         <div style="background:#f0fdf4; border:1px solid #bbf7d0; color:#166534; padding:14px; border-radius:8px; margin-bottom:20px; font-size:14px; text-align:left; font-weight:500;"><?= $message ?></div>
@@ -270,11 +300,11 @@ include "includes/header.php";
                     $isToday = ($currentDateLoopStr === $todayString) ? 'today-accent' : '';
                     echo '<div class="calendar-day-cell current-month ' . $isToday . '"><span class="day-number">' . $day . '</span>';
                     foreach ($bookings as $b) {
-                        // RE-ENGINEERED CALENDAR LOGIC: Stops strictly BEFORE checkout date (<) to leave checkout days free for bookings
                         if ($currentDateLoopStr >= $b['cid'] && $currentDateLoopStr < $b['cod']) {
                             $jsonCleanStr = htmlspecialchars(json_encode($b), ENT_QUOTES, 'UTF-8');
                             $activeClass = ($b['status'] === 'Active') ? 'live-active' : '';
-                            echo '<span class="booking-strip-tag ' . $activeClass . '" onclick=\'openDetailsModal(' . $jsonCleanStr . ')\'>🛎 ' . htmlspecialchars($b['booking_source'] ?: 'Offline') . ' (' . substr($b['phone_number'], -4) . ')</span>';
+                            // REQUIREMENT FULFILLED: Clean labels inside grid nodes, displaying only phone identifiers
+                            echo '<span class="booking-strip-tag ' . $activeClass . '" onclick=\'openDetailsModal(' . $jsonCleanStr . ')\'>🛎 (' . substr($b['phone_number'], -4) . ')</span>';
                         }
                     }
                     echo '</div>';
@@ -292,8 +322,8 @@ include "includes/header.php";
         <div id="modalReadView">
             <h3 style="font-size: 16px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px;">Residency Tracking Sheet</h3>
             <table style="width: 100%; font-size: 14px; text-align: left; border-collapse: collapse; margin-bottom: 20px;">
-                <tr><th style="padding: 4px 0; color: #4b5563;">Channel Source:</th><td id="lblSource"></td></tr>
                 <tr><th style="padding: 4px 0; color: #4b5563;">Contact Phone:</th><td id="lblPhone"></td></tr>
+                <tr><th style="padding: 4px 0; color: #4b5563;">Channel Source:</th><td id="lblSource"></td></tr>
                 <tr><th style="padding: 4px 0; color: #4b5563;">Headcount Group:</th><td><span id="lblGuestsCount"></span> Persons</td></tr>
                 <tr><th style="padding: 4px 0; color: #4b5563;">Duration Stay:</th><td><span id="lblCheckin" style="font-weight:600;"></span> to <span id="lblCheckout" style="font-weight:600;"></span></td></tr>
                 <tr><th style="padding: 4px 0; color: #4b5563;">Total Tariff:</th><td>₹<span id="lblRate"></span></td></tr>
@@ -348,7 +378,7 @@ include "includes/header.php";
                         </div>
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <div><label>Pending Balance (₹)</label><input type="number" name="edit_pending_amount" id="txtEditPending" min="0"></div>
+                        <div><label>Pending Balance (₹)</label><input type="number" name="edit_pending_amount" id="txtEditPending"></div>
                         <div>
                             <label>Pending Received By</label>
                             <select name="edit_pending_received_by" id="txtEditPendingBy">
@@ -385,7 +415,6 @@ function setSystemDefaultFormTimestamps() {
     handleDateAutoLock();
 }
 
-// Rule 1 Fixed: Auto-sets next day as standard baseline check-out date
 function handleDateAutoLock() {
     const checkinInput = document.getElementById("fieldCheckin");
     const checkoutInput = document.getElementById("fieldCheckout");
@@ -413,7 +442,6 @@ function handleEditDateAutoLock() {
     checkoutInput.min = nextDayString;
 }
 
-// Rule 2 Fixed: Calculates explicit pending balance based on the revised formula (Z = X - Y)
 function autoCalculatePendingBalance(prefix) {
     const tariff = parseFloat(document.getElementById(prefix === 'field' ? 'fieldTotalTariff' : 'txtEditRate').value) || 0;
     const advance = parseFloat(document.getElementById(prefix === 'field' ? 'fieldAdvancePaid' : 'txtEditAdvance').value) || 0;
