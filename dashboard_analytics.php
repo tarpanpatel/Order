@@ -8,7 +8,7 @@ $selectedMonth = isset($_GET['month']) ? intval($_GET['month']) : intval(date('m
 $selectedYear  = isset($_GET['year']) ? intval($_GET['year']) : intval(date('Y'));
 $activeTab     = isset($_GET['tab']) ? $_GET['tab'] : 'overview';
 
-// --- AJAX PAGINATION INTERCEPTOR PIpipeline ---
+// --- AJAX PAGINATION INTERCEPTOR PIPE ---
 if (isset($_GET['action_ajax_load_more'])) {
     $offset = isset($_GET['offset']) ? intval($_GET['offset']) : 31;
     $limit  = 30;
@@ -46,7 +46,7 @@ if (isset($_GET['action_ajax_load_more'])) {
             }
         }
     }
-    exit; // Terminate script execution immediately for AJAX output fragments
+    exit;
 }
 
 // 2. Fetch Available Date Ranges Dynamically across tables to build filters
@@ -122,7 +122,7 @@ if (!$is_ajax) { include 'includes/header.php'; }
         .excel-tab-link:hover { color: #06b6d4; }
         .excel-tab-link.is-active { color: #06b6d4; border-bottom-color: #06b6d4; background: rgba(6, 182, 212, 0.04); border-radius: 6px 6px 0 0; }
 
-        /* FIX 1: Handled matrix containers overflow parameters safely */
+        /* FIX 1: Table Stretching Resolved via Scroller Frame Container */
         .excel-table-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow-x: auto; width: 100%; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .excel-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
         .excel-table th { background: #f8fafc; color: #334155; font-weight: 600; padding: 12px 16px; border-bottom: 2px solid #e2e8f0; }
@@ -135,7 +135,7 @@ if (!$is_ajax) { include 'includes/header.php'; }
         .column-visibility-widget { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 15px; text-align: left; }
         .column-visibility-widget summary { font-size: 13px; font-weight: 600; color: #475569; cursor: pointer; outline: none; }
         .toggle-flex-wrap { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; border-top: 1px dashed #e2e8f0; padding-top: 8px; }
-        .toggle-checkbox-label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #334155; cursor: pointer; }
+        .toggle-checkbox-label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #334155; cursor: pointer; font-weight: 500; }
         .toggle-checkbox-label input { accent-color: #06b6d4; }
     </style>
 
@@ -264,43 +264,21 @@ if (!$is_ajax) { include 'includes/header.php'; }
                     </thead>
                     <tbody id="ajaxPaginatedTableStream">
                         <?php
-                        // FIX 3: Implemented layout limit constraints capped at exactly 31 rows initially
-                        $guestStmt = $pdo->prepare("SELECT * FROM guests WHERE MONTH(checkin_date) = :m AND YEAR(checkin_date) = :y ORDER BY checkin_date DESC LIMIT 31");
-                        $guestStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
-                        $guestRows = $guestStmt->fetchAll(PDO::FETCH_ASSOC);
-
-                        if (empty($guestRows)): ?>
-                            <tr><td colspan="17" style="text-align: center; color: #94a3b8;">No room registrations or food records indexed for this selection period.</td></tr>
-                        <?php else: foreach ($guestRows as $g): ?>
-                            <tr>
-                                <td><strong><?= htmlspecialchars($g['guest_name'] ?: 'Unnamed') ?></strong></td>
-                                <td><?= htmlspecialchars($g['booking_source'] ?: 'Offline') ?></td>
-                                <td><?= htmlspecialchars($g['phone_number'] ?: '0000000000') ?></td>
-                                <td style="text-align: center;"><?= intval($g['no_of_guests']) ?></td>
-                                <td><?= $g['checkin_date'] ? date('d M Y', strtotime($g['checkin_date'])) : '-' ?></td>
-                                <td><?= $g['checkout_date'] ? date('d M Y', strtotime($g['checkout_date'])) : '-' ?></td>
-                                <td style="text-align: center;"><?= intval($g['total_days']) ?></td>
-                                <td>₹<?= number_format($g['per_night_charges'], 2) ?></td>
-                                <td style="font-weight: 600;">₹<?= number_format($g['total_charge'], 2) ?></td>
-                                <td style="color: #10b981; font-weight: 600;">₹<?= number_format($g['advance_paid'], 2) ?></td>
-                                <td><span class="badge" style="background: #f1f5f9; color: #475569;"><?= htmlspecialchars($g['advance_received_by'] ?: 'Unnamed') ?></span></td>
-                                <td style="color: #ef4444; font-weight: 600;">₹<?= number_format($g['pending_amount'], 2) ?></td>
-                                <td><span class="badge" style="background: #f1f5f9; color: #475569;"><?= htmlspecialchars($g['pending_received_by'] ?: 'Unnamed') ?></span></td>
-                                <td style="color: #06b6d4; font-weight: 700;">₹<?= number_format($g['total_food'], 2) ?></td>
-                                <td><span class="badge badge-rev"><?= htmlspecialchars($g['food_received_by'] ?: 'Unnamed') ?></span></td>
-                                <td>₹<?= number_format($g['decoration_charges'], 2) ?></td>
-                                <td style="color: #f59e0b; font-weight: 600;">₹<?= number_format($g['tip_amount'], 2) ?></td>
-                            </tr>
-                        <?php endforeach; endif; ?>
+                        // FIX 3: Initial loading bound at 31 items
+                        $_GET['offset'] = 0;
+                        $_GET['tab'] = 'bookings';
+                        $_GET['month'] = $selectedMonth;
+                        $_GET['year'] = $selectedYear;
+                        $_GET['limit'] = 31;
+                        include 'ajax_load_data.php';
+                        ?>
                     </tbody>
                 </table>
             </div>
             
-            <?php if (count($guestRows) >= 31): ?>
-                <div style="padding: 15px; text-align: center; background: #fff; border-top: 1px solid #e2e8f0;">
-                    <button type="button" id="btnTriggerLiveFetch" data-current-offset="31" style="padding: 10px 24px; background: #06b6d4; color: #fff; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px; transition: background 0.2s;">Load More Bookings...</button>
-                </div>
-            <?php endif; ?>
+            <div style="padding: 15px; text-align: center; background: #fff; border-top: 1px solid #e2e8f0;">
+                <button type="button" id="btnTriggerLiveFetch" data-current-offset="31" style="padding: 10px 24px; background: #06b6d4; color: #fff; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px; transition: background 0.2s;">Load More Bookings...</button>
+            </div>
 
         <?php elseif ($activeTab === 'expenses'): ?>
             <table class="excel-table" id="analyticsPrimaryTargetMatrix">
@@ -347,7 +325,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const tableTarget = document.getElementById("analyticsPrimaryTargetMatrix");
     const containerPanel = document.getElementById("liveColumnToggleWrapperPanel");
     
-    // 1. Column Hide/Show Controller Script Engine
+    // 1. Synchronized Show/Hide Column Processor Logic
     if (tableTarget && containerPanel) {
         const structuralHeaders = tableTarget.querySelectorAll("thead th");
         
@@ -364,15 +342,15 @@ document.addEventListener("DOMContentLoaded", function() {
             
             checkControl.addEventListener("change", function() {
                 const targetIdx = this.dataset.targetColumnIndex;
-                const evaluatedDisplayValue = this.checked ? "" : "none";
+                const displayStyle = this.checked ? "" : "none";
                 
-                thCell.style.display = evaluatedDisplayValue;
+                thCell.style.display = displayStyle;
                 
                 const tableBodyRows = tableTarget.querySelectorAll("tbody tr");
                 tableBodyRows.forEach(row => {
                     const dataCell = row.cells[targetIdx];
                     if (dataCell) {
-                        dataCell.style.display = evaluatedDisplayValue;
+                        dataCell.style.display = displayStyle;
                     }
                 });
             });
@@ -383,7 +361,7 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
-    // 2. Continuous AJAX Pagination Stream Core
+    // 2. Synchronized Loop Loader Module
     const actionFetchButton = document.getElementById("btnTriggerLiveFetch");
     if (actionFetchButton) {
         actionFetchButton.addEventListener("click", function() {
@@ -394,10 +372,10 @@ document.addEventListener("DOMContentLoaded", function() {
             const requestUrl = `dashboard_analytics.php?action_ajax_load_more=1&tab=<?= $activeTab ?>&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>&offset=${currentOffset}`;
 
             fetch(requestUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-                .then(responseResponse => responseResponse.text())
+                .then(res => res.text())
                 .then(bodyHtmlString => {
                     if (bodyHtmlString.trim() === "") {
-                        this.innerText = "All row allocations pulled completely";
+                        this.innerText = "All records pulled completely";
                         this.style.background = "#94a3b8";
                     } else {
                         const targetDataContainer = document.getElementById("ajaxPaginatedTableStream");
@@ -408,7 +386,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         this.innerText = "Load More Bookings...";
                         this.disabled = false;
                         
-                        // Re-evaluate visibility mask properties on live injected elements
+                        // Enforce hidden mask visibility layers over dynamically loaded elements
                         if (tableTarget) {
                             const visibilityCheckboxes = containerPanel.querySelectorAll("input[type='checkbox']");
                             visibilityCheckboxes.forEach(cb => {
@@ -425,7 +403,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     }
                 })
                 .catch(error => {
-                    console.error("Pipeline pipeline breakdown processing chunk parameters:", error);
+                    console.error("Network sync logic exception:", error);
                     this.innerText = "Network pipeline error. Retry.";
                     this.disabled = false;
                 });
