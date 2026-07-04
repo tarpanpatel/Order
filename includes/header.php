@@ -179,8 +179,6 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
             <a href="requisitions.php" class="nav-link <?= ($current_page === 'requisitions.php') ? 'active' : ''; ?>">📦 Material Requests</a>
 
             <?php if (isset($_SESSION["role"]) && ($_SESSION["role"] === 'Super Admin' || $_SESSION["role"] === 'Admin')): ?>
-                <a href="dashboard_analytics.php" class="nav-link <?= ($current_page === 'dashboard_analytics.php') ? 'active' : ''; ?>">📈 Business Analytics</a>
-
                 <div class="admin-settings-wrapper" style="margin-top: 10px; border-top: 1px solid #cbd5e0; padding-top: 10px; width: 100%;">
                     <div onclick="toggleAdminSubMenu()" class="nav-link" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 700; color: #475569; padding: 10px 16px;">
                         <span>🛠️ System Settings</span>
@@ -212,6 +210,7 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
                     }
                 }
 
+                // Ensures drop-down state persists across asynchronous AJAX views
                 document.addEventListener("DOMContentLoaded", () => {
                     if (localStorage.getItem("adminPanelExpanded") === "true") {
                         const content = document.getElementById("adminSubMenuContent");
@@ -233,6 +232,7 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
     <div class="main-content" style="padding: 12px;">
 
 <script>
+// Expose the script loop handler on root scope window explicitly for the single-page routing engine
 window.triggerSidebarLedgerActivation = function() {
     const dropdown = document.getElementById("sidebarLiveGuestSelectDropdown");
     if (!dropdown) return;
@@ -251,6 +251,7 @@ window.triggerSidebarLedgerActivation = function() {
     .then(res => res.json())
     .then(data => {
         if (data.success) {
+            // Soft-reloads structural elements flawlessly without duplicate cache loops
             location.reload();
         } else {
             alert("Activation error: " + data.error);
