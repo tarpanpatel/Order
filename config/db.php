@@ -19,13 +19,16 @@ $db_pass = "tPatel13@";
 $db_name = "apartment_blue"; 
 
 try {
-    $pdo = new PDO("mysql:host=$db_host;dbname=$db_name;charset=utf8mb4", $db_user, $db_pass, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES => false,
+    $pdo = new PDO("mysql:host=localhost;dbname=apartment_blue;charset=utf8mb4", "username", "password", [
+        PDO::ATTR_ERRMODE => PDO::ATTR_ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
     ]);
-} catch (PDOException $e) { 
-    die("Database Connection Error: " . $e->getMessage()); 
+    
+    // CRITICAL: Force the MySQL connection session to run on IST (+05:30)
+    $pdo->exec("SET time_zone = '+05:30';");
+
+} catch (PDOException $e) {
+    die("Database connection failed: " . $e->getMessage());
 }
 
 function logAction($userId, $actionText) {
