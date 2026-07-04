@@ -96,7 +96,7 @@ $is_ajax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HT
 if (!$is_ajax) { include 'includes/header.php'; }
 ?>
 
-<div class="main-content" style="padding: 12px; width: 100%; font-family: 'Segoe UI', Helvetica, Arial, sans-serif; box-sizing: border-box;">
+<div class="main-content" style="padding: 12px; width: 100%; max-width: 100%; box-sizing: border-box; overflow-x: hidden; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
     
     <style>
         .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
@@ -122,21 +122,22 @@ if (!$is_ajax) { include 'includes/header.php'; }
         .excel-tab-link:hover { color: #06b6d4; }
         .excel-tab-link.is-active { color: #06b6d4; border-bottom-color: #06b6d4; background: rgba(6, 182, 212, 0.04); border-radius: 6px 6px 0 0; }
 
-        /* FIX 1: Table Stretching Resolved via Scroller Frame Container */
-        .excel-table-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow-x: auto; width: 100%; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
-        .excel-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
-        .excel-table th { background: #f8fafc; color: #334155; font-weight: 600; padding: 12px 16px; border-bottom: 2px solid #e2e8f0; }
-        .excel-table td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; color: #475569; }
+        /* SCROLLER FIX: Added absolute bounding limit dimensions to force horizontal layout responsiveness */
+        .excel-table-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow-x: auto; max-width: 100%; display: block; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .excel-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; table-layout: auto; }
+        .excel-table th { background: #f8fafc; color: #334155; font-weight: 600; padding: 12px 16px; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
+        .excel-table td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; color: #475569; white-space: nowrap; }
         .excel-table tr:hover { background-color: #f8fafc; }
+        
         .badge { padding: 2px 8px; font-size: 11px; font-weight: 600; border-radius: 4px; }
         .badge-rev { background: rgba(16, 185, 129, 0.1); color: #10b981; }
         .badge-exp { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
 
-        .column-visibility-widget { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 15px; text-align: left; }
+        .column-visibility-widget { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 15px; text-align: left; width: 100%; box-sizing: border-box; }
         .column-visibility-widget summary { font-size: 13px; font-weight: 600; color: #475569; cursor: pointer; outline: none; }
         .toggle-flex-wrap { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; border-top: 1px dashed #e2e8f0; padding-top: 8px; }
-        .toggle-checkbox-label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #334155; cursor: pointer; font-weight: 500; }
-        .toggle-checkbox-label input { accent-color: #06b6d4; }
+        .toggle-checkbox-label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #334155; cursor: pointer; font-weight: 500; user-select: none; }
+        .toggle-checkbox-label input { accent-color: #06b6d4; cursor: pointer; }
     </style>
 
     <div class="page-header">
@@ -240,7 +241,7 @@ if (!$is_ajax) { include 'includes/header.php'; }
 
         <?php elseif ($activeTab === 'bookings'): ?>
             <div style="width: 100%;">
-                <table class="excel-table" id="analyticsPrimaryTargetMatrix" style="white-space: nowrap;">
+                <table class="excel-table" id="analyticsPrimaryTargetMatrix">
                     <thead>
                         <tr>
                             <th>Guest Profile</th>
@@ -264,7 +265,6 @@ if (!$is_ajax) { include 'includes/header.php'; }
                     </thead>
                     <tbody id="ajaxPaginatedTableStream">
                         <?php
-                        // FIX 3: Initial loading bound at 31 items
                         $_GET['offset'] = 0;
                         $_GET['tab'] = 'bookings';
                         $_GET['month'] = $selectedMonth;
@@ -325,7 +325,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const tableTarget = document.getElementById("analyticsPrimaryTargetMatrix");
     const containerPanel = document.getElementById("liveColumnToggleWrapperPanel");
     
-    // 1. Synchronized Show/Hide Column Processor Logic
+    // 1. Fixed Column Hide/Show Controller Script Engine
     if (tableTarget && containerPanel) {
         const structuralHeaders = tableTarget.querySelectorAll("thead th");
         
@@ -361,7 +361,7 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
-    // 2. Synchronized Loop Loader Module
+    // 2. Fixed AJAX Load More Flow (Syncs perfectly after each 31 entries step boundary)
     const actionFetchButton = document.getElementById("btnTriggerLiveFetch");
     if (actionFetchButton) {
         actionFetchButton.addEventListener("click", function() {
@@ -381,12 +381,13 @@ document.addEventListener("DOMContentLoaded", function() {
                         const targetDataContainer = document.getElementById("ajaxPaginatedTableStream");
                         targetDataContainer.insertAdjacentHTML('beforeend', bodyHtmlString);
                         
+                        // Caches standard step offset counters cleanly
                         const runningUpdatedOffset = currentOffset + 30;
                         this.setAttribute("data-current-offset", runningUpdatedOffset);
                         this.innerText = "Load More Bookings...";
                         this.disabled = false;
                         
-                        // Enforce hidden mask visibility layers over dynamically loaded elements
+                        // Updates visibility layers over new cells dynamically
                         if (tableTarget) {
                             const visibilityCheckboxes = containerPanel.querySelectorAll("input[type='checkbox']");
                             visibilityCheckboxes.forEach(cb => {
