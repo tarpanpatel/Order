@@ -2,13 +2,15 @@
 // /home/apartment/artistsfarmjaipur.com/Order/seed_june_data.php
 require_once __DIR__ . '/config/db.php';
 
-echo "<h2>Executing Comprehensive June Database Migration & Kitchen Expense Sync...</h2><hr>";
+echo "<h2>Executing Isolated Database Migration & June Ledger Sync...</h2><hr>";
 
 try {
-    // 1. Flush tables to ensure a clean database migration environment
+    // 1. TEMPORARILY DISABLE FOREIGN KEY CONSTRAINTS TO PREVENT TRUNCATE VIOLATIONS
+    $pdo->exec("SET FOREIGN_KEY_CHECKS = 0");
     $pdo->exec("TRUNCATE TABLE transaction_ledger");
     $pdo->exec("TRUNCATE TABLE guests");
-    echo "✔ Central transactional ledger structures cleared safely.<br>";
+    $pdo->exec("SET FOREIGN_KEY_CHECKS = 1"); // Re-enable checks immediately after cleaning
+    echo "✔ Structural data grids cleared with foreign key isolation rules enabled.<br>";
 
     $guestInsert = $pdo->prepare("
         INSERT INTO guests (guest_name, checkin_date, checkout_date, base_room_rent, advance_paid, payment_status, status)
@@ -32,10 +34,10 @@ try {
         $formattedDate = sprintf("2026-06-%02d", $day);
         $dayOfWeek = date('N', strtotime($formattedDate));
         
-        // Dynamic weekend premium scaling pattern matching your metrics
+        // Premium price on Fri/Sat/Sun, Standard on weekdays
         $dailyTariff = ($dayOfWeek >= 5) ? 35000.00 : 30000.00; 
 
-        // Seed guest profile rows
+        // Seed guest profile rows using the structural fallback names and numbers requested
         $guestInsert->execute([
             ':name'    => 'Unnamed',
             ':in'      => $formattedDate,
@@ -46,7 +48,7 @@ try {
         $guestId = $pdo->lastInsertId();
         $bookedCount++;
 
-        // Sync live incoming cashflow straight into the transaction history ledger
+        // Sync incoming room revenue straight into the transaction history ledger
         $ledgerInsert->execute([
             ':guest_id' => $guestId,
             ':t_date'   => $formattedDate,
@@ -69,7 +71,7 @@ try {
         ['date' => '2026-06-02', 'cat' => 'Kitchen Expense', 'desc' => 'Dairy provisions sourcing', 'vendor' => 'Raju', 'amount' => 672.00, 'mode' => 'UPI'],
         ['date' => '2026-06-02', 'cat' => 'Kitchen Expense', 'desc' => 'Frozen / Cold Items provisions sourcing', 'vendor' => 'Aunty ji vendor', 'amount' => 4545.00, 'mode' => 'UPI'],
         ['date' => '2026-06-02', 'cat' => 'Kitchen Expense', 'desc' => 'Frozen / Cold Items provisions sourcing', 'vendor' => 'Raju', 'amount' => 200.00, 'mode' => 'UPI'],
-        ['date' => '2026-06-02', 'cat' => 'Fruits/ dry fruits provisions sourcing', 'vendor' => 'Aunty ji vendor', 'amount' => 440.00, 'mode' => 'UPI'],
+        ['date' => '2026-06-02', 'cat' => 'Kitchen Expense', 'desc' => 'Fruits/ dry fruits provisions sourcing', 'vendor' => 'Aunty ji vendor', 'amount' => 440.00, 'mode' => 'UPI'],
         ['date' => '2026-06-02', 'cat' => 'Kitchen Expense', 'desc' => 'Grocery provisions sourcing', 'vendor' => 'Aunty ji vendor', 'amount' => 16779.00, 'mode' => 'UPI'],
         ['date' => '2026-06-02', 'cat' => 'Kitchen Expense', 'desc' => 'Non Veg provisions sourcing', 'vendor' => 'Arshad meat', 'amount' => 7260.00, 'mode' => 'UPI'],
         ['date' => '2026-06-02', 'cat' => 'Kitchen Expense', 'desc' => 'Oils provisions sourcing', 'vendor' => 'Raju', 'amount' => 60.00, 'mode' => 'UPI'],
@@ -143,7 +145,7 @@ try {
         ['date' => '2026-06-26', 'cat' => 'Kitchen Expense', 'desc' => 'Dairy provisions sourcing', 'vendor' => 'Raju', 'amount' => 1161.00, 'mode' => 'UPI'],
         ['date' => '2026-06-26', 'cat' => 'Kitchen Expense', 'desc' => 'Frozen / Cold Items provisions sourcing', 'vendor' => 'Raju', 'amount' => 625.00, 'mode' => 'UPI'],
         ['date' => '2026-06-26', 'cat' => 'Kitchen Expense', 'desc' => 'Frozen / Cold Items provisions sourcing', 'vendor' => 'shopper paradise', 'amount' => 4795.00, 'mode' => 'UPI'],
-        ['date' => '2026-06-26', 'cat' => 'Fruits/ dry fruits provisions sourcing', 'vendor' => 'Aunty ji vendor', 'amount' => 850.00, 'mode' => 'UPI'],
+        ['date' => '2026-06-26', 'cat' => 'Kitchen Expense', 'desc' => 'Fruits/ dry fruits provisions sourcing', 'vendor' => 'Aunty ji vendor', 'amount' => 850.00, 'mode' => 'UPI'],
         ['date' => '2026-06-26', 'cat' => 'Kitchen Expense', 'desc' => 'Grocery provisions sourcing', 'vendor' => 'Aunty ji vendor', 'amount' => 9284.00, 'mode' => 'UPI'],
         ['date' => '2026-06-26', 'cat' => 'Kitchen Expense', 'desc' => 'Grocery provisions sourcing', 'vendor' => 'Raju', 'amount' => 225.00, 'mode' => 'UPI'],
         ['date' => '2026-06-26', 'cat' => 'Kitchen Expense', 'desc' => 'Other provisions sourcing', 'vendor' => 'Aunty ji vendor', 'amount' => 1934.00, 'mode' => 'UPI'],
