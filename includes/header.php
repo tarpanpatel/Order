@@ -131,7 +131,7 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
     <strong style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-main);">POS Dashboard</strong>
 </div>
 
-<div class="app-container" <?= ($is_staff_role && $current_page === 'kitchen.php') ? 'style="grid-template-columns: 1fr;"' : ''; ?>>
+<div class="app-container" <?= ($is_staff_role && $current_page === 'kitchen.php') ? 'style="grid-template-columns: 1fr;"'; ?>>
     
     <?php if (!($is_staff_role && $current_page === 'kitchen.php')): ?>
     <div class="sidebar" id="appLeftNavigationMenu">
@@ -179,9 +179,6 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
             <a href="requisitions.php" class="nav-link <?= ($current_page === 'requisitions.php') ? 'active' : ''; ?>">📦 Material Requests</a>
 
             <?php if (isset($_SESSION["role"]) && ($_SESSION["role"] === 'Super Admin' || $_SESSION["role"] === 'Admin')): ?>
-                <!-- Clean Analytics Link Insertion inside the valid desktop nav stack -->
-                <a href="dashboard_analytics.php" class="nav-link <?= ($current_page === 'dashboard_analytics.php') ? 'active' : ''; ?>">📈 Business Analytics</a>
-
                 <div class="admin-settings-wrapper" style="margin-top: 10px; border-top: 1px solid #cbd5e0; padding-top: 10px; width: 100%;">
                     <div onclick="toggleAdminSubMenu()" class="nav-link" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 700; color: #475569; padding: 10px 16px;">
                         <span>🛠️ System Settings</span>
