@@ -23,7 +23,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_register_guest
     
     $booking_source      = trim($_POST["booking_source"] ?? 'Offline');
     $no_of_guests        = intval($_POST["no_of_guests"] ?? 1);
-    $per_night_charges   = floatval($_POST["per_night_charges"] ?? 0); // Holds Total Tariff
+    $per_night_charges   = floatval($_POST["per_night_charges"] ?? 0); 
     $advance_received_by = trim($_POST["advance_received_by"] ?? 'Unnamed');
     $pending_received_by = trim($_POST["pending_received_by"] ?? 'Unnamed');
 
@@ -33,7 +33,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_register_guest
         
         $pdo->beginTransaction();
         try {
-            // FIXED OVERLAP CHECK: Evaluates strict bound overlaps to correctly free up open days (like the 9th)
             $check_overlap = $pdo->prepare("
                 SELECT COUNT(*) FROM guests 
                 WHERE status != 'CheckedOut' 
@@ -137,9 +136,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_booking
 // --- 4. DATA COMPILATION FOR UI RENDERING ---
 $current_active_guest = $pdo->query("SELECT * FROM guests WHERE status = 'Active' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 
-// REQUIREMENT FULFILLED: Dropdown now filters dynamically to automatically display only todays guests
+// FIX 1: Filter to get ONLY today's entries for the quick action menu
 $todaysStmt = $pdo->prepare("
-    SELECT id, CONCAT('Phone: (', RIGHT(phone_number, 4), ')') as guest_label 
+    SELECT id, CONCAT('📱 (', RIGHT(phone_number, 4), ')') as guest_label 
     FROM guests 
     WHERE status = 'Booked' AND :today >= checkin_date AND :today2 < checkout_date
     ORDER BY id ASC
@@ -188,6 +187,7 @@ include "includes/header.php";
 
 <div class="app-body" style="max-width: 100% !important; width: 100% !important; display: block !important;">
     
+    <!-- FIX 2: Dynamic Dropdown displays only today's arrivals -->
     <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
         <div style="text-align: left;">
             <span style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #64748b; letter-spacing: 0.5px;">Active Session Context</span>
@@ -216,6 +216,7 @@ include "includes/header.php";
     <?php endif; ?>
 
     <div class="split-registration-container">
+        <!-- FORM WORKSPACE PANEL -->
         <div class="form-registration-panel">
             <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; color: #111827; text-align: left; padding-bottom: 8px; border-bottom: 1px dashed #e2e8f0; margin-bottom: 15px;">Add Guest Booking</h3>
             <form method="POST" action="checkin.php" style="margin: 0;">
@@ -282,6 +283,7 @@ include "includes/header.php";
             </form>
         </div>
 
+        <!-- VISUAL GRID CONTAINER PANEL -->
         <div class="calendar-display-panel">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h3 style="font-size: 15px; font-weight: 700; text-transform: uppercase; color: #111827; margin: 0;"><?= date('F Y') ?></h3>
@@ -303,7 +305,6 @@ include "includes/header.php";
                         if ($currentDateLoopStr >= $b['cid'] && $currentDateLoopStr < $b['cod']) {
                             $jsonCleanStr = htmlspecialchars(json_encode($b), ENT_QUOTES, 'UTF-8');
                             $activeClass = ($b['status'] === 'Active') ? 'live-active' : '';
-                            // REQUIREMENT FULFILLED: Clean labels inside grid nodes, displaying only phone identifiers
                             echo '<span class="booking-strip-tag ' . $activeClass . '" onclick=\'openDetailsModal(' . $jsonCleanStr . ')\'>🛎 (' . substr($b['phone_number'], -4) . ')</span>';
                         }
                     }
@@ -315,6 +316,7 @@ include "includes/header.php";
     </div>
 </div>
 
+<!-- POPUP MODAL ARCHITECTURE COMPONENT -->
 <div id="bookingDetailsModal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
     <div class="modal-content" style="background: white; max-width: 520px; width: 90%; border-radius: 12px; padding: 25px; position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.15); color: #111827;">
         <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="closeDetailsModal()">✕</span>
@@ -408,11 +410,12 @@ let currentActiveSelectedBookingObject = null;
 
 function setSystemDefaultFormTimestamps() {
     const checkinInput = document.getElementById("fieldCheckin");
+    // FIX 3: Read values parameters from inputs only if they are not pre-selected to avoid false alerts on refresh
     if (!checkinInput.value) {
         const now = new Date();
         checkinInput.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        handleDateAutoLock();
     }
-    handleDateAutoLock();
 }
 
 function handleDateAutoLock() {
@@ -426,8 +429,6 @@ function handleDateAutoLock() {
     const nextDayString = `${baseDate.getFullYear()}-${String(baseDate.getMonth() + 1).padStart(2, '0')}-${String(baseDate.getDate()).padStart(2, '0')}`;
     checkoutInput.min = nextDayString;
     checkoutInput.value = nextDayString;
-
-    validateInputSelectionOverlap(checkinInput);
 }
 
 function handleEditDateAutoLock() {
