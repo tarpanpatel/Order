@@ -19,6 +19,7 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>POS</title>
     <link rel="stylesheet" href="assets/css/style.css?v=<?= time(); ?>">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         /* ==========================================================================
            RESPONSIVE SIDEBAR NAVIGATION TOGGLE UI MECHANICS
@@ -131,7 +132,7 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
     <strong style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-main);">POS Dashboard</strong>
 </div>
 
-<div class="app-container" <?= ($is_staff_role && $current_page === 'kitchen.php') ? 'style="grid-template-columns: 1fr;"' : ''; ?>>
+<div class="app-container" <?php echo ($is_staff_role && $current_page === 'kitchen.php') ? 'style="grid-template-columns: 1fr;"' : 'style=""'; ?>>
     
     <?php if (!($is_staff_role && $current_page === 'kitchen.php')): ?>
     <div class="sidebar" id="appLeftNavigationMenu">
@@ -179,6 +180,9 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
             <a href="requisitions.php" class="nav-link <?= ($current_page === 'requisitions.php') ? 'active' : ''; ?>">📦 Material Requests</a>
 
             <?php if (isset($_SESSION["role"]) && ($_SESSION["role"] === 'Super Admin' || $_SESSION["role"] === 'Admin')): ?>
+                <a href="dashboard_analytics.php" class="nav-link <?= ($current_page === 'dashboard_analytics.php') ? 'active' : ''; ?>" style="background: rgba(6, 182, 212, 0.08); color: #0891b2; font-weight: bold; border-left: 3px solid #06b6d4;">📈 Business Analytics</a>
+                <a href="expenses.php" class="nav-link <?= ($current_page === 'expenses.php') ? 'active' : ''; ?>" style="background: rgba(245, 158, 11, 0.08); color: #d97706; font-weight: bold; border-left: 3px solid #f59e0b;">💸 Expense Ledger & Sync</a>
+
                 <div class="admin-settings-wrapper" style="margin-top: 10px; border-top: 1px solid #cbd5e0; padding-top: 10px; width: 100%;">
                     <div onclick="toggleAdminSubMenu()" class="nav-link" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 700; color: #475569; padding: 10px 16px;">
                         <span>🛠️ System Settings</span>
@@ -188,7 +192,6 @@ $all_booked_guests    = $pdo->query("SELECT id, guest_name FROM guests WHERE sta
                     <div id="adminSubMenuContent" style="display: none; flex-direction: column; gap: 4px; padding-left: 20px; margin-top: 5px;">
                         <a href="menu_admin.php" class="nav-link <?= ($current_page === 'menu_admin.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">🍽️ Menu Configuration</a>
                         <a href="materials_admin.php" class="nav-link <?= ($current_page === 'materials_admin.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">📦 Material Registry</a>
-                        <a href="expenses.php" class="nav-link <?= ($current_page === 'expenses.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">📈 Expense & Ledger Sync</a>
                         <a href="change_passcode.php" class="nav-link <?= ($current_page === 'change_passcode.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">🔐 Passcode Control</a>
                         <a href="login_logs.php" class="nav-link <?= ($current_page === 'login_logs.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">🖥️ Security Trace Logs</a>
                     </div>
