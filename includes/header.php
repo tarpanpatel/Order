@@ -190,6 +190,10 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
             <a href="requisitions.php" class="nav-link <?= ($current_page === 'requisitions.php') ? 'active' : ''; ?>">📦 Material Requests</a>
 
             <a href="dashboard_analytics.php" class="nav-link <?= ($current_page === 'dashboard_analytics.php') ? 'active' : ''; ?>">📈 Business Analytics</a>
+            
+            <?php if (isset($_SESSION["role"]) && ($_SESSION["role"] === 'Admin' || $_SESSION["role"] === 'Super Admin')): ?>
+                <a href="past_receipts.php" class="nav-link <?= ($current_page === 'past_receipts.php') ? 'active' : ''; ?>">📜 Past Receipts Log</a>
+            <?php endif; ?>
 
             <?php if (isset($_SESSION["role"]) && ($_SESSION["role"] === 'Super Admin' || $_SESSION["role"] === 'Admin')): ?>
                 <div class="admin-settings-wrapper" style="margin-top: 10px; border-top: 1px solid #cbd5e0; padding-top: 10px; width: 100%;">
