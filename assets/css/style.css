@@ -150,46 +150,13 @@ header {
 .p-btn-confirm { background: var(--primary); color: white; }
 .p-btn-cancel { background: #edf2f7; color: var(--text-muted); }
 
-/* ==========================================================================
-   MOBILE MEDIA QUERY CONSTRAINTS (FOR SIDEBAR DRAWER AND WORKSPACE ADAPTATION)
-   ========================================================================== */
+/* Mobile query drawer view mechanics constraints */
 @media (max-width: 1023px) {
-    .app-container {
-        display: block !important; /* Disables the desktop grid layout, reclaiming horizontal space */
-        width: 100% !important;
-    }
-    
-    .sidebar {
-        position: fixed !important;
-        top: 0;
-        left: 0;
-        height: 100vh;
-        width: 260px;
-        z-index: 9999;
-        transform: translateX(-100%); /* Slides the drawer cleanly out of view on load */
-        transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-        box-shadow: 4px 0 25px rgba(0,0,0,0.08);
-    }
-    
-    /* Triggers the slide-in visibility adjustment when open class matches */
-    .sidebar.is-drawer-open {
-        transform: translateX(0) !important;
-    }
-    
-    .sidebar-backdrop {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(45, 55, 72, 0.3);
-        backdrop-filter: blur(2px);
-        z-index: 9998;
-        display: none;
-    }
-    .sidebar-backdrop.is-active {
-        display: block !important;
-    }
+    .app-container { display: block !important; width: 100% !important; }
+    .sidebar { position: fixed !important; top: 0; left: 0; height: 100vh; width: 260px; z-index: 9999; transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: 4px 0 25px rgba(0,0,0,0.08); }
+    .sidebar.is-drawer-open { transform: translateX(0) !important; }
+    .sidebar-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(45, 55, 72, 0.3); backdrop-filter: blur(2px); z-index: 9998; display: none; }
+    .sidebar-backdrop.is-active { display: block !important; }
 }
 
 @media (max-width: 600px) {
@@ -201,13 +168,18 @@ header {
     .card-name { font-size: 12px; height: auto; margin-bottom: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
     .card-price { font-size: 11px; margin-top: 1px; margin-bottom: 0; }
 }
-/* Green background for Fulfilled state selection */
-.toggle-choice-btn.selected-fulfilled { 
-    background: #38a169 !important; 
-    color: #ffffff !important; 
+
+/* ==========================================================================
+   HIGH-SPECIFICITY INJECTOR OVERRIDES FOR LOG ACTIVE ACTION SELECTIONS
+   ========================================================================== */
+.toggle-choice-btn.active-fulfilled {
+    background: #38a169 !important;
+    background-color: #38a169 !important;
+    color: #ffffff !important;
 }
-/* Red background for Remove state selection */
-.toggle-choice-btn.selected-cancelled { 
-    background: #e53e3e !important; 
-    color: #ffffff !important; 
+
+.toggle-choice-btn.active-cancelled {
+    background: #e53e3e !important;
+    background-color: #e53e3e !important;
+    color: #ffffff !important;
 }
