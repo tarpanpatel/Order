@@ -6,20 +6,17 @@ require_once "config/db.php";
 if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Chef" && $_SESSION["role"] !== "Admin")) {
     header("Location: login.php");
     exit;
-} 
+}
 
-// 1. Get current month and year filters
 $selectedMonth = isset($_GET['month']) ? intval($_GET['month']) : intval(date('m'));
 $selectedYear  = isset($_GET['year']) ? intval($_GET['year']) : intval(date('Y'));
 
-// 2. Fetch available calendar bounds from database dynamically
 $availableDates = $pdo->query("SELECT DISTINCT MONTH(requested_at) as m, YEAR(requested_at) as y FROM requisitions WHERE requested_at IS NOT NULL ORDER BY y DESC, m DESC")->fetchAll(PDO::FETCH_ASSOC);
 
 if (empty($availableDates)) {
     $availableDates[] = ['m' => intval(date('m')), 'y' => intval(date('Y'))];
 }
 
-// 3. Fetch matched monthly entries
 $stmt = $pdo->prepare("
     SELECT r.id, r.requested_at, r.status,
            (SELECT GROUP_CONCAT(CONCAT(rc.item_name, ' (x', ri.quantity, ')') SEPARATOR ', ')
@@ -52,6 +49,9 @@ include "includes/header.php";
 .status-pill { font-size: 11px; padding: 3px 8px; border-radius: 12px; font-weight: 700; display: inline-block; }
 .status-pill.p-pending { background: #fef3c7; color: #d97706; }
 .status-pill.p-fulfilled { background: #d1fae5; color: #059669; }
+
+.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
+.modal-content { background: white; max-width: 500px; width: 90%; border-radius: 12px; padding: 25px; position: relative; color: #111827; text-align: left; }
 </style>
 
 <div class="app-body" style="max-width: 100% !important; width: 100% !important; display: block !important;">
@@ -136,9 +136,8 @@ include "includes/header.php";
     </div>
 </div>
 
-<!-- Modal window sync anchor point mapping script line operations pipeline -->
-<div id="editReqModalPopup" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
-    <div class="modal-content" style="background: white; max-width: 500px; width: 90%; border-radius: 12px; padding: 25px; position: relative; color: #111827; text-align: left;">
+<div id="editReqModalPopup" class="modal">
+    <div class="modal-content">
         <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="window.closeEditReqModal()">✕</span>
         <h3 style="font-size: 15px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px;">Modify Requisition Parameters</h3>
         
@@ -157,7 +156,7 @@ include "includes/header.php";
             <h4 style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #4b5563; margin-bottom: 10px;">Item Quantity Mapping</h4>
             <div id="mdlItemsContainer" style="max-height: 200px; overflow-y: auto; border: 1px solid #edf2f7; border-radius: 6px; padding: 8px; margin-bottom: 20px; background: #fdfdfd;"></div>
 
-            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+            <div style="display: flex; gap: 10px; justify-content: flex-end; align-items: center;">
                 <button type="button" class="btn btn-log" style="padding: 10px 18px;" onclick="window.closeEditReqModal()">Cancel</button>
                 <button type="submit" class="btn btn-start" style="padding: 10px 18px;">Commit Updates</button>
             </div>

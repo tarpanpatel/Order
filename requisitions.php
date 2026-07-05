@@ -153,9 +153,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_requisi
             sendRequisitionFulfilledTelegram($req_id, $pdo);
         }
 
-        // Detect if coming from logs page or active management screen to route back smoothly
-        $referrer = strpos($_SERVER['HTTP_REFERER'] ?? '', 'requisitions_log.php') !== false ? 'requisitions_log.php' : 'requisitions.php';
-        header("Location: " . $referrer);
+        header("Location: requisitions.php");
         exit;
     } catch (Exception $e) {
         $pdo->rollBack();
@@ -172,9 +170,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_complete_requi
         syncKitchenInventoryToGoogleSheets($req_id, $pdo);
         $pdo->commit();
         sendRequisitionFulfilledTelegram($req_id, $pdo);
-        
-        $referrer = strpos($_SERVER['HTTP_REFERER'] ?? '', 'requisitions_log.php') !== false ? 'requisitions_log.php' : 'requisitions.php';
-        header("Location: " . $referrer);
+        header("Location: requisitions.php");
         exit;
     } catch (Exception $e) {
         $pdo->rollBack();
@@ -184,7 +180,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_complete_requi
 $categories = $pdo->query("SELECT * FROM material_categories ORDER BY sort_order ASC")->fetchAll(PDO::FETCH_ASSOC);
 $materials  = $pdo->query("SELECT id, item_name as name, category_id, image_path FROM req_catalog ORDER BY item_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetches strictly the last 10 records for scannability below the summary card
+// Fetches strictly the last 10 records for display inside the right-hand container stack
 $past_requisitions = $pdo->query("SELECT r.id, r.requested_at, r.status,
                                   (SELECT GROUP_CONCAT(CONCAT(rc.item_name, ' (x', ri.quantity, ')') SEPARATOR ', ')
                                    FROM requisition_items ri
@@ -197,37 +193,52 @@ include "includes/header.php";
 ?>
 
 <style>
-.split-requisition-layout { display: grid !important; grid-template-columns: 1fr 340px !important; gap: 20px !important; width: 100% !important; align-items: start !important; margin-top: 15px; }
+.split-requisition-layout { display: grid !important; grid-template-columns: 1fr 360px !important; gap: 20px !important; width: 100% !important; align-items: start !important; margin-top: 15px; }
 .materials-main-panel { display: flex; flex-direction: column; gap: 24px; }
 .catalog-cards-box { background: #ffffff !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; padding: 20px !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important; }
-.requisition-right-sidebar { background: #ffffff !important; border: 1px solid #cbd5e0 !important; border-radius: 12px !important; padding: 20px !important; position: sticky !important; top: 20px !important; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05) !important; display: flex; flex-direction: column; min-height: 440px; text-align: left; }
+
+
+/* Sidebar container adjustments layout mapping rules */
+.right-column-stack { display: flex; flex-direction: column; gap: 20px; position: sticky !important; top: 20px !important; }
+.requisition-right-sidebar { background: #ffffff !important; border: 1px solid #cbd5e0 !important; border-radius: 12px !important; padding: 20px !important; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05) !important; display: flex; flex-direction: column; text-align: left; }
+
 .catalog-tab-header { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; border-bottom: 1px solid #edf2f7; padding-bottom: 12px; }
 .catalog-tab-btn { padding: 6px 12px; font-size: 12px; font-weight: 600; background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer; color: #4a5568; }
 .catalog-tab-btn.active { background: #06b6d4; color: white; border-color: #06b6d4; }
-.material-item-grid { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important; gap: 10px !important; }
-.material-item-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; background: #fff; text-align: center; display: flex; flex-direction: column; justify-content: space-between; min-height: 105px; }
-.material-item-name { font-size: 12px; font-weight: 600; color: #111827; margin-bottom: 8px; line-height: 1.4; }
+
+.material-item-grid { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)) !important; gap: 12px !important; }
+.material-item-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; background: #fff; text-align: center; display: flex; flex-direction: column; justify-content: space-between; align-items: center; min-height: 110px; box-sizing: border-box; }
+.material-item-name { font-size: 12px; font-weight: 600; color: #111827; margin-bottom: 10px; line-height: 1.4; text-align: center; width: 100%; word-wrap: break-word; }
+
+/* FIXED Button layout size specs reduction rules */
+.btn-compact-add { padding: 4px 10px !important; font-size: 11px !important; font-weight: 600 !important; border-radius: 4px !important; width: auto !important; max-width: 90px !important; margin: 0 auto !important; display: inline-block !important; text-align: center !important; }
+
 .sidebar-summary-title { font-size: 14px; font-weight: 700; text-transform: uppercase; color: #111827; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; margin-bottom: 15px; margin-top: 0; }
-.sidebar-cart-list { flex-grow: 1; overflow-y: auto; max-height: 280px; margin-bottom: 15px; }
+.sidebar-cart-list { max-height: 240px; overflow-y: auto; margin-bottom: 15px; }
 .sidebar-cart-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; padding: 8px 0; border-bottom: 1px solid #f7fafc; }
 .qty-btn-sm { padding: 2px 8px; font-size: 12px; font-weight: bold; border: 1px solid #cbd5e0; background: #f7fafc; border-radius: 4px; cursor: pointer; }
-.past-log-section { background: #ffffff !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; padding: 24px !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important; text-align: left; width: 100%; box-sizing: border-box; margin-top: 24px; }
-.past-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.past-table th { background: #f8fafc; padding: 12px; font-weight: 700; color: #4b5563; border-bottom: 2px solid #e2e8f0; }
-.past-table td { padding: 12px; border-bottom: 1px solid #edf2f7; color: #111827; vertical-align: middle; }
-.status-pill { font-size: 11px; padding: 3px 8px; border-radius: 12px; font-weight: 700; display: inline-block; }
+
+/* Compact history column style adjustments rules mapping */
+.past-log-section { background: #ffffff !important; border: 1px solid #cbd5e0 !important; border-radius: 12px !important; padding: 16px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important; text-align: left; width: 100%; box-sizing: border-box; }
+.past-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.past-table th { background: #f8fafc; padding: 8px; font-weight: 700; color: #4b5563; border-bottom: 2px solid #e2e8f0; text-align: left; }
+.past-table td { padding: 8px; border-bottom: 1px solid #edf2f7; color: #111827; vertical-align: middle; }
+.status-pill { font-size: 10px; padding: 2px 6px; border-radius: 10px; font-weight: 700; display: inline-block; }
 .status-pill.p-pending { background: #fef3c7; color: #d97706; }
 .status-pill.p-fulfilled { background: #d1fae5; color: #059669; }
 
+.btn-sidebar-past-link { display: block !important; text-align: center !important; width: 100% !important; padding: 8px !important; background: #f1f5f9 !important; color: #475569 !important; border: 1px solid #cbd5e0 !important; border-radius: 6px !important; font-size: 12px !important; font-weight: 600 !important; text-decoration: none !important; margin-top: 12px !important; box-sizing: border-box !important; transition: background 0.15s ease; }
+.btn-sidebar-past-link:hover { background: #e2e8f0 !important; color: #1e293b !important; }
+
 @media (max-width: 1023px) {
     .split-requisition-layout { grid-template-columns: 1fr !important; }
+    .right-column-stack { position: static !important; }
 }
 </style>
 
 <div class="app-body" style="max-width: 100% !important; width: 100% !important; display: block !important;">
-    <div class="category-section" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+    <div class="category-section" style="margin-bottom: 20px;">
         <h2 class="category-title" style="text-transform: none; margin: 0;">📦 Material Requests Panel</h2>
-        <a href="requisitions_log.php" style="padding: 8px 16px; background: #06b6d4; color: #fff; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">📂 View Monthly Logs</a>
     </div>
 
     <div class="split-requisition-layout">
@@ -255,7 +266,7 @@ include "includes/header.php";
                                 <?php foreach ($catItems as $item): ?>
                                     <div class="material-item-card">
                                         <div class="material-item-name"><?= htmlspecialchars($item['name']) ?></div>
-                                        <button type="button" class="btn btn-start" style="padding: 6px; font-size: 11px; width: 100%; border-radius: 6px;" onclick="window.addMaterialToSidebar(<?= $item['id'] ?>, '<?= htmlspecialchars(addslashes($item['name'])) ?>')">+ Add Item</button>
+                                        <button type="button" class="btn btn-start btn-compact-add" onclick="window.addMaterialToSidebar(<?= $item['id'] ?>, '<?= htmlspecialchars(addslashes($item['name'])) ?>')">+ Add</button>
                                     </div>
                                 <?php endforeach; ?>
                             </div>
@@ -265,70 +276,58 @@ include "includes/header.php";
             </div>
         </div>
 
-        <div class="requisition-right-sidebar">
-            <h3 class="sidebar-summary-title">📝 Requisition Summary</h3>
-            <div class="sidebar-cart-list" id="sidebarCartRowsContainer">
-                <p style="color: #a0aec0; text-align: center; font-size: 13px; margin-top: 40px; font-style: italic;">No items added to this request list yet.</p>
-            </div>
-            <div style="border-top: 1px dashed #e2e8f0; padding-top: 15px;">
-                <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 14px; margin-bottom: 15px; color: #111827;">
-                    <span>Total Item Types:</span>
-                    <span id="sidebarTotalCount">0</span>
+        <div class="right-column-stack">
+            <div class="requisition-right-sidebar">
+                <h3 class="sidebar-summary-title">📝 Requisition Summary</h3>
+                <div class="sidebar-cart-list" id="sidebarCartRowsContainer">
+                    <p style="color: #a0aec0; text-align: center; font-size: 13px; margin-top: 40px; font-style: italic;">No items added to this request list yet.</p>
                 </div>
-                <button type="button" class="btn btn-bill" style="width: 100%; padding: 12px; font-size: 13px; font-weight: bold; border-radius: 8px;" onclick="window.submitSidebarRequisition()">Submit Requisition</button>
+                <div style="border-top: 1px dashed #e2e8f0; padding-top: 15px;">
+                    <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 14px; margin-bottom: 15px; color: #111827;">
+                        <span>Total Item Types:</span>
+                        <span id="sidebarTotalCount">0</span>
+                    </div>
+                    <button type="button" class="btn btn-bill" style="width: 100%; padding: 12px; font-size: 13px; font-weight: bold; border-radius: 8px;" onclick="window.submitSidebarRequisition()">Submit Requisition</button>
+                </div>
             </div>
-        </div>
-    </div>
 
-    <div class="past-log-section">
-        <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; color: #111827; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 10px;">📋 Recent Requisitions (Last 10 Requests)</h3>
-        <div style="overflow-x: auto;">
-            <table class="past-table">
-                <thead>
-                    <tr>
-                        <th style="width: 80px; text-align: center;">Req ID</th>
-                        <th style="width: 140px;">Requested At</th>
-                        <th>Material Selections Summary</th>
-                        <th style="width: 110px; text-align: center;">Status</th>
-                        <th style="width: 160px; text-align: center;">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (!empty($past_requisitions)): foreach ($past_requisitions as $pRow): 
-                        $summary_clean = !empty($pRow['item_summary']) ? $pRow['item_summary'] : '<span style="color:#a0aec0; font-style:italic;">No mapped materials</span>';
-                        $is_fulfilled = ($pRow['status'] === 'Fulfilled');
-                        $pill_class = $is_fulfilled ? 'p-fulfilled' : 'p-pending';
-                        $status_label = empty($pRow['status']) ? 'Pending' : $pRow['status'];
+            <div class="past-log-section">
+                <h3 style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #111827; margin-bottom: 12px; border-bottom: 1px dashed #cbd5e0; padding-bottom: 6px; letter-spacing: 0.5px;">📋 Recent Requisitions Log</h3>
+                <div style="overflow-x: auto;">
+                    <table class="past-table">
+                        <thead>
+                            <tr>
+                                <th style="text-align: center; width: 55px;">ID</th>
+                                <th>Summary Descriptor Details</th>
+                                <th style="text-align: center; width: 70px;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (!empty($past_requisitions)): foreach ($past_requisitions as $pRow): 
+                                $summary_clean = !empty($pRow['item_summary']) ? $pRow['item_summary'] : 'No items';
+                                $is_fulfilled = ($pRow['status'] === 'Fulfilled');
+                                $pill_class = $is_fulfilled ? 'p-fulfilled' : 'p-pending';
+                                $status_label = empty($pRow['status']) ? 'Pending' : $pRow['status'];
 
-                        $lines = $pdo->prepare("SELECT ri.catalog_id, ri.quantity, rc.item_name as name FROM requisition_items ri JOIN req_catalog rc ON ri.catalog_id = rc.id WHERE ri.requisition_id = ?");
-                        $lines->execute([$pRow['id']]);
-                        $serializedItems = json_encode($lines->fetchAll(PDO::FETCH_ASSOC));
-                    ?>
-                        <tr>
-                            <td style="text-align: center; font-weight: 700; color: #4a5568;">#<?= $pRow['id'] ?></td>
-                            <td style="color: #718096;"><?= date('d M Y - H:i', strtotime($pRow['requested_at'])) ?></td>
-                            <td style="font-weight: 600; color: #2d3748;"><?= $summary_clean ?></td>
-                            <td style="text-align: center;">
-                                <span class="status-pill <?= $pill_class ?>"><?= $status_label ?></span>
-                            </td>
-                            <td style="text-align: center;">
-                                <div style="display: flex; gap: 6px; justify-content: center;">
-                                    <button type="button" class="btn btn-start" style="padding: 6px 10px; font-size: 11px; border-radius: 4px;" data-items='<?= htmlspecialchars($serializedItems, ENT_QUOTES, 'UTF-8') ?>' onclick="window.openEditRequisitionModal(<?= $pRow['id'] ?>, '<?= $status_label ?>', this)">✏ Edit</button>
-                                    <?php if (!$is_fulfilled): ?>
-                                        <form method="POST" style="margin:0;" onsubmit="return confirm('Mark request #<?= $pRow['id'] ?> as complete?');">
-                                            <input type="hidden" name="action_complete_requisition" value="1">
-                                            <input type="hidden" name="complete_req_id" value="<?= $pRow['id'] ?>">
-                                            <button type="submit" class="btn btn-bill" style="padding: 6px 10px; font-size: 11px; border-radius: 4px; background: #38a169; border-color: #38a169;">✔ Complete</button>
-                                        </form>
-                                    <?php endif; ?>
-                                </div>
-                            </td>
-                        </tr>
-                    <?php endforeach; else: ?>
-                        <tr><td colspan="5" style="text-align: center; color: #a0aec0; padding: 30px;">No historical data records saved.</td></tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
+                                $lines = $pdo->prepare("SELECT ri.catalog_id, ri.quantity, rc.item_name as name FROM requisition_items ri JOIN req_catalog rc ON ri.catalog_id = rc.id WHERE ri.requisition_id = ?");
+                                $lines->execute([$pRow['id']]);
+                                $serializedItems = json_encode($lines->fetchAll(PDO::FETCH_ASSOC));
+                            ?>
+                                <tr style="cursor: pointer;" data-items='<?= htmlspecialchars($serializedItems, ENT_QUOTES, 'UTF-8') ?>' onclick="window.openEditRequisitionModal(<?= $pRow['id'] ?>, '<?= $status_label ?>', this)">
+                                    <td style="text-align: center; font-weight: 700; color: #4a5568;">#<?= $pRow['id'] ?></td>
+                                    <td style="max-width: 190px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500;" title="<?= htmlspecialchars($summary_clean) ?>"><?= $summary_clean ?></td>
+                                    <td style="text-align: center;">
+                                        <span class="status-pill <?= $pill_class ?>"><?= $status_label ?></span>
+                                    </td>
+                                </tr>
+                            <?php endforeach; else: ?>
+                                <tr><td colspan="3" style="text-align: center; color: #a0aec0; padding: 15px;">No requests found.</td></tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <a href="requisitions_log.php" class="btn-sidebar-past-link">📂 See Past Requests archives</a>
+            </div>
         </div>
     </div>
 </div>
@@ -353,7 +352,7 @@ include "includes/header.php";
             <h4 style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #4b5563; margin-bottom: 10px;">Item Quantity Mapping</h4>
             <div id="mdlItemsContainer" style="max-height: 200px; overflow-y: auto; border: 1px solid #edf2f7; border-radius: 6px; padding: 8px; margin-bottom: 20px; background: #fdfdfd;"></div>
 
-            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+            <div style="display: flex; gap: 10px; justify-content: flex-end; align-items: center;">
                 <button type="button" class="btn btn-log" style="padding: 10px 18px;" onclick="window.closeEditReqModal()">Cancel</button>
                 <button type="submit" class="btn btn-start" style="padding: 10px 18px;">Commit Updates</button>
             </div>
