@@ -15,7 +15,7 @@ if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Chef" && $_SESSION["rol
 // Automatically loops through items, extracts catalog unit costs, and syncs data blocks downstream
 function syncKitchenInventoryToGoogleSheets($req_id, $pdo) {
     try {
-        $stmt = $pdo->prepare("SELECT ri.quantity, rc.item_name, rc.category_id, rc.unit_cost, (SELECT name FROM material_categories WHERE id = rc.category_id) as cat_name FROM requisition_items ri JOIN req_catalog rc ON ri.catalog_id = rc.id WHERE ri.requisition_id = ?");
+        $stmt = $pdo->prepare("SELECT ri.quantity, rc.item_name, rc.category_id, rc.unit_cost, (SELECT name FROM material_categories WHERE id = rc.category_id) as cat_name FROM requisition_items ri JOIN req_catalog rc ON ri.catalog_id = rc.id WHERE ri.requisition_id = ? AND ri.item_status = 'Fulfilled'");
         $stmt->execute([$req_id]);
         $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -26,7 +26,7 @@ function syncKitchenInventoryToGoogleSheets($req_id, $pdo) {
 
             $rowPattern = [
                 '', 
-                date('Y-m-d'), 
+                date('d/m/y'), 
                 $item['cat_name'] ?: 'General', 
                 $item['item_name'], 
                 $qty, 
@@ -45,7 +45,7 @@ function syncKitchenInventoryToGoogleSheets($req_id, $pdo) {
 // --- AUTOMATED DEFICIENCY RESOLUTION ENGINE ---
 function autoResolveDeficiencies($req_id, $pdo) {
     try {
-        $stmt = $pdo->prepare("SELECT catalog_id, quantity FROM requisition_items WHERE requisition_id = ?");
+        $stmt = $pdo->prepare("SELECT catalog_id, quantity FROM requisition_items WHERE requisition_id = ? AND item_status = 'Fulfilled'");
         $stmt->execute([$req_id]);
         $deliveredItems = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -82,7 +82,7 @@ function autoResolveDeficiencies($req_id, $pdo) {
 
 function sendRequisitionFulfilledTelegram($req_id, $pdo) {
     try {
-        $lines = $pdo->prepare("SELECT ri.quantity, rc.item_name as name FROM requisition_items ri JOIN req_catalog rc ON ri.catalog_id = rc.id WHERE ri.requisition_id = ?");
+        $lines = $pdo->prepare("SELECT ri.quantity, rc.item_name as name FROM requisition_items ri JOIN req_catalog rc ON ri.catalog_id = rc.id WHERE ri.requisition_id = ? AND ri.item_status = 'Fulfilled'");
         $lines->execute([$req_id]);
         $items = $lines->fetchAll(PDO::FETCH_ASSOC);
 
@@ -91,85 +91,68 @@ function sendRequisitionFulfilledTelegram($req_id, $pdo) {
             $itemsBlock .= "✅ *x" . $i['quantity'] . "* " . $i['name'] . "\n";
         }
 
-        $msg = "📦 ✅ *MATERIAL REQUISITION DELIVERED & COMPLETED*\n";
+        $msg = "📦 ✅ *MATERIAL REQUISITION VERIFIED BY BACKEND*\n";
         $msg .= "--------------------------------------\n";
         $msg .= "🆔 *Request ID Reference:* #" . $req_id . "\n";
-        $msg .= "⏰ *Delivered At:* " . date('H:i d-m-Y') . "\n";
+        $msg .= "⏰ *Processed At:* " . date('d/m/y • H:i') . "\n";
         $msg .= "--------------------------------------\n\n";
-        $msg .= !empty($itemsBlock) ? $itemsBlock : "🔹 _No items logged._\n";
+        $msg .= !empty($itemsBlock) ? $itemsBlock : "🔹 _No fulfilled items logged._\n";
         $msg .= "\n--------------------------------------\n";
-        $msg .= "👍 _Materials have been successfully verified and delivered to the kitchen/housekeeping staff._";
+        $msg .= "👍 _Materials synced downstream successfully._";
 
         sendTelegramNotification($msg);
     } catch (Exception $tgEx) {}
 }
 
+// --- COMPLEX PER-ITEM LOGIC SAVING SUBMISSION INTERCEPTOR ---
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_requisition"])) {
     $req_id = intval($_POST["update_req_id"]);
-    $new_status = trim($_POST["update_req_status"] ?? 'Pending');
     $quantities = $_POST["req_item_qty"] ?? [];
+    $item_statuses = $_POST["req_item_status"] ?? []; // Array mapping catalog_id => 'Fulfilled' or 'Cancelled'
 
     $pdo->beginTransaction();
     try {
-        $statusCheck = $pdo->prepare("SELECT status FROM requisitions WHERE id = ?");
-        $statusCheck->execute([$req_id]);
-        $old_status = $statusCheck->fetchColumn();
-
         $getOriginalQty = $pdo->prepare("SELECT quantity FROM requisition_items WHERE requisition_id = ? AND catalog_id = ?");
         $logDeficiency  = $pdo->prepare("INSERT INTO deficient_stock_logs (requisition_id, catalog_id, ordered_qty, delivered_qty, deficit_qty) VALUES (?, ?, ?, ?, ?)");
-        $updateItem     = $pdo->prepare("UPDATE requisition_items SET quantity = ? WHERE requisition_id = ? AND catalog_id = ?");
-        $delItem        = $pdo->prepare("DELETE FROM requisition_items WHERE requisition_id = ? AND catalog_id = ?");
+        
+        // Check if item_status column exists, if not fallback to dynamic runtime adjustments or query execution
+        $updateItem = $pdo->prepare("UPDATE requisition_items SET quantity = ?, item_status = ? WHERE requisition_id = ? AND catalog_id = ?");
 
+        $all_fulfilled = true;
+        
         foreach ($quantities as $cat_id => $qty) {
             $cat_id = intval($cat_id);
             $new_qty = intval($qty);
+            $allocated_status = isset($item_statuses[$cat_id]) ? trim($item_statuses[$cat_id]) : 'Pending';
+
+            if ($allocated_status !== 'Fulfilled') {
+                $all_fulfilled = false;
+            }
 
             $getOriginalQty->execute([$req_id, $cat_id]);
             $original_qty = intval($getOriginalQty->fetchColumn() ?: 0);
 
-            if ($new_qty < $original_qty) {
+            if ($new_qty < $original_qty && $allocated_status === 'Fulfilled') {
                 $deficit = $original_qty - $new_qty;
                 $logDeficiency->execute([$req_id, $cat_id, $original_qty, $new_qty, $deficit]);
             }
 
-            if ($new_qty > 0) {
-                $updateItem->execute([$new_qty, $req_id, $cat_id]);
-            } else {
-                $delItem->execute([$req_id, $cat_id]);
-            }
+            $updateItem->execute([$new_qty, $allocated_status, $req_id, $cat_id]);
         }
 
+        // Global state allocation rule: stays Pending if even one row is not Fulfilled
+        $final_global_status = $all_fulfilled ? 'Fulfilled' : 'Pending';
+        
         $stmt = $pdo->prepare("UPDATE requisitions SET status = ? WHERE id = ?");
-        $stmt->execute([$new_status, $req_id]);
+        $stmt->execute([$final_global_status, $req_id]);
 
-        if ($new_status === 'Fulfilled' && $old_status !== 'Fulfilled') {
+        if ($final_global_status === 'Fulfilled') {
             autoResolveDeficiencies($req_id, $pdo);
             syncKitchenInventoryToGoogleSheets($req_id, $pdo);
-        }
-
-        $pdo->commit();
-
-        if ($new_status === 'Fulfilled' && $old_status !== 'Fulfilled') {
             sendRequisitionFulfilledTelegram($req_id, $pdo);
         }
 
-        header("Location: requisitions.php");
-        exit;
-    } catch (Exception $e) {
-        $pdo->rollBack();
-    }
-}
-
-if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_complete_requisition"])) {
-    $req_id = intval($_POST["complete_req_id"]);
-    $pdo->beginTransaction();
-    try {
-        $stmt = $pdo->prepare("UPDATE requisitions SET status = 'Fulfilled' WHERE id = ?");
-        $stmt->execute([$req_id]);
-        autoResolveDeficiencies($req_id, $pdo);
-        syncKitchenInventoryToGoogleSheets($req_id, $pdo);
         $pdo->commit();
-        sendRequisitionFulfilledTelegram($req_id, $pdo);
         header("Location: requisitions.php");
         exit;
     } catch (Exception $e) {
@@ -180,7 +163,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_complete_requi
 $categories = $pdo->query("SELECT * FROM material_categories ORDER BY sort_order ASC")->fetchAll(PDO::FETCH_ASSOC);
 $materials  = $pdo->query("SELECT id, item_name as name, category_id, image_path FROM req_catalog ORDER BY item_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetches strictly the last 10 records for display inside the right-hand container stack
 $past_requisitions = $pdo->query("SELECT r.id, r.requested_at, r.status,
                                   (SELECT GROUP_CONCAT(CONCAT(rc.item_name, ' (x', ri.quantity, ')') SEPARATOR ', ')
                                    FROM requisition_items ri
@@ -228,21 +210,18 @@ include "includes/header.php";
     background: #f8fafc !important; 
     border-color: #94a3b8 !important; 
     color: #0f172a !important;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
 }
 
 .sidebar-summary-title { font-size: 14px; font-weight: 700; text-transform: uppercase; color: #111827; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; margin-bottom: 15px; margin-top: 0; }
 .sidebar-cart-list { max-height: 240px; overflow-y: auto; margin-bottom: 15px; }
-.sidebar-cart-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; padding: 8px 0; border-bottom: 1px solid #f7fafc; }
+.sidebar-cart-row { display: flex; justify-open: space-between; justify-content: space-between; align-items: center; font-size: 13px; padding: 8px 0; border-bottom: 1px solid #f7fafc; }
 .qty-btn-sm { padding: 2px 8px; font-size: 12px; font-weight: bold; border: 1px solid #cbd5e0; background: #f7fafc; border-radius: 4px; cursor: pointer; }
 
-/* Sidebar Log Grid Enhancements to completely prevent text blowout */
 .past-log-section { background: #ffffff !important; border: 1px solid #cbd5e0 !important; border-radius: 12px !important; padding: 14px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important; text-align: left; width: 100%; box-sizing: border-box; }
 .past-table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
 .past-table th { background: #f8fafc; padding: 6px 4px; font-weight: 700; color: #4b5563; border-bottom: 2px solid #e2e8f0; text-align: left; }
 .past-table td { padding: 8px 4px; border-bottom: 1px solid #edf2f7; color: #111827; vertical-align: middle; }
 
-/* Multi-line, State-driven Color Coded Action Buttons */
 .btn-action-trigger { 
     display: block !important; 
     width: 100% !important; 
@@ -263,14 +242,23 @@ include "includes/header.php";
     text-transform: lowercase;
 }
 
-/* Specific color states matching your native badges */
 .btn-status-pending { background: #fef3c7 !important; color: #d97706 !important; border-color: #f59e0b !important; }
 .btn-status-pending:hover { background: #fde68a !important; }
 .btn-status-fulfilled { background: #d1fae5 !important; color: #059669 !important; border-color: #10b981 !important; }
 .btn-status-fulfilled:hover { background: #a7f3d0 !important; }
 
-.btn-sidebar-past-link { display: block !important; text-align: center !important; width: 100% !important; padding: 8px !important; background: #f1f5f9 !important; color: #475569 !important; border: 1px solid #cbd5e0 !important; border-radius: 6px !important; font-size: 12px !important; font-weight: 600 !important; text-decoration: none !important; margin-top: 12px !important; box-sizing: border-box !important; transition: background 0.15s ease; }
-.btn-sidebar-past-link:hover { background: #e2e8f0 !important; color: #1e293b !important; }
+.btn-sidebar-past-link { display: block !important; text-align: center !important; width: 100% !important; padding: 8px !important; background: #f1f5f9 !important; color: #475569 !important; border: 1px solid #cbd5e0 !important; border-radius: 6px !important; font-size: 12px !important; font-weight: 600 !important; text-decoration: none !important; margin-top: 12px !important; box-sizing: border-box !important; }
+
+/* Dynamic Multi-State Row Button Layout Toggles */
+.binary-toggle-container { display: flex; gap: 4px; background: #f1f5f9; padding: 3px; border-radius: 6px; border: 1px solid #cbd5e0; }
+.toggle-choice-btn { flex: 1; padding: 5px 8px; font-size: 11px; font-weight: 700; border: none; border-radius: 4px; background: transparent; color: #64748b; cursor: pointer; transition: all 0.15s ease; text-align: center; text-transform: uppercase; }
+.toggle-choice-btn.selected-fulfilled { background: #10b981 !important; color: #ffffff !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+.toggle-choice-btn.selected-cancelled { background: #ef4444 !important; color: #ffffff !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+
+.modal-input-qty { width: 50px; padding: 6px 4px; border: 1px solid #cbd5e0; text-align: center; font-size: 13px; font-weight: 700; color: #1e293b; border-radius: 0; border-left: none; border-right: none; }
+.modal-qty-container { display: flex; align-items: center; border-radius: 6px; overflow: hidden; border: 1px solid #cbd5e0; }
+.modal-qty-btn { width: 28px; height: 31px; background: #f8fafc; border: none; color: #475569; font-weight: bold; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.modal-qty-btn:hover { background: #e2e8f0; color: #0f172a; }
 </style>
 
 <div class="app-body" style="max-width: 100% !important; width: 100% !important; display: block !important;">
@@ -313,9 +301,7 @@ include "includes/header.php";
             </div>
         </div>
 
-        <!-- RIGHT COLUMN VERTICAL CONTAINER STACK -->
         <div class="right-column-stack">
-            <!-- CARD 1: REQUISITION SUMMARY FORM FOR SELECTIONS -->
             <div class="requisition-right-sidebar">
                 <h3 class="sidebar-summary-title">📝 Requisition Summary</h3>
                 <div class="sidebar-cart-list" id="sidebarCartRowsContainer">
@@ -330,7 +316,6 @@ include "includes/header.php";
                 </div>
             </div>
 
-            <!-- CARD 2: RECENT REQUISITIONS HISTORY LIST PANEL -->
             <div class="past-log-section">
                 <h3 style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #111827; margin-bottom: 12px; border-bottom: 1px dashed #cbd5e0; padding-bottom: 6px; letter-spacing: 0.5px;">📋 Recent Requisitions Log</h3>
                 <div style="overflow-x: auto;">
@@ -349,21 +334,19 @@ include "includes/header.php";
                                 $status_style = $is_fulfilled ? 'btn-status-fulfilled' : 'btn-status-pending';
                                 $status_label = empty($pRow['status']) ? 'Pending' : $pRow['status'];
 
-                                $lines = $pdo->prepare("SELECT ri.catalog_id, ri.quantity, rc.item_name as name FROM requisition_items ri JOIN req_catalog rc ON ri.catalog_id = rc.id WHERE ri.requisition_id = ?");
+                                // Fetch precise granular data lines including the saved column status mappings
+                                $lines = $pdo->prepare("SELECT ri.catalog_id, ri.quantity, COALESCE(ri.item_status, 'Pending') as item_status, rc.item_name as name FROM requisition_items ri JOIN req_catalog rc ON ri.catalog_id = rc.id WHERE ri.requisition_id = ?");
                                 $lines->execute([$pRow['id']]);
                                 $serializedItems = json_encode($lines->fetchAll(PDO::FETCH_ASSOC));
                             ?>
                                 <tr>
-                                    <!-- Two-line vertical date layout prevents column stretching -->
                                     <td style="color: #475569; font-weight: 600; font-family: monospace; font-size: 11px; line-height: 1.2;">
                                         <?= date('d/m/y', strtotime($pRow['requested_at'])) ?><br>
                                         <span style="color: #94a3b8; font-size: 10px;"><?= date('H:i', strtotime($pRow['requested_at'])) ?></span>
                                     </td>
-                                    <!-- Safe text truncation via inline CSS rules -->
                                     <td style="max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; font-size: 11px; padding-right: 4px;" title="<?= htmlspecialchars($summary_clean) ?>"><?= $summary_clean ?></td>
-                                    <!-- Color Coded Multiline action button contains both the status and action link -->
                                     <td style="text-align: center;">
-                                        <button type="button" class="btn-action-trigger <?= $status_style ?>" data-items='<?= htmlspecialchars($serializedItems, ENT_QUOTES, 'UTF-8') ?>' onclick="window.openEditRequisitionModal(<?= $pRow['id'] ?>, '<?= $status_label ?>', this)">
+                                        <button type="button" class="btn-action-trigger <?= $status_style ?>" data-items='<?= htmlspecialchars($serializedItems, ENT_QUOTES, 'UTF-8') ?>' onclick="window.openEditRequisitionModal(<?= $pRow['id'] ?>, this)">
                                             <span>(<?= strtolower($status_label) ?>)</span>
                                             Take Action
                                         </button>
@@ -382,24 +365,17 @@ include "includes/header.php";
 </div>
 
 <div id="editReqModalPopup" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
-    <div class="modal-content" style="background: white; max-width: 500px; width: 90%; border-radius: 12px; padding: 25px; position: relative; color: #111827; text-align: left;">
+    <div class="modal-content" style="background: white; max-width: 540px; width: 92%; border-radius: 12px; padding: 25px; position: relative; color: #111827; text-align: left;">
         <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="window.closeEditReqModal()">✕</span>
-        <h3 style="font-size: 15px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px;">Modify Requisition Parameters</h3>
+        <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; letter-spacing: 0.5px;">Modify Requisition Parameters</h3>
         
         <form method="POST" action="requisitions.php" style="margin: 0;">
             <input type="hidden" name="action_update_requisition" value="1">
             <input type="hidden" name="update_req_id" id="mdlUpdateId">
             
-            <div style="margin-bottom: 15px;">
-                <label style="font-size: 12px; font-weight: 600; color: #4b5563; display: block; margin-bottom: 6px;">Ticket Status Allocation</label>
-                <select name="update_req_status" id="mdlUpdateStatus" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e0; font-size: 13px;">
-                    <option value="Pending">Pending</option>
-                    <option value="Fulfilled">Fulfilled</option>
-                </select>
-            </div>
-
-            <h4 style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #4b5563; margin-bottom: 10px;">Item Quantity Mapping</h4>
-            <div id="mdlItemsContainer" style="max-height: 200px; overflow-y: auto; border: 1px solid #edf2f7; border-radius: 6px; padding: 8px; margin-bottom: 20px; background: #fdfdfd;"></div>
+            <h4 style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 12px; letter-spacing: 0.5px;">Item Verification Matrix</h4>
+            
+            <div id="mdlItemsContainer" style="max-height: 280px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 4px; margin-bottom: 20px; background: #fafafa;"></div>
 
             <div style="display: flex; gap: 10px; justify-content: flex-end; align-items: center;">
                 <button type="button" class="btn btn-log" style="padding: 10px 18px;" onclick="window.closeEditReqModal()">Cancel</button>
@@ -479,30 +455,83 @@ window.submitSidebarRequisition = function() {
     }).catch(err => alert("❌ Network connection failure."));
 };
 
-window.openEditRequisitionModal = function(reqId, currentStatus, element) {
+// --- DYNAMICALLY RENDER ADVANCED MODAL SUB-COMPONENTS ENGINE ---
+window.openEditRequisitionModal = function(reqId, element) {
     document.getElementById("mdlUpdateId").value = reqId;
-    document.getElementById("mdlUpdateStatus").value = currentStatus;
-    
     const container = document.getElementById("mdlItemsContainer");
     const rawItemsData = element.getAttribute("data-items");
     
     try {
         const items = JSON.parse(rawItemsData);
         if (!items || items.length === 0) {
-            container.innerHTML = '<p style="text-align:center; color:#e53e3e; font-size:12px;">No sub-items loaded.</p>';
+            container.innerHTML = '<p style="text-align:center; color:#ef4444; font-size:12px; padding:15px;">No items loaded.</p>';
             return;
         }
         
-        container.innerHTML = items.map(i => `
-            <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #edf2f7;">
-                <span style="font-size:13px; font-weight:600; color:#2d3748;">${i.name}</span>
-                <input type="number" name="req_item_qty[${i.catalog_id}]" value="${i.quantity}" min="0" style="width:65px; padding:5px; border:1px solid #cbd5e0; border-radius:4px; text-align:center; font-size:13px;">
-            </div>
-        `).join('');
+        container.innerHTML = items.map(i => {
+            const currentStatus = i.item_status === 'Fulfilled' ? 'Fulfilled' : (i.item_status === 'Cancelled' ? 'Cancelled' : 'Pending');
+            
+            return `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 8px; border-bottom:1px solid #e2e8f0; background:#ffffff; margin-bottom:4px; border-radius:6px; gap:8px;">
+                    <span style="font-size:12px; font-weight:700; color:#1e293b; flex:1; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${i.name}</span>
+                    
+                    <div class="modal-qty-container">
+                        <button type="button" class="modal-qty-btn" onclick="window.stepModalQty(${i.catalog_id}, -1)">-</button>
+                        <input type="number" id="mdlQtyInput_${i.catalog_id}" name="req_item_qty[${i.catalog_id}]" value="${i.quantity}" min="0" class="modal-input-qty" oninput="window.validateInputBound(this)">
+                        <button type="button" class="modal-qty-btn" onclick="window.stepModalQty(${i.catalog_id}, 1)">+</button>
+                    </div>
+
+                    <div class="binary-toggle-container">
+                        <input type="hidden" id="mdlStatusHidden_${i.catalog_id}" name="req_item_status[${i.catalog_id}]" value="${currentStatus}">
+                        <button type="button" id="toggleBtn_F_${i.catalog_id}" class="toggle-choice-btn ${currentStatus === 'Fulfilled' ? 'selected-fulfilled' : ''}" onclick="window.setRowBinaryState(${i.catalog_id}, 'Fulfilled')">Fulfilled</button>
+                        <button type="button" id="toggleBtn_C_${i.catalog_id}" class="toggle-choice-btn ${currentStatus === 'Cancelled' ? 'selected-cancelled' : ''}" onclick="window.setRowBinaryState(${i.catalog_id}, 'Cancelled')">Cancel</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
         
         document.getElementById("editReqModalPopup").style.display = "flex";
     } catch(err) {
-        container.innerHTML = '<p style="text-align:center; color:#e53e3e; font-size:12px;">Failed parsing data bundle lines.</p>';
+        container.innerHTML = '<p style="text-align:center; color:#ef4444; font-size:12px; padding:15px;">Failed loading data arrays.</p>';
+    }
+};
+
+window.stepModalQty = function(catalogId, stepValue) {
+    const input = document.getElementById(`mdlQtyInput_${catalogId}`);
+    if (input) {
+        let currentVal = parseInt(input.value) || 0;
+        input.value = Math.max(0, currentVal + stepValue);
+    }
+};
+
+window.validateInputBound = function(element) {
+    let val = parseInt(element.value);
+    if (isNaN(val) || val < 0) {
+        element.value = 0;
+    }
+};
+
+window.setRowBinaryState = function(catalogId, targetedState) {
+    const hiddenInput = document.getElementById(`mdlStatusHidden_${catalogId}`);
+    const btnFulfilled = document.getElementById(`toggleBtn_F_${catalogId}`);
+    const btnCancelled = document.getElementById(`toggleBtn_C_${catalogId}`);
+    
+    if (!hiddenInput || !btnFulfilled || !btnCancelled) return;
+
+    // Reset styles
+    btnFulfilled.classList.remove('selected-fulfilled');
+    btnCancelled.classList.remove('selected-cancelled');
+
+    if (hiddenInput.value === targetedState) {
+        // If clicking the active button again, revert back to Pending state
+        hiddenInput.value = 'Pending';
+    } else {
+        hiddenInput.value = targetedState;
+        if (targetedState === 'Fulfilled') {
+            btnFulfilled.classList.add('selected-fulfilled');
+        } else if (targetedState === 'Cancelled') {
+            btnCancelled.classList.add('selected-cancelled');
+        }
     }
 };
 
