@@ -201,3 +201,13 @@ header {
     .card-name { font-size: 12px; height: auto; margin-bottom: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
     .card-price { font-size: 11px; margin-top: 1px; margin-bottom: 0; }
 }
+/* Green background for Fulfilled state selection */
+.toggle-choice-btn.selected-fulfilled { 
+    background: #38a169 !important; 
+    color: #ffffff !important; 
+}
+/* Red background for Remove state selection */
+.toggle-choice-btn.selected-cancelled { 
+    background: #e53e3e !important; 
+    color: #ffffff !important; 
+}
