@@ -123,7 +123,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_requisi
             $new_qty = intval($qty);
             $allocated_status = isset($item_statuses[$cat_id]) ? trim($item_statuses[$cat_id]) : 'Pending';
 
-            // If any single item remains Pending, the macro ticket cannot close and stays Pending
             if ($allocated_status !== 'Fulfilled' && $allocated_status !== 'Cancelled') {
                 $all_fulfilled = false;
             }
@@ -249,12 +248,12 @@ include "includes/header.php";
 
 .binary-toggle-container { display: flex; gap: 4px; background: #f1f5f9; padding: 3px; border-radius: 6px; border: 1px solid #cbd5e0; }
 
-/* FIXED: Color-coded green/red style parameters for binary choices */
+/* RE-PRIORITIZED SELECTOR SPECIFICITY: Enforces backgrounds using !important directly on classes */
 .toggle-choice-btn { flex: 1; padding: 5px 8px; font-size: 11px; font-weight: 700; border: none; border-radius: 4px; background: transparent; color: #64748b; cursor: pointer; transition: all 0.15s ease; text-align: center; text-transform: uppercase; }
 .toggle-choice-btn.selected-fulfilled { background: #38a169 !important; color: #ffffff !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
 .toggle-choice-btn.selected-cancelled { background: #e53e3e !important; color: #ffffff !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
 
-.modal-input-qty { width: 50px; padding: 6px 4px; border: 1px solid #cbd5e0; text-align: center; font-size: 13px; font-weight: 700; color: #1e293b; border-radius: 0; border-left: none; border-right: none; }
+.modal-input-qty { width: 50px; padding: 6px 4px; border: 1px solid #cbd5e0; text-align: center; font-size: 13px; font-weight: 700; color: #1e293b; border-radius: 0; border-left: none; border-right: none; background: #fff !important; }
 .modal-qty-container { display: flex; align-items: center; border-radius: 6px; overflow: hidden; border: 1px solid #cbd5e0; }
 .modal-qty-btn { width: 28px; height: 31px; background: #f8fafc; border: none; color: #475569; font-weight: bold; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .modal-qty-btn:hover { background: #e2e8f0; color: #0f172a; }
@@ -362,7 +361,7 @@ include "includes/header.php";
     </div>
 </div>
 
-<div id="editReqModalPopup" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
+<div id="editReqModalPopup" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
     <div class="modal-content" style="background: white; max-width: 540px; width: 92%; border-radius: 12px; padding: 25px; position: relative; color: #111827; text-align: left;">
         <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="window.closeEditReqModal()">✕</span>
         <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; letter-spacing: 0.5px;">Modify Requisition Parameters</h3>
@@ -452,7 +451,6 @@ window.submitSidebarRequisition = function() {
     }).catch(err => alert("❌ Network connection failure."));
 };
 
-// --- DYNAMICALLY RENDER MODAL WITH SQL DEFINED DATA FIELDS ---
 window.openEditRequisitionModal = function(reqId, element) {
     document.getElementById("mdlUpdateId").value = reqId;
     const container = document.getElementById("mdlItemsContainer");
@@ -515,17 +513,24 @@ window.setRowBinaryState = function(catalogId, targetedState) {
     
     if (!hiddenInput || !btnFulfilled || !btnCancelled) return;
 
-    btnFulfilled.classList.remove('selected-fulfilled');
-    btnCancelled.classList.remove('selected-cancelled');
-
     if (hiddenInput.value === targetedState) {
         hiddenInput.value = 'Pending';
+        btnFulfilled.style.setProperty('background', 'transparent', 'important');
+        btnFulfilled.style.setProperty('color', '#64748b', 'important');
+        btnCancelled.style.setProperty('background', 'transparent', 'important');
+        btnCancelled.style.setProperty('color', '#64748b', 'important');
     } else {
         hiddenInput.value = targetedState;
         if (targetedState === 'Fulfilled') {
-            btnFulfilled.classList.add('selected-fulfilled');
+            btnFulfilled.style.setProperty('background', '#38a169', 'important');
+            btnFulfilled.style.setProperty('color', '#ffffff', 'important');
+            btnCancelled.style.setProperty('background', 'transparent', 'important');
+            btnCancelled.style.setProperty('color', '#64748b', 'important');
         } else if (targetedState === 'Cancelled') {
-            btnCancelled.classList.add('selected-cancelled');
+            btnCancelled.style.setProperty('background', '#e53e3e', 'important');
+            btnCancelled.style.setProperty('color', '#ffffff', 'important');
+            btnFulfilled.style.setProperty('background', 'transparent', 'important');
+            btnFulfilled.style.setProperty('color', '#64748b', 'important');
         }
     }
 };
