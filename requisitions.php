@@ -153,7 +153,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_requisi
             sendRequisitionFulfilledTelegram($req_id, $pdo);
         }
 
-        header("Location: requisitions.php");
+        // Detect if coming from logs page or active management screen to route back smoothly
+        $referrer = strpos($_SERVER['HTTP_REFERER'] ?? '', 'requisitions_log.php') !== false ? 'requisitions_log.php' : 'requisitions.php';
+        header("Location: " . $referrer);
         exit;
     } catch (Exception $e) {
         $pdo->rollBack();
@@ -170,7 +172,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_complete_requi
         syncKitchenInventoryToGoogleSheets($req_id, $pdo);
         $pdo->commit();
         sendRequisitionFulfilledTelegram($req_id, $pdo);
-        header("Location: requisitions.php");
+        
+        $referrer = strpos($_SERVER['HTTP_REFERER'] ?? '', 'requisitions_log.php') !== false ? 'requisitions_log.php' : 'requisitions.php';
+        header("Location: " . $referrer);
         exit;
     } catch (Exception $e) {
         $pdo->rollBack();
@@ -180,7 +184,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_complete_requi
 $categories = $pdo->query("SELECT * FROM material_categories ORDER BY sort_order ASC")->fetchAll(PDO::FETCH_ASSOC);
 $materials  = $pdo->query("SELECT id, item_name as name, category_id, image_path FROM req_catalog ORDER BY item_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
-// MODIFIED: Fetches strictly the last 10 records for fast scannability on operations panel
+// Fetches strictly the last 10 records for scannability below the summary card
 $past_requisitions = $pdo->query("SELECT r.id, r.requested_at, r.status,
                                   (SELECT GROUP_CONCAT(CONCAT(rc.item_name, ' (x', ri.quantity, ')') SEPARATOR ', ')
                                    FROM requisition_items ri
@@ -276,7 +280,6 @@ include "includes/header.php";
         </div>
     </div>
 
-    <!-- MODIFIED: Relocated structure positioned completely below requisition layout blocks -->
     <div class="past-log-section">
         <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; color: #111827; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 10px;">📋 Recent Requisitions (Last 10 Requests)</h3>
         <div style="overflow-x: auto;">
