@@ -123,6 +123,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_requisi
             $new_qty = intval($qty);
             $allocated_status = isset($item_statuses[$cat_id]) ? trim($item_statuses[$cat_id]) : 'Pending';
 
+            // Requisition stays Pending if even a single item remains unfulfilled or un-removed
             if ($allocated_status !== 'Fulfilled' && $allocated_status !== 'Cancelled') {
                 $all_fulfilled = false;
             }
@@ -246,9 +247,28 @@ include "includes/header.php";
 
 .btn-sidebar-past-link { display: block !important; text-align: center !important; width: 100% !important; padding: 8px !important; background: #f1f5f9 !important; color: #475569 !important; border: 1px solid #cbd5e0 !important; border-radius: 6px !important; font-size: 12px !important; font-weight: 600 !important; text-decoration: none !important; margin-top: 12px !important; }
 
-.binary-toggle-container { display: flex; gap: 4px; background: #f1f5f9; padding: 3px; border-radius: 6px; border: 1px solid #cbd5e0; }
+/* FIX: Simple, clean layout alignment rules for individual color block buttons */
+.binary-actions-wrapper { display: flex; gap: 6px; align-items: center; }
+.action-block-btn { 
+    padding: 6px 12px !important; 
+    font-size: 11px !important; 
+    font-weight: 700 !important; 
+    border: none !important; 
+    border-radius: 6px !important; 
+    color: #ffffff !important; 
+    cursor: pointer !important; 
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+    transition: transform 0.1s ease;
+}
+.action-block-btn:active { transform: scale(0.96); }
 
-.toggle-choice-btn { flex: 1; padding: 5px 8px; font-size: 11px; font-weight: 700; border: none; border-radius: 4px; background: transparent; color: #64748b; cursor: pointer; transition: all 0.15s ease; text-align: center; text-transform: uppercase; }
+/* Static fixed color codes across modal scopes */
+.btn-block-fulfilled { background: #38a169 !important; }
+.btn-block-fulfilled:hover { background: #2f855a !important; }
+.btn-block-remove { background: #e53e3e !important; }
+.btn-block-remove:hover { background: #c53030 !important; }
 
 .modal-input-qty { width: 50px; padding: 6px 4px; border: 1px solid #cbd5e0; text-align: center; font-size: 13px; font-weight: 700; color: #1e293b; border-radius: 0; border-left: none; border-right: none; background: #fff !important; }
 .modal-qty-container { display: flex; align-items: center; border-radius: 6px; overflow: hidden; border: 1px solid #cbd5e0; }
@@ -296,6 +316,7 @@ include "includes/header.php";
             </div>
         </div>
 
+        <!-- RIGHT COLUMN VERTICAL CONTAINER STACK -->
         <div class="right-column-stack">
             <div class="requisition-right-sidebar">
                 <h3 class="sidebar-summary-title">📝 Requisition Summary</h3>
@@ -463,10 +484,6 @@ window.openEditRequisitionModal = function(reqId, element) {
         container.innerHTML = items.map(i => {
             const currentStatus = i.item_status;
             
-            // RESOLVED: Attaches explicit active formatting triggers by default initialization
-            const fClass = (currentStatus === 'Fulfilled') ? 'active-fulfilled' : '';
-            const cClass = (currentStatus === 'Cancelled') ? 'active-cancelled' : '';
-            
             return `
                 <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 8px; border-bottom:1px solid #e2e8f0; background:#ffffff; margin-bottom:4px; border-radius:6px; gap:8px;">
                     <span style="font-size:12px; font-weight:700; color:#1e293b; flex:1; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${i.name}</span>
@@ -477,10 +494,11 @@ window.openEditRequisitionModal = function(reqId, element) {
                         <button type="button" class="modal-qty-btn" onclick="window.stepModalQty(${i.catalog_id}, 1)">+</button>
                     </div>
 
-                    <div class="binary-toggle-container">
+                    <!-- FIXED: Permanent, side-by-side action buttons that write directly to hidden inputs without toggling visibility styles on click -->
+                    <div class="binary-actions-wrapper">
                         <input type="hidden" id="mdlStatusHidden_${i.catalog_id}" name="req_item_status[${i.catalog_id}]" value="${currentStatus}">
-                        <button type="button" id="toggleBtn_F_${i.catalog_id}" class="toggle-choice-btn ${fClass}" onclick="window.setRowBinaryState(${i.catalog_id}, 'Fulfilled')">Fulfilled</button>
-                        <button type="button" id="toggleBtn_C_${i.catalog_id}" class="toggle-choice-btn ${cClass}" onclick="window.setRowBinaryState(${i.catalog_id}, 'Cancelled')">Remove</button>
+                        <button type="button" class="action-block-btn btn-block-fulfilled" onclick="window.setRowDirectValue(${i.catalog_id}, 'Fulfilled')">Fulfilled</button>
+                        <button type="button" class="action-block-btn btn-block-remove" onclick="window.setRowDirectValue(${i.catalog_id}, 'Cancelled')">Remove</button>
                     </div>
                 </div>
             `;
@@ -507,26 +525,12 @@ window.validateInputBound = function(element) {
     }
 };
 
-window.setRowBinaryState = function(catalogId, targetedState) {
+// FIXED FUNCTION: Natively updates database target records directly without requiring on-click layout swaps
+window.setRowDirectValue = function(catalogId, targetedState) {
     const hiddenInput = document.getElementById(`mdlStatusHidden_${catalogId}`);
-    const btnFulfilled = document.getElementById(`toggleBtn_F_${catalogId}`);
-    const btnCancelled = document.getElementById(`toggleBtn_C_${catalogId}`);
-    
-    if (!hiddenInput || !btnFulfilled || !btnCancelled) return;
-
-    if (hiddenInput.value === targetedState) {
-        hiddenInput.value = 'Pending';
-        btnFulfilled.classList.remove('active-fulfilled');
-        btnCancelled.classList.remove('active-cancelled');
-    } else {
+    if (hiddenInput) {
         hiddenInput.value = targetedState;
-        if (targetedState === 'Fulfilled') {
-            btnFulfilled.classList.add('active-fulfilled');
-            btnCancelled.classList.remove('active-cancelled');
-        } else if (targetedState === 'Cancelled') {
-            btnCancelled.classList.add('active-cancelled');
-            btnFulfilled.classList.remove('active-fulfilled');
-        }
+        alert(`Item marked as ${targetedState === 'Fulfilled' ? 'FULFILLED' : 'REMOVED'}. Click 'Commit Updates' to save.`);
     }
 };
 
