@@ -242,8 +242,11 @@ include "includes/header.php";
 
 .btn-block-fulfilled { background: #10b981 !important; border: 1px solid #059669 !important; opacity: 1; }
 .btn-block-fulfilled:hover { background: #059669 !important; }
+.btn-block-fulfilled:disabled { background: #cbd5e0 !important; border-color: #cbd5e0 !important; color: #94a3b8 !important; cursor: not-allowed !important; opacity: 0.7; }
+
 .btn-block-remove { background: #ef4444 !important; border: 1px solid #dc2626 !important; opacity: 1; }
 .btn-block-remove:hover { background: #dc2626 !important; }
+.btn-block-remove:disabled { background: #cbd5e0 !important; border-color: #cbd5e0 !important; color: #94a3b8 !important; cursor: not-allowed !important; opacity: 0.7; }
 
 /* Visual feedback states classes mapping styles layout */
 .row-state-greyed-out .item-text-title { color: #94a3b8 !important; text-decoration: line-through; }
@@ -472,8 +475,17 @@ window.openEditRequisitionModal = function(reqId, element) {
         container.innerHTML = items.map(i => {
             const initialStatus = i.item_status || 'Pending';
             let rowStateClass = '';
-            if (initialStatus === 'Fulfilled') rowStateClass = 'row-state-green-highlight';
-            if (initialStatus === 'Cancelled') rowStateClass = 'row-state-greyed-out';
+            let fDisabled = '';
+            let rDisabled = '';
+            
+            if (initialStatus === 'Fulfilled') {
+                rowStateClass = 'row-state-green-highlight';
+                fDisabled = 'disabled';
+            }
+            if (initialStatus === 'Cancelled') {
+                rowStateClass = 'row-state-greyed-out';
+                rDisabled = 'disabled';
+            }
 
             return `
                 <div id="itemVerificationRow_${i.catalog_id}" class="verification-item-row-wrapper ${rowStateClass}" style="display:flex; justify-content:space-between; align-items:center; padding:12px 10px; border-bottom:1px solid #e2e8f0; background:#ffffff; margin-bottom:6px; border-radius:8px; gap:8px;">
@@ -490,8 +502,8 @@ window.openEditRequisitionModal = function(reqId, element) {
 
                     <div class="binary-toggle-container" style="background:transparent; border:none; padding:0;">
                         <input type="hidden" id="mdlStatusHidden_${i.catalog_id}" name="req_item_status[${i.catalog_id}]" value="${initialStatus}">
-                        <button type="button" class="toggle-choice-btn btn-block-fulfilled" onclick="window.triggerMemoryStateUpdate(${i.catalog_id}, 'Fulfilled')">Fulfilled</button>
-                        <button type="button" class="toggle-choice-btn btn-block-remove" onclick="window.triggerMemoryStateUpdate(${i.catalog_id}, 'Cancelled')">Remove</button>
+                        <button type="button" id="toggleBtn_F_${i.catalog_id}" ${fDisabled} class="toggle-choice-btn btn-block-fulfilled" onclick="window.triggerMemoryStateUpdate(${i.catalog_id}, 'Fulfilled')">Fulfilled</button>
+                        <button type="button" id="toggleBtn_C_${i.catalog_id}" ${rDisabled} class="toggle-choice-btn btn-block-remove" onclick="window.triggerMemoryStateUpdate(${i.catalog_id}, 'Cancelled')">Remove</button>
                     </div>
                 </div>
             `;
@@ -506,47 +518,47 @@ window.openEditRequisitionModal = function(reqId, element) {
 
 window.adjustVerificationRowQty = function(catalogId, stepValue) {
     const input = document.getElementById(`mdlQtyInput_${catalogId}`);
-    const hiddenStatus = document.getElementById(`mdlStatusHidden_${catalogId}`);
-    const rowWrapper   = document.getElementById(`itemVerificationRow_${catalogId}`);
-    
-    if (input && hiddenStatus && rowWrapper) {
+    if (input) {
         let currentVal = parseInt(input.value) || 0;
         let finalVal = Math.max(0, currentVal + stepValue);
         input.value = finalVal;
         
-        // FIXED ACTION MATRIX: Quantity modification on a greyed-out or completed row updates memory maps smoothly
-        if (hiddenStatus.value === 'Cancelled' && finalVal > 0) {
-            hiddenStatus.value = 'Fulfilled';
-            rowWrapper.classList.remove('row-state-greyed-out');
-            rowWrapper.classList.add('row-state-green-highlight');
-        } else if (hiddenStatus.value === 'Pending' && finalVal > 0) {
-            hiddenStatus.value = 'Fulfilled';
-            rowWrapper.classList.add('row-state-green-highlight');
-        }
-        
+        // CRITICAL DEACTIVATION ENGINE: Any change in quantity unlocks the action buttons for evaluation re-verification
+        window.reactivateActionRowButtons(catalogId, finalVal);
         window.syncRowAuditText(catalogId);
     }
 };
 
 window.handleQuantityInputChangeDirect = function(catalogId) {
     const input = document.getElementById(`mdlQtyInput_${catalogId}`);
-    const hiddenStatus = document.getElementById(`mdlStatusHidden_${catalogId}`);
-    const rowWrapper   = document.getElementById(`itemVerificationRow_${catalogId}`);
-    
-    if (input && hiddenStatus && rowWrapper) {
+    if (input) {
         let finalVal = parseInt(input.value) || 0;
         if (finalVal < 0) { finalVal = 0; input.value = 0; }
         
-        if (hiddenStatus.value === 'Cancelled' && finalVal > 0) {
-            hiddenStatus.value = 'Fulfilled';
-            rowWrapper.classList.remove('row-state-greyed-out');
-            rowWrapper.classList.add('row-state-green-highlight');
-        } else if (hiddenStatus.value === 'Pending' && finalVal > 0) {
-            hiddenStatus.value = 'Fulfilled';
-            rowWrapper.classList.add('row-state-green-highlight');
-        }
-        
+        window.reactivateActionRowButtons(catalogId, finalVal);
         window.syncRowAuditText(catalogId);
+    }
+};
+
+// FIXED CONTROL ENGINE: Dynamic class stripping and button reactivation handler routines
+window.reactivateActionRowButtons = function(catalogId, activeValue) {
+    const hiddenStatus = document.getElementById(`mdlStatusHidden_${catalogId}`);
+    const rowWrapper   = document.getElementById(`itemVerificationRow_${catalogId}`);
+    const btnFulfilled = document.getElementById(`toggleBtn_F_${catalogId}`);
+    const btnCancelled = document.getElementById(`toggleBtn_C_${catalogId}`);
+
+    if (!hiddenStatus || !rowWrapper || !btnFulfilled || !btnCancelled) return;
+
+    // Reset layout highlighting classes and re-enable input pointer lines
+    rowWrapper.classList.remove('row-state-greyed-out', 'row-state-green-highlight');
+    btnFulfilled.removeAttribute('disabled');
+    btnCancelled.removeAttribute('disabled');
+
+    // Automatically transition unlocked paths into an intermediate Pending state evaluating new numbers
+    hiddenStatus.value = (activeValue > 0) ? 'Pending' : 'Cancelled';
+    if (activeValue === 0) {
+        rowWrapper.classList.add('row-state-greyed-out');
+        btnCancelled.setAttribute('disabled', 'disabled');
     }
 };
 
@@ -569,10 +581,14 @@ window.triggerMemoryStateUpdate = function(catalogId, targetedState) {
     const hiddenStatus = document.getElementById(`mdlStatusHidden_${catalogId}`);
     const rowWrapper   = document.getElementById(`itemVerificationRow_${catalogId}`);
     const qtyInput     = document.getElementById(`mdlQtyInput_${catalogId}`);
+    const btnFulfilled = document.getElementById(`toggleBtn_F_${catalogId}`);
+    const btnCancelled = document.getElementById(`toggleBtn_C_${catalogId}`);
 
-    if (!hiddenStatus || !rowWrapper || !qtyInput) return;
+    if (!hiddenStatus || !rowWrapper || !qtyInput || !btnFulfilled || !btnCancelled) return;
 
     rowWrapper.classList.remove('row-state-greyed-out', 'row-state-green-highlight');
+    btnFulfilled.removeAttribute('disabled');
+    btnCancelled.removeAttribute('disabled');
 
     if (hiddenStatus.value === targetedState) {
         hiddenStatus.value = 'Pending';
@@ -581,9 +597,11 @@ window.triggerMemoryStateUpdate = function(catalogId, targetedState) {
         if (targetedState === 'Cancelled') {
             qtyInput.value = 0;
             rowWrapper.classList.add('row-state-greyed-out');
+            btnCancelled.setAttribute('disabled', 'disabled');
             window.syncRowAuditText(catalogId);
         } else if (targetedState === 'Fulfilled') {
             rowWrapper.classList.add('row-state-green-highlight');
+            btnFulfilled.setAttribute('disabled', 'disabled');
         }
     }
 };
