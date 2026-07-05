@@ -6,7 +6,7 @@ require_once "config/db.php";
 if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Chef" && $_SESSION["role"] !== "Admin")) {
     header("Location: login.php");
     exit;
-}
+} 
 
 // 1. Get current month and year filters
 $selectedMonth = isset($_GET['month']) ? intval($_GET['month']) : intval(date('m'));
