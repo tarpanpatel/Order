@@ -12,7 +12,7 @@ if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Chef" && $_SESSION["rol
     exit;
 }
 
-// Automatically loops through items, extracts catalog unit costs, and syncs data blocks downstream[cite: 1]
+// Automatically loops through items, extracts catalog unit costs, and syncs data blocks downstream
 function syncKitchenInventoryToGoogleSheets($req_id, $pdo) {
     try {
         $stmt = $pdo->prepare("SELECT ri.quantity, rc.item_name, rc.category_id, rc.unit_cost, (SELECT name FROM material_categories WHERE id = rc.category_id) as cat_name FROM requisition_items ri JOIN req_catalog rc ON ri.catalog_id = rc.id WHERE ri.requisition_id = ? AND ri.item_status = 'Fulfilled'");
@@ -42,7 +42,7 @@ function syncKitchenInventoryToGoogleSheets($req_id, $pdo) {
     }
 }
 
-// --- AUTOMATED DEFICIENCY RESOLUTION ENGINE ---[cite: 1]
+// --- AUTOMATED DEFICIENCY RESOLUTION ENGINE ---
 function autoResolveDeficiencies($req_id, $pdo) {
     try {
         $stmt = $pdo->prepare("SELECT catalog_id, quantity FROM requisition_items WHERE requisition_id = ? AND item_status = 'Fulfilled'");
@@ -104,7 +104,6 @@ function sendRequisitionFulfilledTelegram($req_id, $pdo) {
     } catch (Exception $tgEx) {}
 }
 
-// --- SAVING SUBMISSION INTERCEPTOR RE-INSTALLED TO SAVE ENTIRE BATCH AT ONCE ---[cite: 1]
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_requisition"])) {
     $req_id = intval($_POST["update_req_id"]);
     $quantities = $_POST["req_item_qty"] ?? [];
@@ -241,13 +240,12 @@ include "includes/header.php";
 .binary-toggle-container { display: flex; gap: 4px; background: #f1f5f9; padding: 3px; border-radius: 6px; border: 1px solid #cbd5e0; }
 .toggle-choice-btn { padding: 6px 12px !important; font-size: 11px !important; font-weight: 700 !important; border: none !important; border-radius: 6px !important; color: #ffffff !important; cursor: pointer !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; }
 
-/* Fixed baseline state styling blueprints */
 .btn-block-fulfilled { background: #10b981 !important; border: 1px solid #059669 !important; opacity: 1; }
 .btn-block-fulfilled:hover { background: #059669 !important; }
 .btn-block-remove { background: #ef4444 !important; border: 1px solid #dc2626 !important; opacity: 1; }
 .btn-block-remove:hover { background: #dc2626 !important; }
 
-/* Visual feedback state modifier targets */
+/* Visual feedback states modifiers rules mapping layout */
 .row-state-greyed-out .item-text-title { color: #94a3b8 !important; text-decoration: line-through; }
 .row-state-greyed-out .btn-block-remove { background: #cbd5e0 !important; border-color: #cbd5e0 !important; color: #94a3b8 !important; cursor: not-allowed !important; opacity: 0.6; }
 
@@ -265,7 +263,6 @@ include "includes/header.php";
 
 <div class="app-body" style="max-width: 100% !important; width: 100% !important; display: block !important;">
     
-    <!-- HIGH-VISIBILITY TOAST NOTIFICATION CONTAINER -->
     <?php if (isset($_SESSION['requisition_saved_toast'])): ?>
         <div class="global-toast-notification">
             📢 <strong><?= htmlspecialchars($_SESSION['requisition_saved_toast']) ?></strong>
@@ -373,23 +370,20 @@ include "includes/header.php";
     </div>
 </div>
 
-<!-- CLIENT-SIDE RE-INTEGRATED STANDALONE TRANSACTION BATCH MODAL LAYER -->
 <div id="editReqModalPopup" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
-    <div class="modal-content" style="background: white; max-width: 580px; width: 94%; border-radius: 12px; padding: 25px; position: relative; color: #111827; text-align: left;">
+    <div class="modal-content" style="background: white; max-width: 540px; width: 92%; border-radius: 12px; padding: 25px; position: relative; color: #111827; text-align: left;">
         <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="window.closeEditReqModal()">✕</span>
-        <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; letter-spacing: 0.5px;">Modify Requisition Parameters</h3>
         
-        <!-- NATIVE SQL FORM RESTORED TO RETREIVE ENTIRE CHANGESET MAP AT ONCE -->[cite: 1]
+        <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; letter-spacing: 0.5px;">Modify Stock Order</h3>
+        
         <form method="POST" action="requisitions.php" style="margin: 0;">
             <input type="hidden" name="action_update_requisition" value="1">
             <input type="hidden" name="update_req_id" id="mdlUpdateId">
             
-            <h4 style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 12px; letter-spacing: 0.5px;">Item Verification Matrix</h4>
             <div id="mdlItemsContainer" style="max-height: 290px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px; margin-bottom: 20px; background: #fafafa;"></div>
 
             <div style="display: flex; gap: 10px; justify-content: flex-end; align-items: center;">
                 <button type="button" class="btn btn-log" style="padding: 10px 18px;" onclick="window.closeEditReqModal()">Cancel</button>
-                <!-- RENAME: Commit updates button renamed to Save -->
                 <button type="submit" class="btn btn-start" style="padding: 10px 24px; font-weight: 800;">Save</button>
             </div>
         </form>
@@ -466,7 +460,6 @@ window.submitSidebarRequisition = function() {
     }).catch(err => alert("❌ Network connection failure."));
 };
 
-// --- RENDER COMPACT INTERACTION MATRIX AND POPULATE SUB-DOM TREE ---
 window.openEditRequisitionModal = function(reqId, element) {
     document.getElementById("mdlUpdateId").value = reqId;
     const container = document.getElementById("mdlItemsContainer");
@@ -489,13 +482,12 @@ window.openEditRequisitionModal = function(reqId, element) {
                 <div id="itemVerificationRow_${i.catalog_id}" class="verification-item-row-wrapper ${rowStateClass}" style="display:flex; justify-content:space-between; align-items:center; padding:12px 10px; border-bottom:1px solid #e2e8f0; background:#ffffff; margin-bottom:6px; border-radius:8px; gap:8px;">
                     <div style="flex:1; min-width:0; text-align:left;">
                         <span class="item-text-title" style="font-size:12px; font-weight:700; color:#1e293b; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; transition:all 0.15s ease;">${i.name}</span>
-                        <!-- AUDIT TRAIL TIMELINE ELEMENT HOOK -->
                         <span id="qtyAuditSubtitle_${i.catalog_id}" class="audit-history-subtitle" data-original="${i.quantity}">Ordered: ${i.quantity}</span>
                     </div>
                     
                     <div class="modal-qty-container">
                         <button type="button" class="modal-qty-btn" onclick="window.adjustVerificationRowQty(${i.catalog_id}, -1)">-</button>
-                        <input type="number" id="mdlQtyInput_${i.catalog_id}" name="req_item_qty[${i.catalog_id}]" value="${i.quantity}" min="0" class="modal-input-qty" oninput="window.syncRowAuditText(${i.catalog_id})">
+                        <input type="number" id="mdlQtyInput_${i.catalog_id}" name="req_item_qty[${i.catalog_id}]" value="${i.quantity}" min="0" class="modal-input-qty" oninput="window.handleQuantityInputChangeDirect(${i.catalog_id})">
                         <button type="button" class="modal-qty-btn" onclick="window.adjustVerificationRowQty(${i.catalog_id}, 1)">+</button>
                     </div>
 
@@ -508,7 +500,6 @@ window.openEditRequisitionModal = function(reqId, element) {
             `;
         }).join('');
         
-        // Loop again quickly on render to correctly configure the cross-strike text states on setup initialization
         items.forEach(i => window.syncRowAuditText(i.catalog_id));
         document.getElementById("editReqModalPopup").style.display = "flex";
     } catch(err) {
@@ -520,25 +511,32 @@ window.adjustVerificationRowQty = function(catalogId, stepValue) {
     const input = document.getElementById(`mdlQtyInput_${catalogId}`);
     if (input) {
         let currentVal = parseInt(input.value) || 0;
-        input.value = Math.max(0, currentVal + stepValue);
+        let finalVal = Math.max(0, currentVal + stepValue);
+        input.value = finalVal;
         
-        // Force evaluation check logic rules: if quantity goes back above 0, clear accidental greyed out states
-        if (currentVal + stepValue > 0) {
-            const hiddenStatus = document.getElementById(`mdlStatusHidden_${catalogId}`);
-            if (hiddenStatus && hiddenStatus.value === 'Cancelled') {
-                window.triggerMemoryStateUpdate(catalogId, 'Pending');
-            }
+        // FIXED ACTION: Modifying a greyed-out item drops the cancel state and makes Fulfilled active again
+        const hiddenStatus = document.getElementById(`mdlStatusHidden_${catalogId}`);
+        if (hiddenStatus && hiddenStatus.value === 'Cancelled' && finalVal > 0) {
+            window.triggerMemoryStateUpdate(catalogId, 'Fulfilled');
         }
         window.syncRowAuditText(catalogId);
     }
 };
 
-window.validateInputBound = function(element) {
-    let val = parseInt(element.value);
-    if (isNaN(val) || val < 0) { element.value = 0; }
+window.handleQuantityInputChangeDirect = function(catalogId) {
+    const input = document.getElementById(`mdlQtyInput_${catalogId}`);
+    if (input) {
+        let finalVal = parseInt(input.value) || 0;
+        if (finalVal < 0) { finalVal = 0; input.value = 0; }
+        
+        const hiddenStatus = document.getElementById(`mdlStatusHidden_${catalogId}`);
+        if (hiddenStatus && hiddenStatus.value === 'Cancelled' && finalVal > 0) {
+            window.triggerMemoryStateUpdate(catalogId, 'Fulfilled');
+        }
+        window.syncRowAuditText(catalogId);
+    }
 };
 
-// --- DYNAMICALLY RENDER STRIKETHROUGH CHARACTERS AUDIT PATTERNS ---
 window.syncRowAuditText = function(catalogId) {
     const input = document.getElementById(`mdlQtyInput_${catalogId}`);
     const subtitle = document.getElementById(`qtyAuditSubtitle_${catalogId}`);
@@ -554,25 +552,27 @@ window.syncRowAuditText = function(catalogId) {
     }
 };
 
-// --- LOCAL APPLICATION MEMORY LAYER MODIFIER STATE ENGINE ---
 window.triggerMemoryStateUpdate = function(catalogId, targetedState) {
     const hiddenStatus = document.getElementById(`mdlStatusHidden_${catalogId}`);
     const rowWrapper   = document.getElementById(`itemVerificationRow_${catalogId}`);
-    const inputQty     = document.getElementById(`mdlQtyInput_${catalogId}`);
+    const qtyInput     = document.getElementById(`mdlQtyInput_${catalogId}`);
 
-    if (!hiddenStatus || !rowWrapper) return;
+    if (!hiddenStatus || !rowWrapper || !qtyInput) return;
 
-    // Reset runtime utility class mappings
     rowWrapper.classList.remove('row-state-greyed-out', 'row-state-green-highlight');
 
-    if (targetedState === 'Cancelled') {
-        hiddenStatus.value = 'Cancelled';
-        rowWrapper.classList.add('row-state-greyed-out');
-    } else if (targetedState === 'Fulfilled') {
-        hiddenStatus.value = 'Fulfilled';
-        rowWrapper.classList.add('row-state-green-highlight');
-    } else {
+    if (hiddenStatus.value === targetedState) {
         hiddenStatus.value = 'Pending';
+    } else {
+        hiddenStatus.value = targetedState;
+        if (targetedState === 'Cancelled') {
+            // FIXED ACTION LOGIC: Clicking Remove forces the row count to 0 and writes the strikethrough audit trail target
+            qtyInput.value = 0;
+            rowWrapper.classList.add('row-state-greyed-out');
+            window.syncRowAuditText(catalogId);
+        } else if (targetedState === 'Fulfilled') {
+            rowWrapper.classList.add('row-state-green-highlight');
+        }
     }
 };
 
