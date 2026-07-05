@@ -8,6 +8,27 @@ if (!isset($_SESSION["user_id"])) {
     exit; 
 }
 
+// Handle AJAX Request for detailed food items breakdown dynamically on row click
+if (isset($_GET['action_fetch_food_breakdown'])) {
+    header('Content-Type: application/json');
+    $bookingId = isset($_GET['booking_id']) ? intval($_GET['booking_id']) : 0;
+    
+    // Cross-reference using your real schema: order items matching the guest link recorded under farm_bookings
+    $stmt = $pdo->prepare("
+        SELECT mi.name, oi.quantity, oi.returned_qty, mi.price
+        FROM order_items oi
+        JOIN menu_items mi ON oi.menu_item_id = mi.id
+        JOIN orders o ON oi.order_id = o.id
+        JOIN farm_bookings fb ON fb.contact_no = (SELECT phone_number FROM guests WHERE id = o.guest_id LIMIT 1)
+        WHERE fb.id = ?
+    ");
+    $stmt->execute([$bookingId]);
+    $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    echo json_encode($items);
+    exit;
+}
+
 // Fetch date filters if selected
 $selectedMonth = isset($_GET['month']) ? intval($_GET['month']) : null;
 $selectedYear  = isset($_GET['year']) ? intval($_GET['year']) : null;
@@ -64,6 +85,7 @@ include "includes/header.php";
         .modal-content { max-width: 450px; width: 90%; background: white; padding: 24px; border-radius: 12px; font-family: monospace; color: #111827; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
         .receipt-line { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; }
         .receipt-divider { border-bottom: 1px dashed #cbd5e0; margin: 12px 0; }
+        .food-item-detail-row { display: flex; justify-content: space-between; font-size: 11px; color: #4b5563; padding-left: 12px; margin-bottom: 3px; font-style: italic; }
     </style>
 
     <div class="page-header">
@@ -99,11 +121,10 @@ include "includes/header.php";
         <table class="excel-table">
             <thead>
                 <tr>
-                    <th>Invoice ID</th>
-                    <th>Guest / Source</th>
-                    <th>Contact No.</th>
                     <th>Check-In</th>
                     <th>Check-Out</th>
+                    <th>Guest / Source</th>
+                    <th>Contact No.</th>
                     <th>Stay Nights</th>
                     <th>Total Settlement</th>
                     <th>Remarks</th>
@@ -112,17 +133,18 @@ include "includes/header.php";
             </thead>
             <tbody>
                 <?php if (empty($receipts)): ?>
-                    <tr><td colspan="9" style="text-align: center; color: #94a3b8; padding: 24px;">No historical checkout logs found for the selection filters.</td></tr>
+                    <tr><td colspan="8" style="text-align: center; color: #94a3b8; padding: 24px;">No historical checkout logs found for the selection filters.</td></tr>
                 <?php else: foreach ($receipts as $r): 
+                    // Safe logic floor fix: if dates align on the exact same calendar day, ensure stay is tracked as 1 night minimum
+                    $stayNights = max(1, intval($r['total_days']));
                     $grandTotalBill = floatval($r['total_charge']) + floatval($r['total_food_bill']) + floatval($r['decoration_charges']) + floatval($r['tip_amount']);
                 ?>
                     <tr>
-                        <td><strong>#INV-<?= $r['id'] ?></strong></td>
-                        <td><strong><?= htmlspecialchars($r['booking_source'] ?: 'Offline Guest') ?></strong> <span class="badge"><?= intval($r['no_of_guests']) ?> Pax</span></td>
-                        <td><?= htmlspecialchars($r['contact_no'] ?: 'N/A') ?></td>
                         <td><?= date('d M Y', strtotime($r['check_in_date'])) ?></td>
                         <td><?= date('d M Y', strtotime($r['check_out_date'])) ?></td>
-                        <td style="text-align: center;"><?= intval($r['total_days']) ?> Nights</td>
+                        <td><strong><?= htmlspecialchars($r['booking_source'] ?: 'Offline Guest') ?></strong> <span class="badge"><?= intval($r['no_of_guests']) ?> Pax</span></td>
+                        <td><?= htmlspecialchars($r['contact_no'] ?: 'N/A') ?></td>
+                        <td style="text-align: center;"><?= $stayNights ?> Nights</td>
                         <td style="font-weight: 700; color: #0f172a;">₹<?= number_format($grandTotalBill, 2) ?></td>
                         <td><span class="badge badge-success"><?= htmlspecialchars($r['remarks']) ?></span></td>
                         <td style="text-align: center;">
@@ -138,6 +160,7 @@ include "includes/header.php";
     </div>
 </div>
 
+<!-- POPUP MODAL CONTAINER -->
 <div id="historicalReceiptModal" class="modal">
     <div class="modal-content">
         <span style="float: right; cursor: pointer; font-size: 20px; color: #a0aec0; font-family: sans-serif;" onclick="closeInvoiceModal()">✕</span>
@@ -145,22 +168,27 @@ include "includes/header.php";
         <p style="text-align: center; font-size: 11px; color: #718096; margin-top: 0; margin-bottom: 5px;">Jaipur, Rajasthan</p>
         <h4 style="text-align: center; margin-bottom: 15px; text-decoration: underline;">INVOICE STATEMENT</h4>
         
-        <div class="receipt-line"><span>Invoice Ref:</span><strong id="rcptInvId"></strong></div>
+        <div class="receipt-line"><span>Check-In Date:</span><strong id="rcptCheckIn"></strong></div>
+        <div class="receipt-line"><span>Check-Out Date:</span><strong id="rcptCheckOut"></strong></div>
         <div class="receipt-line"><span>Guest / Channel:</span><strong id="rcptGuest"></strong></div>
         <div class="receipt-line"><span>Contact No:</span><strong id="rcptPhone"></strong></div>
         <div class="receipt-line"><span>Stay Timeline:</span><strong id="rcptDates"></strong></div>
         
         <div class="receipt-divider"></div>
         
-        <div class="receipt-line"><span>Accommodation Cost:</span><span id="rcptRoom"></span></div>
-        <div class="receipt-line"><span>Kitchen & Food Bill:</span><span id="rcptFood"></span></div>
-        <div class="receipt-line"><span>Decoration Charges:</span><span id="rcptDecor"></span></div>
-        <div class="receipt-line"><span>Staff Tip Gratuity:</span><span id="rcptTip"></span></div>
+        <!-- Accommodation cost includes baseline charge + advance accommodation payment -->
+        <div class="receipt-line"><span>Accommodation Cost:</span><span id="rcptRoom" style="font-weight: bold;"></span></div>
         
         <div class="receipt-divider"></div>
         
-        <div class="receipt-line" style="font-size: 14px; font-weight: bold;"><span>Gross Total Bill:</span><span id="rcptGross"></span></div>
-        <div class="receipt-line" style="color: #059669;"><span>Advance Deducted:</span><span id="rcptAdvance"></span></div>
+        <div class="receipt-line" style="font-weight: bold; margin-bottom: 8px;"><span>Kitchen & Food Bill:</span><span id="rcptFoodTotal"></span></div>
+        <!-- Target Hook for dynamic detailed item listing -->
+        <div id="rcptFoodItemsContainer"></div>
+        
+        <div class="receipt-divider"></div>
+        
+        <div class="receipt-line"><span>Decoration Charges:</span><span id="rcptDecor"></span></div>
+        <div class="receipt-line"><span>Staff Tip Gratuity:</span><span id="rcptTip"></span></div>
         
         <div class="receipt-divider" style="border-bottom-style: double; border-bottom-width: 3px;"></div>
         
@@ -175,34 +203,72 @@ include "includes/header.php";
 
 <script>
 function openInvoiceModal(data) {
-    const totalRoom = parseFloat(data.total_charge) || 0;
+    const rawAdvance = parseFloat(data.advance_paid) || 0;
+    const rawRoomCharges = parseFloat(data.total_charge) || 0;
+    
+    // Corrective math: merge room charges and advance deposit into final accommodation cost balance
+    const totalAccommodationCost = rawRoomCharges + rawAdvance;
+    
     const totalFood = parseFloat(data.total_food_bill) || 0;
     const totalDecor = parseFloat(data.decoration_charges) || 0;
     const totalTip = parseFloat(data.tip_amount) || 0;
-    const advance = parseFloat(data.advance_paid) || 0;
     
-    const grossBill = totalRoom + totalFood + totalDecor + totalTip;
-    const netPaid = parseFloat(data.pending_amount) || 0;
+    // Safety check floor fix: force minimum stay window calculation to 1 night
+    const correctedNights = Math.max(1, parseInt(data.total_days));
 
-    document.getElementById("rcptInvId").innerText = "#INV-" + data.id;
+    document.getElementById("rcptCheckIn").innerText = data.check_in_date;
+    document.getElementById("rcptCheckOut").innerText = data.check_out_date;
     document.getElementById("rcptGuest").innerText = data.booking_source;
     document.getElementById("rcptPhone").innerText = data.contact_no || 'N/A';
-    document.getElementById("rcptDates").innerText = data.total_days + " Nights";
+    document.getElementById("rcptDates").innerText = correctedNights + " Nights";
     
-    document.getElementById("rcptRoom").innerText = "₹" + totalRoom.toFixed(2);
-    document.getElementById("rcptFood").innerText = "₹" + totalFood.toFixed(2);
+    document.getElementById("rcptRoom").innerText = "₹" + totalAccommodationCost.toFixed(2);
+    document.getElementById("rcptFoodTotal").innerText = "₹" + totalFood.toFixed(2);
     document.getElementById("rcptDecor").innerText = "₹" + totalDecor.toFixed(2);
     document.getElementById("rcptTip").innerText = "₹" + totalTip.toFixed(2);
     
-    document.getElementById("rcptGross").innerText = "₹" + grossBill.toFixed(2);
-    document.getElementById("rcptAdvance").innerText = "-₹" + advance.toFixed(2);
-    document.getElementById("rcptNet").innerText = "₹" + (advance + netPaid).toFixed(2);
+    // Net aggregate financial tracking summation balance
+    const netCollected = totalAccommodationCost + totalFood + totalDecor + totalTip;
+    document.getElementById("rcptNet").innerText = "₹" + netCollected.toFixed(2);
+
+    const container = document.getElementById("rcptFoodItemsContainer");
+    container.innerHTML = '<div style="font-size:11px; color:#94a3b8; padding-left:12px;">Loading breakdown items...</div>';
+
+    fetch(`past_receipts.php?action_fetch_food_breakdown=1&booking_id=${data.id}`)
+    .then(res => res.json())
+    .then(dishList => {
+        container.innerHTML = "";
+        if (dishList.length === 0) {
+            container.innerHTML = '<div style="font-size:11px; color:#a0aec0; padding-left:12px;">No food items logged.</div>';
+            return;
+        }
+        dishList.forEach(item => {
+            const netQty = intval(item.quantity) - intval(item.returned_qty);
+            if (netQty > 0) {
+                const itemTotalCost = netQty * parseFloat(item.price);
+                container.innerHTML += `
+                    <div class="food-item-detail-row">
+                        <span>↳ ${item.name} (x${netQty})</span>
+                        <span>₹${itemTotalCost.toFixed(2)}</span>
+                    </div>
+                `;
+            }
+        });
+    })
+    .catch(() => {
+        container.innerHTML = '<div style="font-size:11px; color:#ef4444; padding-left:12px;">Failed to load order items.</div>';
+    });
 
     document.getElementById("historicalReceiptModal").style.display = "flex";
 }
 
 function closeInvoiceModal() {
     document.getElementById("historicalReceiptModal").style.display = "none";
+}
+
+// Utility function to ensure string digits compute cleanly to integer boundaries
+function intval(val) {
+    return parseInt(val) || 0;
 }
 </script>
 
