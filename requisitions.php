@@ -12,7 +12,7 @@ if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Chef" && $_SESSION["rol
     exit;
 }
 
-// Automatically loops through items, extracts catalog unit costs, and syncs data blocks downstream
+// Automatically loops through items, extracts catalog unit costs, and syncs data blocks downstream[cite: 1]
 function syncKitchenInventoryToGoogleSheets($req_id, $pdo) {
     try {
         $stmt = $pdo->prepare("SELECT ri.quantity, rc.item_name, rc.category_id, rc.unit_cost, (SELECT name FROM material_categories WHERE id = rc.category_id) as cat_name FROM requisition_items ri JOIN req_catalog rc ON ri.catalog_id = rc.id WHERE ri.requisition_id = ? AND ri.item_status = 'Fulfilled'");
@@ -42,7 +42,7 @@ function syncKitchenInventoryToGoogleSheets($req_id, $pdo) {
     }
 }
 
-// --- AUTOMATED DEFICIENCY RESOLUTION ENGINE ---
+// --- AUTOMATED DEFICIENCY RESOLUTION ENGINE ---[cite: 1]
 function autoResolveDeficiencies($req_id, $pdo) {
     try {
         $stmt = $pdo->prepare("SELECT catalog_id, quantity FROM requisition_items WHERE requisition_id = ? AND item_status = 'Fulfilled'");
@@ -104,13 +104,11 @@ function sendRequisitionFulfilledTelegram($req_id, $pdo) {
     } catch (Exception $tgEx) {}
 }
 
-// --- NEW AJAX INSTANT-COMMIT SUBMISSION BACKGROUND CHANNEL ---
-if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_instant_ajax_item_sync"])) {
-    header('Content-Type: application/json');
-    $req_id     = intval($_POST["requisition_id"]);
-    $catalog_id = intval($_POST["catalog_id"]);
-    $new_qty    = intval($_POST["quantity"]);
-    $new_status = trim($_POST["item_status"]); // 'Fulfilled' or 'Cancelled'
+// --- SAVING SUBMISSION INTERCEPTOR RE-INSTALLED TO SAVE ENTIRE BATCH AT ONCE ---[cite: 1]
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_requisition"])) {
+    $req_id = intval($_POST["update_req_id"]);
+    $quantities = $_POST["req_item_qty"] ?? [];
+    $item_statuses = $_POST["req_item_status"] ?? [];
 
     $pdo->beginTransaction();
     try {
@@ -118,23 +116,29 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_instant_ajax_i
         $logDeficiency  = $pdo->prepare("INSERT INTO deficient_stock_logs (requisition_id, catalog_id, ordered_qty, delivered_qty, deficit_qty) VALUES (?, ?, ?, ?, ?)");
         $updateItem     = $pdo->prepare("UPDATE requisition_items SET quantity = ?, item_status = ? WHERE requisition_id = ? AND catalog_id = ?");
 
-        $getOriginalQty->execute([$req_id, $catalog_id]);
-        $original_qty = intval($getOriginalQty->fetchColumn() ?: 0);
+        $all_fulfilled = true;
+        
+        foreach ($quantities as $cat_id => $qty) {
+            $cat_id = intval($cat_id);
+            $new_qty = intval($qty);
+            $allocated_status = isset($item_statuses[$cat_id]) ? trim($item_statuses[$cat_id]) : 'Pending';
 
-        if ($new_qty < $original_qty && $new_status === 'Fulfilled') {
-            $deficit = $original_qty - $new_qty;
-            $logDeficiency->execute([$req_id, $catalog_id, $original_qty, $new_qty, $deficit]);
+            if ($allocated_status !== 'Fulfilled' && $allocated_status !== 'Cancelled') {
+                $all_fulfilled = false;
+            }
+
+            $getOriginalQty->execute([$req_id, $cat_id]);
+            $original_qty = intval($getOriginalQty->fetchColumn() ?: 0);
+
+            if ($new_qty < $original_qty && $allocated_status === 'Fulfilled') {
+                $deficit = $original_qty - $new_qty;
+                $logDeficiency->execute([$req_id, $cat_id, $original_qty, $new_qty, $deficit]);
+            }
+
+            $updateItem->execute([$new_qty, $allocated_status, $req_id, $cat_id]);
         }
 
-        $updateItem->execute([$new_qty, $new_status, $req_id, $catalog_id]);
-
-        // Evaluate parent ticket context: look at all sibling items in this batch request
-        $siblingCheck = $pdo->prepare("SELECT COUNT(*) FROM requisition_items WHERE requisition_id = ? AND item_status NOT IN ('Fulfilled', 'Cancelled')");
-        $siblingCheck->execute([$req_id]);
-        $pendingSiblingsCount = intval($siblingCheck->fetchColumn() ?: 0);
-
-        // Micro-status lookup logic: globally marked Fulfilled only if 0 pending items remain
-        $final_global_status = ($pendingSiblingsCount === 0) ? 'Fulfilled' : 'Pending';
+        $final_global_status = $all_fulfilled ? 'Fulfilled' : 'Pending';
         
         $stmt = $pdo->prepare("UPDATE requisitions SET status = ? WHERE id = ?");
         $stmt->execute([$final_global_status, $req_id]);
@@ -146,12 +150,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_instant_ajax_i
         }
 
         $pdo->commit();
-        echo json_encode(['success' => true, 'global_status' => $final_global_status]);
+        $_SESSION['requisition_saved_toast'] = "Notification Saved successfully!";
+        header("Location: requisitions.php");
+        exit;
     } catch (Exception $e) {
         $pdo->rollBack();
-        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
-    exit;
 }
 
 $categories = $pdo->query("SELECT * FROM material_categories ORDER BY sort_order ASC")->fetchAll(PDO::FETCH_ASSOC);
@@ -234,24 +238,40 @@ include "includes/header.php";
 
 .btn-sidebar-past-link { display: block !important; text-align: center !important; width: 100% !important; padding: 8px !important; background: #f1f5f9 !important; color: #475569 !important; border: 1px solid #cbd5e0 !important; border-radius: 6px !important; font-size: 12px !important; font-weight: 600 !important; text-decoration: none !important; margin-top: 12px !important; }
 
-.binary-actions-wrapper { display: flex; gap: 6px; align-items: center; }
-.action-block-btn { padding: 6px 12px !important; font-size: 11px !important; font-weight: 700 !important; border: none !important; border-radius: 6px !important; color: #ffffff !important; cursor: pointer !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; }
+.binary-toggle-container { display: flex; gap: 4px; background: #f1f5f9; padding: 3px; border-radius: 6px; border: 1px solid #cbd5e0; }
+.toggle-choice-btn { padding: 6px 12px !important; font-size: 11px !important; font-weight: 700 !important; border: none !important; border-radius: 6px !important; color: #ffffff !important; cursor: pointer !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; }
 
-.btn-block-fulfilled { background: #38a169 !important; }
-.btn-block-fulfilled:hover { background: #2f855a !important; }
-.btn-block-remove { background: #e53e3e !important; }
-.btn-block-remove:hover { background: #c53030 !important; }
+/* Fixed baseline state styling blueprints */
+.btn-block-fulfilled { background: #10b981 !important; border: 1px solid #059669 !important; opacity: 1; }
+.btn-block-fulfilled:hover { background: #059669 !important; }
+.btn-block-remove { background: #ef4444 !important; border: 1px solid #dc2626 !important; opacity: 1; }
+.btn-block-remove:hover { background: #dc2626 !important; }
+
+/* Visual feedback state modifier targets */
+.row-state-greyed-out .item-text-title { color: #94a3b8 !important; text-decoration: line-through; }
+.row-state-greyed-out .btn-block-remove { background: #cbd5e0 !important; border-color: #cbd5e0 !important; color: #94a3b8 !important; cursor: not-allowed !important; opacity: 0.6; }
+
+.row-state-green-highlight .item-text-title { color: #10b981 !important; font-weight: 800; }
+.row-state-green-highlight .btn-block-fulfilled { background: #cbd5e0 !important; border-color: #cbd5e0 !important; color: #94a3b8 !important; cursor: not-allowed !important; opacity: 0.6; }
 
 .modal-input-qty { width: 50px; padding: 6px 4px; border: 1px solid #cbd5e0; text-align: center; font-size: 13px; font-weight: 700; color: #1e293b; border-radius: 0; border-left: none; border-right: none; background: #fff !important; }
-.modal-qty-container { display: flex; align-items: center; border-radius: 6px; overflow: hidden; border: 1px solid #cbd5e0; }
+.modal-qty-container { display: flex; align-items: center; border-radius: 6px; overflow: hidden; border: 1px solid #cbd5e0; background: #fff; }
 .modal-qty-btn { width: 28px; height: 31px; background: #f8fafc; border: none; color: #475569; font-weight: bold; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .modal-qty-btn:hover { background: #e2e8f0; color: #0f172a; }
 
-/* Inline micro-notification message styling */
-.micro-saved-toast { font-size: 11px; font-weight: bold; color: #10b981; display: block; margin-top: 4px; opacity: 0; transition: opacity 0.2s ease; text-align: center; font-family: monospace; }
+.audit-history-subtitle { font-size: 11px; color: #64748b; font-weight: 600; display: block; margin-top: 2px; font-family: monospace; }
+.global-toast-notification { padding: 12px 24px; background: #10b981; color: white; font-size: 14px; font-weight: 800; text-align: center; border-radius: 8px; box-shadow: 0 4px 12px rgba(16,185,129,0.2); margin-bottom: 15px; border: 1px solid #059669; }
 </style>
 
 <div class="app-body" style="max-width: 100% !important; width: 100% !important; display: block !important;">
+    
+    <!-- HIGH-VISIBILITY TOAST NOTIFICATION CONTAINER -->
+    <?php if (isset($_SESSION['requisition_saved_toast'])): ?>
+        <div class="global-toast-notification">
+            📢 <strong><?= htmlspecialchars($_SESSION['requisition_saved_toast']) ?></strong>
+        </div>
+    <?php unset($_SESSION['requisition_saved_toast']); endif; ?>
+
     <div class="category-section" style="margin-bottom: 20px;">
         <h2 class="category-title" style="text-transform: none; margin: 0;">📦 Material Requests Panel</h2>
     </div>
@@ -353,19 +373,26 @@ include "includes/header.php";
     </div>
 </div>
 
+<!-- CLIENT-SIDE RE-INTEGRATED STANDALONE TRANSACTION BATCH MODAL LAYER -->
 <div id="editReqModalPopup" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
-    <div class="modal-content" style="background: white; max-width: 550px; width: 92%; border-radius: 12px; padding: 25px; position: relative; color: #111827; text-align: left;">
+    <div class="modal-content" style="background: white; max-width: 580px; width: 94%; border-radius: 12px; padding: 25px; position: relative; color: #111827; text-align: left;">
         <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="window.closeEditReqModal()">✕</span>
         <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; letter-spacing: 0.5px;">Modify Requisition Parameters</h3>
         
-        <h4 style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 12px; letter-spacing: 0.5px;">Item Verification Matrix</h4>
-        
-        <input type="hidden" id="mdlUpdateId">
-        <div id="mdlItemsContainer" style="max-height: 320px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 4px; margin-bottom: 15px; background: #fafafa;"></div>
+        <!-- NATIVE SQL FORM RESTORED TO RETREIVE ENTIRE CHANGESET MAP AT ONCE -->[cite: 1]
+        <form method="POST" action="requisitions.php" style="margin: 0;">
+            <input type="hidden" name="action_update_requisition" value="1">
+            <input type="hidden" name="update_req_id" id="mdlUpdateId">
+            
+            <h4 style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 12px; letter-spacing: 0.5px;">Item Verification Matrix</h4>
+            <div id="mdlItemsContainer" style="max-height: 290px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px; margin-bottom: 20px; background: #fafafa;"></div>
 
-        <div style="display: flex; justify-content: flex-end;">
-            <button type="button" class="btn btn-log" style="padding: 10px 24px; border-radius: 8px;" onclick="window.closeEditReqModal()">Close Window</button>
-        </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end; align-items: center;">
+                <button type="button" class="btn btn-log" style="padding: 10px 18px;" onclick="window.closeEditReqModal()">Cancel</button>
+                <!-- RENAME: Commit updates button renamed to Save -->
+                <button type="submit" class="btn btn-start" style="padding: 10px 24px; font-weight: 800;">Save</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -439,6 +466,7 @@ window.submitSidebarRequisition = function() {
     }).catch(err => alert("❌ Network connection failure."));
 };
 
+// --- RENDER COMPACT INTERACTION MATRIX AND POPULATE SUB-DOM TREE ---
 window.openEditRequisitionModal = function(reqId, element) {
     document.getElementById("mdlUpdateId").value = reqId;
     const container = document.getElementById("mdlItemsContainer");
@@ -452,90 +480,104 @@ window.openEditRequisitionModal = function(reqId, element) {
         }
         
         container.innerHTML = items.map(i => {
+            const initialStatus = i.item_status || 'Pending';
+            let rowStateClass = '';
+            if (initialStatus === 'Fulfilled') rowStateClass = 'row-state-green-highlight';
+            if (initialStatus === 'Cancelled') rowStateClass = 'row-state-greyed-out';
+
             return `
-                <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 8px; border-bottom:1px solid #e2e8f0; background:#ffffff; margin-bottom:4px; border-radius:6px; gap:8px;">
-                    <div style="flex:1; min-width:0;">
-                        <span style="font-size:12px; font-weight:700; color:#1e293b; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${i.name}</span>
-                        <span id="microSavedToast_${i.catalog_id}" class="micro-saved-toast">Saved ✓</span>
+                <div id="itemVerificationRow_${i.catalog_id}" class="verification-item-row-wrapper ${rowStateClass}" style="display:flex; justify-content:space-between; align-items:center; padding:12px 10px; border-bottom:1px solid #e2e8f0; background:#ffffff; margin-bottom:6px; border-radius:8px; gap:8px;">
+                    <div style="flex:1; min-width:0; text-align:left;">
+                        <span class="item-text-title" style="font-size:12px; font-weight:700; color:#1e293b; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; transition:all 0.15s ease;">${i.name}</span>
+                        <!-- AUDIT TRAIL TIMELINE ELEMENT HOOK -->
+                        <span id="qtyAuditSubtitle_${i.catalog_id}" class="audit-history-subtitle" data-original="${i.quantity}">Ordered: ${i.quantity}</span>
                     </div>
                     
                     <div class="modal-qty-container">
-                        <button type="button" class="modal-qty-btn" onclick="window.stepModalQty(${i.catalog_id}, -1)">-</button>
-                        <input type="number" id="mdlQtyInput_${i.catalog_id}" value="${i.quantity}" min="0" class="modal-input-qty" oninput="window.validateInputBound(this)">
-                        <button type="button" class="modal-qty-btn" onclick="window.stepModalQty(${i.catalog_id}, 1)">+</button>
+                        <button type="button" class="modal-qty-btn" onclick="window.adjustVerificationRowQty(${i.catalog_id}, -1)">-</button>
+                        <input type="number" id="mdlQtyInput_${i.catalog_id}" name="req_item_qty[${i.catalog_id}]" value="${i.quantity}" min="0" class="modal-input-qty" oninput="window.syncRowAuditText(${i.catalog_id})">
+                        <button type="button" class="modal-qty-btn" onclick="window.adjustVerificationRowQty(${i.catalog_id}, 1)">+</button>
                     </div>
 
-                    <div class="binary-toggle-container" style="background:#fff;">
-                        <button type="button" class="action-block-btn btn-block-fulfilled" onclick="window.commitRowStateInstant(${i.catalog_id}, 'Fulfilled')">Fulfilled</button>
-                        <button type="button" class="action-block-btn btn-block-remove" onclick="window.commitRowStateInstant(${i.catalog_id}, 'Cancelled')">Remove</button>
+                    <div class="binary-toggle-container" style="background:transparent; border:none; padding:0;">
+                        <input type="hidden" id="mdlStatusHidden_${i.catalog_id}" name="req_item_status[${i.catalog_id}]" value="${initialStatus}">
+                        <button type="button" class="toggle-choice-btn btn-block-fulfilled" onclick="window.triggerMemoryStateUpdate(${i.catalog_id}, 'Fulfilled')">Fulfilled</button>
+                        <button type="button" class="toggle-choice-btn btn-block-remove" onclick="window.triggerMemoryStateUpdate(${i.catalog_id}, 'Cancelled')">Remove</button>
                     </div>
                 </div>
             `;
         }).join('');
         
+        // Loop again quickly on render to correctly configure the cross-strike text states on setup initialization
+        items.forEach(i => window.syncRowAuditText(i.catalog_id));
         document.getElementById("editReqModalPopup").style.display = "flex";
     } catch(err) {
         container.innerHTML = '<p style="text-align:center; color:#ef4444; font-size:12px; padding:15px;">Failed loading data arrays.</p>';
     }
 };
 
-window.stepModalQty = function(catalogId, stepValue) {
+window.adjustVerificationRowQty = function(catalogId, stepValue) {
     const input = document.getElementById(`mdlQtyInput_${catalogId}`);
     if (input) {
         let currentVal = parseInt(input.value) || 0;
         input.value = Math.max(0, currentVal + stepValue);
+        
+        // Force evaluation check logic rules: if quantity goes back above 0, clear accidental greyed out states
+        if (currentVal + stepValue > 0) {
+            const hiddenStatus = document.getElementById(`mdlStatusHidden_${catalogId}`);
+            if (hiddenStatus && hiddenStatus.value === 'Cancelled') {
+                window.triggerMemoryStateUpdate(catalogId, 'Pending');
+            }
+        }
+        window.syncRowAuditText(catalogId);
     }
 };
 
 window.validateInputBound = function(element) {
     let val = parseInt(element.value);
-    if (isNaN(val) || val < 0) {
-        element.value = 0;
+    if (isNaN(val) || val < 0) { element.value = 0; }
+};
+
+// --- DYNAMICALLY RENDER STRIKETHROUGH CHARACTERS AUDIT PATTERNS ---
+window.syncRowAuditText = function(catalogId) {
+    const input = document.getElementById(`mdlQtyInput_${catalogId}`);
+    const subtitle = document.getElementById(`qtyAuditSubtitle_${catalogId}`);
+    if (!input || !subtitle) return;
+
+    const originalCount = parseInt(subtitle.getAttribute("data-original")) || 0;
+    const currentCount  = parseInt(input.value) || 0;
+
+    if (currentCount === originalCount) {
+        subtitle.innerHTML = `Ordered: ${originalCount}`;
+    } else {
+        subtitle.innerHTML = `Ordered: <del>${originalCount}</del> <strong style="color:#0284c7;">${currentCount}</strong>`;
     }
 };
 
-// --- CORE RE-ENGINEERING: FIXED AUTOMATED BACKGROUND TRANSACTIONS PIPE ENGINE ---
-window.commitRowStateInstant = function(catalogId, selectedState) {
-    const macroReqId = document.getElementById("mdlUpdateId").value;
-    const qtyValue   = document.getElementById(`mdlQtyInput_${catalogId}`).value;
-    const toastLabel = document.getElementById(`microSavedToast_${catalogId}`);
+// --- LOCAL APPLICATION MEMORY LAYER MODIFIER STATE ENGINE ---
+window.triggerMemoryStateUpdate = function(catalogId, targetedState) {
+    const hiddenStatus = document.getElementById(`mdlStatusHidden_${catalogId}`);
+    const rowWrapper   = document.getElementById(`itemVerificationRow_${catalogId}`);
+    const inputQty     = document.getElementById(`mdlQtyInput_${catalogId}`);
 
-    // Create standard secure network form data bundle block
-    const formParams = new FormData();
-    formParams.append('action_instant_ajax_item_sync', '1');
-    formParams.append('requisition_id', macroReqId);
-    formParams.append('catalog_id', catalogId);
-    formParams.append('quantity', qtyValue);
-    formParams.append('item_status', selectedState);
+    if (!hiddenStatus || !rowWrapper) return;
 
-    // Fire instant background fetch pipeline execution
-    fetch('requisitions.php', {
-        method: 'POST',
-        body: formParams
-    })
-    .then(res => res.json())
-    .then(payload => {
-        if (payload.success) {
-            // Display clean custom success confirmation label inline for exactly 500ms
-            if (toastLabel) {
-                toastLabel.style.opacity = '1';
-                setTimeout(() => {
-                    toastLabel.style.opacity = '0';
-                }, 500);
-            }
-        } else {
-            alert('❌ Operation transaction failure.');
-        }
-    })
-    .catch(() => {
-        alert('❌ Network connection drop error context.');
-    });
+    // Reset runtime utility class mappings
+    rowWrapper.classList.remove('row-state-greyed-out', 'row-state-green-highlight');
+
+    if (targetedState === 'Cancelled') {
+        hiddenStatus.value = 'Cancelled';
+        rowWrapper.classList.add('row-state-greyed-out');
+    } else if (targetedState === 'Fulfilled') {
+        hiddenStatus.value = 'Fulfilled';
+        rowWrapper.classList.add('row-state-green-highlight');
+    } else {
+        hiddenStatus.value = 'Pending';
+    }
 };
 
 window.closeEditReqModal = function() { 
-    document.getElementById("editReqModalPopup").style.display = "none";
-    // Reload parent dashboard container state context to align color indicator row blocks beautifully
-    location.reload(); 
+    document.getElementById("editReqModalPopup").style.display = "none"; 
 };
 </script>
 
