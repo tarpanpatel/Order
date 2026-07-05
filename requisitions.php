@@ -248,10 +248,7 @@ include "includes/header.php";
 
 .binary-toggle-container { display: flex; gap: 4px; background: #f1f5f9; padding: 3px; border-radius: 6px; border: 1px solid #cbd5e0; }
 
-/* RE-PRIORITIZED SELECTOR SPECIFICITY: Enforces backgrounds using !important directly on classes */
 .toggle-choice-btn { flex: 1; padding: 5px 8px; font-size: 11px; font-weight: 700; border: none; border-radius: 4px; background: transparent; color: #64748b; cursor: pointer; transition: all 0.15s ease; text-align: center; text-transform: uppercase; }
-.toggle-choice-btn.selected-fulfilled { background: #38a169 !important; color: #ffffff !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-.toggle-choice-btn.selected-cancelled { background: #e53e3e !important; color: #ffffff !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
 
 .modal-input-qty { width: 50px; padding: 6px 4px; border: 1px solid #cbd5e0; text-align: center; font-size: 13px; font-weight: 700; color: #1e293b; border-radius: 0; border-left: none; border-right: none; background: #fff !important; }
 .modal-qty-container { display: flex; align-items: center; border-radius: 6px; overflow: hidden; border: 1px solid #cbd5e0; }
@@ -466,6 +463,10 @@ window.openEditRequisitionModal = function(reqId, element) {
         container.innerHTML = items.map(i => {
             const currentStatus = i.item_status;
             
+            // FIXED: Add explicit targeted active state classes dynamically directly inside JS element builder
+            const fClass = (currentStatus === 'Fulfilled') ? 'active-fulfilled' : '';
+            const cClass = (currentStatus === 'Cancelled') ? 'active-cancelled' : '';
+            
             return `
                 <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 8px; border-bottom:1px solid #e2e8f0; background:#ffffff; margin-bottom:4px; border-radius:6px; gap:8px;">
                     <span style="font-size:12px; font-weight:700; color:#1e293b; flex:1; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${i.name}</span>
@@ -478,8 +479,8 @@ window.openEditRequisitionModal = function(reqId, element) {
 
                     <div class="binary-toggle-container">
                         <input type="hidden" id="mdlStatusHidden_${i.catalog_id}" name="req_item_status[${i.catalog_id}]" value="${currentStatus}">
-                        <button type="button" id="toggleBtn_F_${i.catalog_id}" class="toggle-choice-btn ${currentStatus === 'Fulfilled' ? 'selected-fulfilled' : ''}" onclick="window.setRowBinaryState(${i.catalog_id}, 'Fulfilled')">Fulfilled</button>
-                        <button type="button" id="toggleBtn_C_${i.catalog_id}" class="toggle-choice-btn ${currentStatus === 'Cancelled' ? 'selected-cancelled' : ''}" onclick="window.setRowBinaryState(${i.catalog_id}, 'Cancelled')">Remove</button>
+                        <button type="button" id="toggleBtn_F_${i.catalog_id}" class="toggle-choice-btn ${fClass}" onclick="window.setRowBinaryState(${i.catalog_id}, 'Fulfilled')">Fulfilled</button>
+                        <button type="button" id="toggleBtn_C_${i.catalog_id}" class="toggle-choice-btn ${cClass}" onclick="window.setRowBinaryState(${i.catalog_id}, 'Cancelled')">Remove</button>
                     </div>
                 </div>
             `;
@@ -506,6 +507,7 @@ window.validateInputBound = function(element) {
     }
 };
 
+// FIXED JS STATE HANDLER: Drops property injection and uses class toggling, bypassing layout cascade bugs completely
 window.setRowBinaryState = function(catalogId, targetedState) {
     const hiddenInput = document.getElementById(`mdlStatusHidden_${catalogId}`);
     const btnFulfilled = document.getElementById(`toggleBtn_F_${catalogId}`);
@@ -515,22 +517,16 @@ window.setRowBinaryState = function(catalogId, targetedState) {
 
     if (hiddenInput.value === targetedState) {
         hiddenInput.value = 'Pending';
-        btnFulfilled.style.setProperty('background', 'transparent', 'important');
-        btnFulfilled.style.setProperty('color', '#64748b', 'important');
-        btnCancelled.style.setProperty('background', 'transparent', 'important');
-        btnCancelled.style.setProperty('color', '#64748b', 'important');
+        btnFulfilled.classList.remove('active-fulfilled');
+        btnCancelled.classList.remove('active-cancelled');
     } else {
         hiddenInput.value = targetedState;
         if (targetedState === 'Fulfilled') {
-            btnFulfilled.style.setProperty('background', '#38a169', 'important');
-            btnFulfilled.style.setProperty('color', '#ffffff', 'important');
-            btnCancelled.style.setProperty('background', 'transparent', 'important');
-            btnCancelled.style.setProperty('color', '#64748b', 'important');
+            btnFulfilled.classList.add('active-fulfilled');
+            btnCancelled.classList.remove('active-cancelled');
         } else if (targetedState === 'Cancelled') {
-            btnCancelled.style.setProperty('background', '#e53e3e', 'important');
-            btnCancelled.style.setProperty('color', '#ffffff', 'important');
-            btnFulfilled.style.setProperty('background', 'transparent', 'important');
-            btnFulfilled.style.setProperty('color', '#64748b', 'important');
+            btnCancelled.classList.add('active-cancelled');
+            btnFulfilled.classList.remove('active-fulfilled');
         }
     }
 };
