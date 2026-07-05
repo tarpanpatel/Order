@@ -1,11 +1,12 @@
 <?php
+// /home/apartment/artistsfarmjaipur.com/Order/requisitions.php
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 require_once "config/db.php";
 require_once "config/telegram.php"; 
-// require_once "config/google_sheets_bridge.php"; // Include Google App Sync Engine
 include_once __DIR__ . '/config/local_db_bridge.php';
+
 if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Chef" && $_SESSION["role"] !== "Admin")) {
     header("Location: login.php");
     exit;
@@ -23,8 +24,6 @@ function syncKitchenInventoryToGoogleSheets($req_id, $pdo) {
             $unit_cost = floatval($item['unit_cost']);
             $total_cost = $qty * $unit_cost;
 
-            // Target Sheet Tab: "Kitchen Exp"
-            // Layout Row Matches: [Sr No., Date, Category, Description, Qty, Unit, Price, Total, Vendor]
             $rowPattern = [
                 '', 
                 date('Y-m-d'), 
@@ -145,7 +144,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_requisi
 
         if ($new_status === 'Fulfilled' && $old_status !== 'Fulfilled') {
             autoResolveDeficiencies($req_id, $pdo);
-            syncKitchenInventoryToGoogleSheets($req_id, $pdo); // CLOUD SYNC AUTOMATION
+            syncKitchenInventoryToGoogleSheets($req_id, $pdo);
         }
 
         $pdo->commit();
@@ -168,7 +167,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_complete_requi
         $stmt = $pdo->prepare("UPDATE requisitions SET status = 'Fulfilled' WHERE id = ?");
         $stmt->execute([$req_id]);
         autoResolveDeficiencies($req_id, $pdo);
-        syncKitchenInventoryToGoogleSheets($req_id, $pdo); // CLOUD SYNC AUTOMATION
+        syncKitchenInventoryToGoogleSheets($req_id, $pdo);
         $pdo->commit();
         sendRequisitionFulfilledTelegram($req_id, $pdo);
         header("Location: requisitions.php");
@@ -180,13 +179,15 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_complete_requi
 
 $categories = $pdo->query("SELECT * FROM material_categories ORDER BY sort_order ASC")->fetchAll(PDO::FETCH_ASSOC);
 $materials  = $pdo->query("SELECT id, item_name as name, category_id, image_path FROM req_catalog ORDER BY item_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+// MODIFIED: Fetches strictly the last 10 records for fast scannability on operations panel
 $past_requisitions = $pdo->query("SELECT r.id, r.requested_at, r.status,
                                   (SELECT GROUP_CONCAT(CONCAT(rc.item_name, ' (x', ri.quantity, ')') SEPARATOR ', ')
                                    FROM requisition_items ri
                                    JOIN req_catalog rc ON ri.catalog_id = rc.id
                                    WHERE ri.requisition_id = r.id) as item_summary
                                   FROM requisitions r
-                                  ORDER BY r.id DESC LIMIT 15")->fetchAll(PDO::FETCH_ASSOC);
+                                  ORDER BY r.id DESC LIMIT 10")->fetchAll(PDO::FETCH_ASSOC);
                                   
 include "includes/header.php";
 ?>
@@ -206,7 +207,7 @@ include "includes/header.php";
 .sidebar-cart-list { flex-grow: 1; overflow-y: auto; max-height: 280px; margin-bottom: 15px; }
 .sidebar-cart-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; padding: 8px 0; border-bottom: 1px solid #f7fafc; }
 .qty-btn-sm { padding: 2px 8px; font-size: 12px; font-weight: bold; border: 1px solid #cbd5e0; background: #f7fafc; border-radius: 4px; cursor: pointer; }
-.past-log-section { background: #ffffff !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; padding: 24px !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important; text-align: left; width: 100%; box-sizing: border-box; }
+.past-log-section { background: #ffffff !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; padding: 24px !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important; text-align: left; width: 100%; box-sizing: border-box; margin-top: 24px; }
 .past-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .past-table th { background: #f8fafc; padding: 12px; font-weight: 700; color: #4b5563; border-bottom: 2px solid #e2e8f0; }
 .past-table td { padding: 12px; border-bottom: 1px solid #edf2f7; color: #111827; vertical-align: middle; }
@@ -216,13 +217,13 @@ include "includes/header.php";
 
 @media (max-width: 1023px) {
     .split-requisition-layout { grid-template-columns: 1fr !important; }
-    .requisition-right-sidebar { position: static !important; min-height: auto; }
 }
 </style>
 
 <div class="app-body" style="max-width: 100% !important; width: 100% !important; display: block !important;">
-    <div class="category-section" style="margin-bottom: 20px;">
-        <h2 class="category-title" style="text-transform: none;">📦 Material Requests Panel</h2>
+    <div class="category-section" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+        <h2 class="category-title" style="text-transform: none; margin: 0;">📦 Material Requests Panel</h2>
+        <a href="requisitions_log.php" style="padding: 8px 16px; background: #06b6d4; color: #fff; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">📂 View Monthly Logs</a>
     </div>
 
     <div class="split-requisition-layout">
@@ -258,58 +259,6 @@ include "includes/header.php";
                     <?php endforeach; ?>
                 </div>
             </div>
-
-            <div class="past-log-section">
-                <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; color: #111827; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 10px;">📋 Requisitions History Log</h3>
-                <div style="overflow-x: auto;">
-                    <table class="past-table">
-                        <thead>
-                            <tr>
-                                <th style="width: 80px; text-align: center;">Req ID</th>
-                                <th style="width: 140px;">Requested At</th>
-                                <th>Material Selections Summary</th>
-                                <th style="width: 110px; text-align: center;">Status</th>
-                                <th style="width: 160px; text-align: center;">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php if (!empty($past_requisitions)): foreach ($past_requisitions as $pRow): 
-                                $summary_clean = !empty($pRow['item_summary']) ? $pRow['item_summary'] : '<span style="color:#a0aec0; font-style:italic;">No mapped materials</span>';
-                                $is_fulfilled = ($pRow['status'] === 'Fulfilled');
-                                $pill_class = $is_fulfilled ? 'p-fulfilled' : 'p-pending';
-                                $status_label = empty($pRow['status']) ? 'Pending' : $pRow['status'];
-
-                                $lines = $pdo->prepare("SELECT ri.catalog_id, ri.quantity, rc.item_name as name FROM requisition_items ri JOIN req_catalog rc ON ri.catalog_id = rc.id WHERE ri.requisition_id = ?");
-                                $lines->execute([$pRow['id']]);
-                                $serializedItems = json_encode($lines->fetchAll(PDO::FETCH_ASSOC));
-                            ?>
-                                <tr>
-                                    <td style="text-align: center; font-weight: 700; color: #4a5568;">#<?= $pRow['id'] ?></td>
-                                    <td style="color: #718096;"><?= date('d M Y - H:i', strtotime($pRow['requested_at'])) ?></td>
-                                    <td style="font-weight: 600; color: #2d3748;"><?= $summary_clean ?></td>
-                                    <td style="text-align: center;">
-                                        <span class="status-pill <?= $pill_class ?>"><?= $status_label ?></span>
-                                    </td>
-                                    <td style="text-align: center;">
-                                        <div style="display: flex; gap: 6px; justify-content: center;">
-                                            <button type="button" class="btn btn-start" style="padding: 6px 10px; font-size: 11px; border-radius: 4px;" data-items='<?= htmlspecialchars($serializedItems, ENT_QUOTES, 'UTF-8') ?>' onclick="window.openEditRequisitionModal(<?= $pRow['id'] ?>, '<?= $status_label ?>', this)">✏ Edit</button>
-                                            <?php if (!$is_fulfilled): ?>
-                                                <form method="POST" style="margin:0;" onsubmit="return confirm('Mark request #<?= $pRow['id'] ?> as complete?');">
-                                                    <input type="hidden" name="action_complete_requisition" value="1">
-                                                    <input type="hidden" name="complete_req_id" value="<?= $pRow['id'] ?>">
-                                                    <button type="submit" class="btn btn-bill" style="padding: 6px 10px; font-size: 11px; border-radius: 4px; background: #38a169; border-color: #38a169;">✔ Complete</button>
-                                                </form>
-                                            <?php endif; ?>
-                                        </div>
-                                    </td>
-                                </tr>
-                            <?php endforeach; else: ?>
-                                <tr><td colspan="5" style="text-align: center; color: #a0aec0; padding: 30px;">No historical data records saved.</td></tr>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
         </div>
 
         <div class="requisition-right-sidebar">
@@ -324,6 +273,59 @@ include "includes/header.php";
                 </div>
                 <button type="button" class="btn btn-bill" style="width: 100%; padding: 12px; font-size: 13px; font-weight: bold; border-radius: 8px;" onclick="window.submitSidebarRequisition()">Submit Requisition</button>
             </div>
+        </div>
+    </div>
+
+    <!-- MODIFIED: Relocated structure positioned completely below requisition layout blocks -->
+    <div class="past-log-section">
+        <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; color: #111827; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 10px;">📋 Recent Requisitions (Last 10 Requests)</h3>
+        <div style="overflow-x: auto;">
+            <table class="past-table">
+                <thead>
+                    <tr>
+                        <th style="width: 80px; text-align: center;">Req ID</th>
+                        <th style="width: 140px;">Requested At</th>
+                        <th>Material Selections Summary</th>
+                        <th style="width: 110px; text-align: center;">Status</th>
+                        <th style="width: 160px; text-align: center;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (!empty($past_requisitions)): foreach ($past_requisitions as $pRow): 
+                        $summary_clean = !empty($pRow['item_summary']) ? $pRow['item_summary'] : '<span style="color:#a0aec0; font-style:italic;">No mapped materials</span>';
+                        $is_fulfilled = ($pRow['status'] === 'Fulfilled');
+                        $pill_class = $is_fulfilled ? 'p-fulfilled' : 'p-pending';
+                        $status_label = empty($pRow['status']) ? 'Pending' : $pRow['status'];
+
+                        $lines = $pdo->prepare("SELECT ri.catalog_id, ri.quantity, rc.item_name as name FROM requisition_items ri JOIN req_catalog rc ON ri.catalog_id = rc.id WHERE ri.requisition_id = ?");
+                        $lines->execute([$pRow['id']]);
+                        $serializedItems = json_encode($lines->fetchAll(PDO::FETCH_ASSOC));
+                    ?>
+                        <tr>
+                            <td style="text-align: center; font-weight: 700; color: #4a5568;">#<?= $pRow['id'] ?></td>
+                            <td style="color: #718096;"><?= date('d M Y - H:i', strtotime($pRow['requested_at'])) ?></td>
+                            <td style="font-weight: 600; color: #2d3748;"><?= $summary_clean ?></td>
+                            <td style="text-align: center;">
+                                <span class="status-pill <?= $pill_class ?>"><?= $status_label ?></span>
+                            </td>
+                            <td style="text-align: center;">
+                                <div style="display: flex; gap: 6px; justify-content: center;">
+                                    <button type="button" class="btn btn-start" style="padding: 6px 10px; font-size: 11px; border-radius: 4px;" data-items='<?= htmlspecialchars($serializedItems, ENT_QUOTES, 'UTF-8') ?>' onclick="window.openEditRequisitionModal(<?= $pRow['id'] ?>, '<?= $status_label ?>', this)">✏ Edit</button>
+                                    <?php if (!$is_fulfilled): ?>
+                                        <form method="POST" style="margin:0;" onsubmit="return confirm('Mark request #<?= $pRow['id'] ?> as complete?');">
+                                            <input type="hidden" name="action_complete_requisition" value="1">
+                                            <input type="hidden" name="complete_req_id" value="<?= $pRow['id'] ?>">
+                                            <button type="submit" class="btn btn-bill" style="padding: 6px 10px; font-size: 11px; border-radius: 4px; background: #38a169; border-color: #38a169;">✔ Complete</button>
+                                        </form>
+                                    <?php endif; ?>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endforeach; else: ?>
+                        <tr><td colspan="5" style="text-align: center; color: #a0aec0; padding: 30px;">No historical data records saved.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
@@ -389,7 +391,7 @@ window.renderSidebarCart = function() {
         <div class="sidebar-cart-row">
             <div style="font-weight: 600; color: #111827; max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${item.name}</div>
             <div style="display: flex; align-items: center; gap: 8px;">
-                <button type="button" class="qty-btn-sm" onclick="window.updateSidebarQty(${item.id}, -1)"></button>
+                <button type="button" class="qty-btn-sm" onclick="window.updateSidebarQty(${item.id}, -1)">-</button>
                 <span style="font-weight: 700; font-size: 13px; width: 20px; text-align: center;">${item.qty}</span>
                 <button type="button" class="qty-btn-sm" onclick="window.updateSidebarQty(${item.id}, 1)">+</button>
             </div>
