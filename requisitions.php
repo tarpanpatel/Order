@@ -209,7 +209,6 @@ include "includes/header.php";
 .material-item-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; background: #fff; text-align: center; display: flex; flex-direction: column; justify-content: space-between; align-items: center; min-height: 110px; box-sizing: border-box; }
 .material-item-name { font-size: 12px; font-weight: 600; color: #111827; margin-bottom: 10px; line-height: 1.4; text-align: center; width: 100%; word-wrap: break-word; }
 
-/* FIXED: Re-designed Add Button to match rounded white category selection pill headers */
 .btn-tab-styled-add { 
     display: inline-block !important;
     padding: 5px 14px !important; 
@@ -237,21 +236,41 @@ include "includes/header.php";
 .sidebar-cart-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; padding: 8px 0; border-bottom: 1px solid #f7fafc; }
 .qty-btn-sm { padding: 2px 8px; font-size: 12px; font-weight: bold; border: 1px solid #cbd5e0; background: #f7fafc; border-radius: 4px; cursor: pointer; }
 
-/* Sidebar log list adjustments */
-.past-log-section { background: #ffffff !important; border: 1px solid #cbd5e0 !important; border-radius: 12px !important; padding: 16px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important; text-align: left; width: 100%; box-sizing: border-box; }
-.past-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.past-table th { background: #f8fafc; padding: 8px; font-weight: 700; color: #4b5563; border-bottom: 2px solid #e2e8f0; text-align: left; }
-.past-table td { padding: 8px; border-bottom: 1px solid #edf2f7; color: #111827; vertical-align: middle; }
-.status-pill { font-size: 10px; padding: 2px 6px; border-radius: 10px; font-weight: 700; display: inline-block; }
-.status-pill.p-pending { background: #fef3c7; color: #d97706; }
-.status-pill.p-fulfilled { background: #d1fae5; color: #059669; }
+/* Sidebar Log Grid Enhancements to completely prevent text blowout */
+.past-log-section { background: #ffffff !important; border: 1px solid #cbd5e0 !important; border-radius: 12px !important; padding: 14px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important; text-align: left; width: 100%; box-sizing: border-box; }
+.past-table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
+.past-table th { background: #f8fafc; padding: 6px 4px; font-weight: 700; color: #4b5563; border-bottom: 2px solid #e2e8f0; text-align: left; }
+.past-table td { padding: 8px 4px; border-bottom: 1px solid #edf2f7; color: #111827; vertical-align: middle; }
+
+/* Multi-line, State-driven Color Coded Action Buttons */
+.btn-action-trigger { 
+    display: block !important; 
+    width: 100% !important; 
+    padding: 6px 4px !important; 
+    font-size: 10px !important; 
+    font-weight: 700 !important; 
+    text-transform: uppercase; 
+    border-radius: 6px !important; 
+    cursor: pointer !important; 
+    text-align: center !important; 
+    line-height: 1.3 !important;
+    border: 1px solid transparent !important;
+}
+.btn-action-trigger span { 
+    display: block !important; 
+    font-size: 9px !important; 
+    font-weight: 800 !important;
+    text-transform: lowercase;
+}
+
+/* Specific color states matching your native badges */
+.btn-status-pending { background: #fef3c7 !important; color: #d97706 !important; border-color: #f59e0b !important; }
+.btn-status-pending:hover { background: #fde68a !important; }
+.btn-status-fulfilled { background: #d1fae5 !important; color: #059669 !important; border-color: #10b981 !important; }
+.btn-status-fulfilled:hover { background: #a7f3d0 !important; }
 
 .btn-sidebar-past-link { display: block !important; text-align: center !important; width: 100% !important; padding: 8px !important; background: #f1f5f9 !important; color: #475569 !important; border: 1px solid #cbd5e0 !important; border-radius: 6px !important; font-size: 12px !important; font-weight: 600 !important; text-decoration: none !important; margin-top: 12px !important; box-sizing: border-box !important; transition: background 0.15s ease; }
 .btn-sidebar-past-link:hover { background: #e2e8f0 !important; color: #1e293b !important; }
-
-/* Take Action interactive item element styling */
-.btn-take-action { padding: 3px 8px !important; font-size: 11px !important; font-weight: 600 !important; background: #06b6d4 !important; color: #ffffff !important; border: none !important; border-radius: 4px !important; cursor: pointer !important; text-align: center !important; }
-.btn-take-action:hover { background: #0891b2 !important; }
 </style>
 
 <div class="app-body" style="max-width: 100% !important; width: 100% !important; display: block !important;">
@@ -294,7 +313,9 @@ include "includes/header.php";
             </div>
         </div>
 
+        <!-- RIGHT COLUMN VERTICAL CONTAINER STACK -->
         <div class="right-column-stack">
+            <!-- CARD 1: REQUISITION SUMMARY FORM FOR SELECTIONS -->
             <div class="requisition-right-sidebar">
                 <h3 class="sidebar-summary-title">📝 Requisition Summary</h3>
                 <div class="sidebar-cart-list" id="sidebarCartRowsContainer">
@@ -309,23 +330,23 @@ include "includes/header.php";
                 </div>
             </div>
 
+            <!-- CARD 2: RECENT REQUISITIONS HISTORY LIST PANEL -->
             <div class="past-log-section">
                 <h3 style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #111827; margin-bottom: 12px; border-bottom: 1px dashed #cbd5e0; padding-bottom: 6px; letter-spacing: 0.5px;">📋 Recent Requisitions Log</h3>
                 <div style="overflow-x: auto;">
                     <table class="past-table">
                         <thead>
                             <tr>
-                                <th style="width: 95px;">Date & Time</th>
-                                <th>Summary Descriptor Details</th>
-                                <th style="text-align: center; width: 60px;">Status</th>
-                                <th style="text-align: center; width: 75px;">Action</th>
+                                <th style="width: 65px;">Date &amp; Time</th>
+                                <th>Summary Details</th>
+                                <th style="text-align: center; width: 80px;">Action</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if (!empty($past_requisitions)): foreach ($past_requisitions as $pRow): 
                                 $summary_clean = !empty($pRow['item_summary']) ? $pRow['item_summary'] : 'No items';
                                 $is_fulfilled = ($pRow['status'] === 'Fulfilled');
-                                $pill_class = $is_fulfilled ? 'p-fulfilled' : 'p-pending';
+                                $status_style = $is_fulfilled ? 'btn-status-fulfilled' : 'btn-status-pending';
                                 $status_label = empty($pRow['status']) ? 'Pending' : $pRow['status'];
 
                                 $lines = $pdo->prepare("SELECT ri.catalog_id, ri.quantity, rc.item_name as name FROM requisition_items ri JOIN req_catalog rc ON ri.catalog_id = rc.id WHERE ri.requisition_id = ?");
@@ -333,17 +354,23 @@ include "includes/header.php";
                                 $serializedItems = json_encode($lines->fetchAll(PDO::FETCH_ASSOC));
                             ?>
                                 <tr>
-                                    <td style="color: #475569; font-weight: 600; font-family: monospace; white-space: nowrap;"><?= date('d/m/y • H:i', strtotime($pRow['requested_at'])) ?></td>
-                                    <td style="max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500;" title="<?= htmlspecialchars($summary_clean) ?>"><?= $summary_clean ?></td>
-                                    <td style="text-align: center;">
-                                        <span class="status-pill <?= $pill_class ?>"><?= $status_label ?></span>
+                                    <!-- Two-line vertical date layout prevents column stretching -->
+                                    <td style="color: #475569; font-weight: 600; font-family: monospace; font-size: 11px; line-height: 1.2;">
+                                        <?= date('d/m/y', strtotime($pRow['requested_at'])) ?><br>
+                                        <span style="color: #94a3b8; font-size: 10px;"><?= date('H:i', strtotime($pRow['requested_at'])) ?></span>
                                     </td>
+                                    <!-- Safe text truncation via inline CSS rules -->
+                                    <td style="max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; font-size: 11px; padding-right: 4px;" title="<?= htmlspecialchars($summary_clean) ?>"><?= $summary_clean ?></td>
+                                    <!-- Color Coded Multiline action button contains both the status and action link -->
                                     <td style="text-align: center;">
-                                        <button type="button" class="btn-take-action" data-items='<?= htmlspecialchars($serializedItems, ENT_QUOTES, 'UTF-8') ?>' onclick="window.openEditRequisitionModal(<?= $pRow['id'] ?>, '<?= $status_label ?>', this)">Take Action</button>
+                                        <button type="button" class="btn-action-trigger <?= $status_style ?>" data-items='<?= htmlspecialchars($serializedItems, ENT_QUOTES, 'UTF-8') ?>' onclick="window.openEditRequisitionModal(<?= $pRow['id'] ?>, '<?= $status_label ?>', this)">
+                                            <span>(<?= strtolower($status_label) ?>)</span>
+                                            Take Action
+                                        </button>
                                     </td>
                                 </tr>
                             <?php endforeach; else: ?>
-                                <tr><td colspan="4" style="text-align: center; color: #a0aec0; padding: 15px;">No requests found.</td></tr>
+                                <tr><td colspan="3" style="text-align: center; color: #a0aec0; padding: 15px;">No requests found.</td></tr>
                             <?php endif; ?>
                         </tbody>
                     </table>
