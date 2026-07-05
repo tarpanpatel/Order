@@ -529,7 +529,7 @@ window.setRowBinaryState = function(catalogId, targetedState) {
         }
     }
 };
- 
+
 window.closeEditReqModal = function() { 
     document.getElementById("editReqModalPopup").style.display = "none"; 
 };
