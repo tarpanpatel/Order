@@ -463,7 +463,7 @@ window.openEditRequisitionModal = function(reqId, element) {
         container.innerHTML = items.map(i => {
             const currentStatus = i.item_status;
             
-            // FIXED: Add explicit targeted active state classes dynamically directly inside JS element builder
+            // RESOLVED: Attaches explicit active formatting triggers by default initialization
             const fClass = (currentStatus === 'Fulfilled') ? 'active-fulfilled' : '';
             const cClass = (currentStatus === 'Cancelled') ? 'active-cancelled' : '';
             
@@ -507,7 +507,6 @@ window.validateInputBound = function(element) {
     }
 };
 
-// FIXED JS STATE HANDLER: Drops property injection and uses class toggling, bypassing layout cascade bugs completely
 window.setRowBinaryState = function(catalogId, targetedState) {
     const hiddenInput = document.getElementById(`mdlStatusHidden_${catalogId}`);
     const btnFulfilled = document.getElementById(`toggleBtn_F_${catalogId}`);
