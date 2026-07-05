@@ -146,7 +146,7 @@ if ($tab === 'overview') {
     }
 
 } elseif ($tab === 'dish_stats') {
-    // 7. 🔥 POPULAR DISHES METRICS ACCUMULATOR
+    // 7. 🔥 POPULAR DISHES METRICS ACCUMULATOR (FIXED: Robust Date conversion for cross-timezone compatibility)
     $stmt = $pdo->prepare("
         SELECT 
             mi.name AS dish_name,
@@ -155,8 +155,8 @@ if ($tab === 'overview') {
         FROM order_items oi
         JOIN menu_items mi ON oi.menu_item_id = mi.id
         JOIN orders o ON oi.order_id = o.id
-        WHERE MONTH(o.order_time) = :m 
-          AND YEAR(o.order_time) = :y
+        WHERE MONTH(STR_TO_DATE(o.order_time, '%Y-%m-%d %H:%i:%s')) = :m 
+          AND YEAR(STR_TO_DATE(o.order_time, '%Y-%m-%d %H:%i:%s')) = :y
         GROUP BY oi.menu_item_id
         HAVING total_qty > 0
         ORDER BY total_qty DESC, total_revenue DESC
@@ -170,16 +170,23 @@ if ($tab === 'overview') {
     $stmt->execute();
     
     $rank = $offset + 1;
+    $hasRecords = false;
+
     while ($row = $stmt->fetch()) {
+        $hasRecords = true;
         $rankBadge = ($rank <= 3) ? "background: #f59e0b; color: white;" : "background: #f1f5f9; color: #475569;";
         
         echo '<tr>
             <td><span class="badge" style="' . $rankBadge . '">#' . $rank . '</span></td>
             <td><strong>' . htmlspecialchars($row['dish_name']) . '</strong></td>
-            <td style="text-align: center; font-weight: 600;">' . intval($row['total_qty']) . ' ordered</td>
+            <td style="text-align: center; font-weight: 600;">' . intval($row['total_qty']) . ' units ordered</td>
             <td style="color: #06b6d4; font-weight: 700;">₹' . number_format($row['total_revenue'], 2) . '</td>
         </tr>';
         $rank++;
+    }
+
+    if (!$hasRecords && $offset === 0) {
+        echo '<tr><td colspan="4" style="text-align: center; color: #94a3b8; padding: 20px;">No dishes logged for this specific calendar period selection.</td></tr>';
     }
 }
 ?>
