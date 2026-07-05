@@ -245,12 +245,9 @@ include "includes/header.php";
 .btn-block-remove { background: #ef4444 !important; border: 1px solid #dc2626 !important; opacity: 1; }
 .btn-block-remove:hover { background: #dc2626 !important; }
 
-/* Visual feedback states modifiers rules mapping layout */
+/* Visual feedback states classes mapping styles layout */
 .row-state-greyed-out .item-text-title { color: #94a3b8 !important; text-decoration: line-through; }
-.row-state-greyed-out .btn-block-remove { background: #cbd5e0 !important; border-color: #cbd5e0 !important; color: #94a3b8 !important; cursor: not-allowed !important; opacity: 0.6; }
-
 .row-state-green-highlight .item-text-title { color: #10b981 !important; font-weight: 800; }
-.row-state-green-highlight .btn-block-fulfilled { background: #cbd5e0 !important; border-color: #cbd5e0 !important; color: #94a3b8 !important; cursor: not-allowed !important; opacity: 0.6; }
 
 .modal-input-qty { width: 50px; padding: 6px 4px; border: 1px solid #cbd5e0; text-align: center; font-size: 13px; font-weight: 700; color: #1e293b; border-radius: 0; border-left: none; border-right: none; background: #fff !important; }
 .modal-qty-container { display: flex; align-items: center; border-radius: 6px; overflow: hidden; border: 1px solid #cbd5e0; background: #fff; }
@@ -509,30 +506,46 @@ window.openEditRequisitionModal = function(reqId, element) {
 
 window.adjustVerificationRowQty = function(catalogId, stepValue) {
     const input = document.getElementById(`mdlQtyInput_${catalogId}`);
-    if (input) {
+    const hiddenStatus = document.getElementById(`mdlStatusHidden_${catalogId}`);
+    const rowWrapper   = document.getElementById(`itemVerificationRow_${catalogId}`);
+    
+    if (input && hiddenStatus && rowWrapper) {
         let currentVal = parseInt(input.value) || 0;
         let finalVal = Math.max(0, currentVal + stepValue);
         input.value = finalVal;
         
-        // FIXED ACTION: Modifying a greyed-out item drops the cancel state and makes Fulfilled active again
-        const hiddenStatus = document.getElementById(`mdlStatusHidden_${catalogId}`);
-        if (hiddenStatus && hiddenStatus.value === 'Cancelled' && finalVal > 0) {
-            window.triggerMemoryStateUpdate(catalogId, 'Fulfilled');
+        // FIXED ACTION MATRIX: Quantity modification on a greyed-out or completed row updates memory maps smoothly
+        if (hiddenStatus.value === 'Cancelled' && finalVal > 0) {
+            hiddenStatus.value = 'Fulfilled';
+            rowWrapper.classList.remove('row-state-greyed-out');
+            rowWrapper.classList.add('row-state-green-highlight');
+        } else if (hiddenStatus.value === 'Pending' && finalVal > 0) {
+            hiddenStatus.value = 'Fulfilled';
+            rowWrapper.classList.add('row-state-green-highlight');
         }
+        
         window.syncRowAuditText(catalogId);
     }
 };
 
 window.handleQuantityInputChangeDirect = function(catalogId) {
     const input = document.getElementById(`mdlQtyInput_${catalogId}`);
-    if (input) {
+    const hiddenStatus = document.getElementById(`mdlStatusHidden_${catalogId}`);
+    const rowWrapper   = document.getElementById(`itemVerificationRow_${catalogId}`);
+    
+    if (input && hiddenStatus && rowWrapper) {
         let finalVal = parseInt(input.value) || 0;
         if (finalVal < 0) { finalVal = 0; input.value = 0; }
         
-        const hiddenStatus = document.getElementById(`mdlStatusHidden_${catalogId}`);
-        if (hiddenStatus && hiddenStatus.value === 'Cancelled' && finalVal > 0) {
-            window.triggerMemoryStateUpdate(catalogId, 'Fulfilled');
+        if (hiddenStatus.value === 'Cancelled' && finalVal > 0) {
+            hiddenStatus.value = 'Fulfilled';
+            rowWrapper.classList.remove('row-state-greyed-out');
+            rowWrapper.classList.add('row-state-green-highlight');
+        } else if (hiddenStatus.value === 'Pending' && finalVal > 0) {
+            hiddenStatus.value = 'Fulfilled';
+            rowWrapper.classList.add('row-state-green-highlight');
         }
+        
         window.syncRowAuditText(catalogId);
     }
 };
@@ -566,7 +579,6 @@ window.triggerMemoryStateUpdate = function(catalogId, targetedState) {
     } else {
         hiddenStatus.value = targetedState;
         if (targetedState === 'Cancelled') {
-            // FIXED ACTION LOGIC: Clicking Remove forces the row count to 0 and writes the strikethrough audit trail target
             qtyInput.value = 0;
             rowWrapper.classList.add('row-state-greyed-out');
             window.syncRowAuditText(catalogId);
