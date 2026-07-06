@@ -52,12 +52,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_invoice
     }
 }
 
-// FIXED SQL: Removed non-existent room_number column reference
+// FIXED SQL: Changed ORDER BY to 'id DESC' to avoid unknown column error on timestamp
 $orders = $pdo->query("
     SELECT o.*, g.phone_number
     FROM orders o 
     LEFT JOIN guests g ON o.guest_id = g.id 
-    ORDER BY o.created_at DESC
+    ORDER BY o.id DESC
 ")->fetchAll(PDO::FETCH_ASSOC);
 
 include "includes/header.php";
@@ -95,7 +95,6 @@ include "includes/header.php";
                 <thead>
                     <tr>
                         <th>Invoice ID</th>
-                        <th>Timestamp Date</th>
                         <th>Guest Mapping</th>
                         <th>Subtotal Amount</th>
                         <th>Discount</th>
@@ -111,7 +110,6 @@ include "includes/header.php";
                     ?>
                         <tr class="invoice-data-row" data-search-string="<?= strtolower($order['id'] . ' ' . ($order['phone_number'] ?? '')) ?>">
                             <td style="font-weight: bold; color: #0284c7;">#<?= $order['id'] ?></td>
-                            <td><?= date('d M Y, h:i A', strtotime($order['created_at'])) ?></td>
                             <td style="font-family:monospace; font-weight:bold; color:#475569;"><?= htmlspecialchars($order['phone_number'] ?? 'Walk-In Guest') ?></td>
                             <td>₹<?= number_format($order['subtotal'], 2) ?></td>
                             <td style="color:#ef4444;">₹<?= number_format($order['discount'], 2) ?></td>
@@ -123,7 +121,7 @@ include "includes/header.php";
                             </td>
                         </tr>
                     <?php endforeach; else: ?>
-                        <tr><td colspan="7" style="text-align:center; color:#94a3b8; padding:30px; font-style:italic;">No past invoice records found.</td></tr>
+                        <tr><td colspan="6" style="text-align:center; color:#94a3b8; padding:30px; font-style:italic;">No past invoice records found.</td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
