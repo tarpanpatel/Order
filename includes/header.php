@@ -1,4 +1,5 @@
 <?php
+// /home/apartment/artistsfarmjaipur.com/Order/includes/header.php
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . "/../config/db.php";
 
@@ -124,10 +125,9 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
                 top: 0; 
                 left: 0; 
                 width: 100%; 
-                height: 100%;
-                background: rgba(45, 55, 72, 0.3); 
-                backdrop-filter: blur(2px);
-                z-index: 9998; 
+                height: 100%; 
+                background: rgba(0,0,0,0.4); 
+                z-index: 99998; 
                 display: none;
             }
             .sidebar-backdrop.is-active { display: block !important; }
@@ -154,7 +154,14 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
         
         <nav style="display: flex; flex-direction: column; gap: 4px;">
-            <?php if (isset($_SESSION["role"]) && ($_SESSION["role"] === 'Admin' || $_SESSION["role"] === 'Super Admin')): ?>
+            <?php 
+            // CORE ACCESS CONTROL MATRIX DEFINITION
+            $is_manager = isset($_SESSION["role"]) && $_SESSION["role"] === 'Admin';
+            $is_super   = isset($_SESSION["role"]) && $_SESSION["role"] === 'Super Admin';
+            
+            if ($is_manager || $is_super): 
+            ?>
+                <!-- SHARED OPERATION SECTION: Shared access points for manager and super admins -->
                 <a href="index.php" class="nav-link <?= ($current_page === 'index.php') ? 'active' : ''; ?>">📊 Dashboard</a>
                 
                 <?php if (!empty($current_active_guest)): ?>
@@ -185,17 +192,20 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
                 <a href="billing.php" class="nav-link <?= ($current_page === 'billing.php') ? 'active' : ''; ?>">🧾 Settlements & Billing</a>
             <?php endif; ?>
 
+            <!-- GENERAL UTILITY ACCESS MODULE -->
             <a href="order.php" class="nav-link <?= ($current_page === 'order.php') ? 'active' : ''; ?>">🍽️ Take Food Order</a>
             <a href="kitchen.php" class="nav-link <?= ($current_page === 'kitchen.php') ? 'active' : ''; ?>">🍳 Kitchen Orders</a>
             <a href="requisitions.php" class="nav-link <?= ($current_page === 'requisitions.php') ? 'active' : ''; ?>">📦 Material Requests</a>
-
             <a href="dashboard_analytics.php" class="nav-link <?= ($current_page === 'dashboard_analytics.php') ? 'active' : ''; ?>">📈 Business Analytics</a>
             
-            <?php if (isset($_SESSION["role"]) && ($_SESSION["role"] === 'Admin' || $_SESSION["role"] === 'Super Admin')): ?>
+            <?php if ($is_manager || $is_super): ?>
                 <a href="past_receipts.php" class="nav-link <?= ($current_page === 'past_receipts.php') ? 'active' : ''; ?>">📜 Past Receipts Log</a>
             <?php endif; ?>
 
-            <?php if (isset($_SESSION["role"]) && ($_SESSION["role"] === 'Super Admin' || $_SESSION["role"] === 'Admin')): ?>
+            <?php 
+            // CRITICAL GATEWAY SEGREGATION: System Configurations lock down strictly to the Super Admin role only
+            if ($is_super): 
+            ?>
                 <div class="admin-settings-wrapper" style="margin-top: 10px; border-top: 1px solid #cbd5e0; padding-top: 10px; width: 100%;">
                     <div onclick="toggleAdminSubMenu()" class="nav-link" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 700; color: #475569; padding: 10px 16px;">
                         <span>🛠️ System Settings</span>
