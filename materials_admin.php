@@ -8,7 +8,7 @@ if (!isset($_SESSION["role"]) || $_SESSION["role"] !== "Admin") {
 }
 
 // AUTOMATED IMAGE RESIZING AND CROPPING GD ENGINE (150x50)
-function resizeAndCropToTargetMetric($source_file_path, $target_file_path, $thumb_w = 150, $thumb_h = 50) {
+function resizeAndCropToTarget150x50($source_file_path, $target_file_path, $thumb_w = 150, $thumb_h = 50) {
     // Get image dimensions and format type
     list($width, $height, $image_type) = getimagesize($source_file_path);
     
@@ -23,7 +23,7 @@ function resizeAndCropToTargetMetric($source_file_path, $target_file_path, $thum
             $src_img = imagecreatefrompng($source_file_path);
             break;
         default:
-            return false; // Unsupported layout type format
+            return false; // Unsupported format type
     }
 
     if (!$src_img) return false;
@@ -49,7 +49,7 @@ function resizeAndCropToTargetMetric($source_file_path, $target_file_path, $thum
     // Generate canvas and apply sampling layers
     $dst_img = imagecreatetruecolor($thumb_w, $thumb_h);
 
-    // Maintain transparency details if a transparent PNG is uploaded
+    // Maintain transparency details if a transparent PNG/GIF is uploaded
     if ($image_type === IMAGETYPE_PNG || $image_type === IMAGETYPE_GIF) {
         imagealphablending($dst_img, false);
         imagesavealpha($dst_img, true);
@@ -80,8 +80,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_save_catalog_i
     $item_id     = isset($_POST["item_id"]) ? intval($_POST["item_id"]) : 0;
     $item_name   = trim($_POST["item_name"]);
     $category_id = intval($_POST["category_id"]);
-    $unit_type   = trim($_POST["unit_type"]);
-    $unit_label  = trim($_POST["unit_label"]);
+    
+    // SAFE FALLBACKS: Resolves undefined array key warnings gracefully
+    $unit_type   = isset($_POST["unit_type"]) ? trim($_POST["unit_type"]) : 'Count';
+    $unit_label  = isset($_POST["unit_label"]) ? trim($_POST["unit_label"]) : 'Packets';
+    
     $unit_cost   = floatval($_POST["unit_cost"]);
     $pack_size   = floatval($_POST["pack_size"]);
     $pack_unit   = trim($_POST["pack_unit"]);
@@ -96,9 +99,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_save_catalog_i
             mkdir($target_dir, 0755, true);
         }
         
-        $final_destination = $target_dir . $file_name;
-        
-        // INTERCEPTOR ENGINE: Process image through the dynamic GD cropping resizer
+        // FIXED CALL: Synchronized to invoke matching function declaration name perfectly
         if (resizeAndCropToTarget150x50($file_tmp, $target_dir . $file_name)) {
             $image_path = $target_dir . $file_name;
         }
@@ -128,7 +129,6 @@ if (isset($_GET['approve_id'])) {
     exit;
 }
 
-// REPLACEMENT FIX: Standard relational array configuration restored
 $categories = $pdo->query("SELECT * FROM material_categories ORDER BY sort_order ASC")->fetchAll(PDO::FETCH_ASSOC);
 $allItems   = $pdo->query("SELECT rc.*, mc.name as category_name FROM req_catalog rc JOIN material_categories mc ON rc.category_id = mc.id ORDER BY rc.is_verified ASC, rc.item_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
