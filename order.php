@@ -1,4 +1,5 @@
 <?php
+// /home/apartment/artistsfarmjaipur.com/Order/order.php
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -88,8 +89,8 @@ include "includes/header.php";
 
 .dish-item-grid {
     display: grid !important;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
-    gap: 12px !important;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)) !important;
+    gap: 14px !important;
 }
 
 .dish-item-card {
@@ -101,7 +102,24 @@ include "includes/header.php";
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    min-height: 120px;
+    min-height: 185px; /* Expanded card box footprint to fit image banner */
+    box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+}
+
+.dish-item-image-wrapper {
+    width: 100%;
+    height: 50px;
+    overflow: hidden;
+    border-radius: 6px;
+    border: 1px solid #edf2f7;
+    background: #f8fafc;
+    margin-bottom: 8px;
+}
+
+.dish-item-image-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .dish-item-name {
@@ -207,9 +225,14 @@ include "includes/header.php";
                         <div class="category-block" id="cat_<?= $cat['id'] ?>" style="margin-bottom: 25px;">
                             <h4 style="font-size: 13px; text-transform: uppercase; color: #4b5563; text-align: left; margin-bottom: 12px; font-weight: 700;"><?= htmlspecialchars($cat['name']) ?></h4>
                             <div class="dish-item-grid">
-                                <?php foreach ($catItems as $item): ?>
+                                <?php foreach ($catItems as $item): 
+                                    $img_src = !empty($item['image_path']) ? $item['image_path'] : 'assets/images/catalog/placeholder.png';
+                                ?>
                                     <div class="dish-item-card">
                                         <div>
+                                            <div class="dish-item-image-wrapper">
+                                                <img src="<?= $img_src ?>" alt="">
+                                            </div>
                                             <div class="dish-item-name"><?= htmlspecialchars($item['name']) ?></div>
                                             <div class="dish-item-price">₹<?= number_format($item['price'], 0) ?></div>
                                         </div>
@@ -242,9 +265,6 @@ include "includes/header.php";
 </div>
 
 <script>
-// ==========================================================================
-// EXPEL DOMCONTENTLOADED WRAPPERS TO ENSURE LIVE SPA ATTACHMENT COMPATIBILITY
-// ==========================================================================
 window.foodCart = [];
 
 window.addFoodItemToCart = function(id, name, price) {
@@ -332,7 +352,6 @@ window.submitKitchenOrder = function() {
             alert("✔ Food order sent to kitchen successfully!");
             window.foodCart = [];
             window.renderOrderCart();
-            // If global history state reload handles routing parameters softly
             location.reload();
         } else {
             alert("❌ Entry failed: " + data.error);
@@ -341,7 +360,6 @@ window.submitKitchenOrder = function() {
     .catch(() => alert("❌ Critical processing communication fault error."));
 };
 
-// Global initializer fallback call triggered automatically by site-wide footer hooks
 window.loadCatalog = function() {
     window.foodCart = [];
     window.renderOrderCart();
