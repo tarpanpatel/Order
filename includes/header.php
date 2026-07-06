@@ -155,11 +155,10 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
         
         <nav style="display: flex; flex-direction: column; gap: 4px;">
             <?php 
-            // COMPREHENSIVE SECURITY ASSIGNMENT
+            // SECURITY DEFINITIONS ASSIGNMENT
             $is_manager = isset($_SESSION["role"]) && $_SESSION["role"] === 'Admin';
             $is_super   = isset($_SESSION["role"]) && $_SESSION["role"] === 'Super Admin';
             
-            // Chef, Managers, and Super Admins all have access to operational interfaces[cite: 3]
             if ($is_manager || $is_super): 
             ?>
                 <a href="index.php" class="nav-link <?= ($current_page === 'index.php') ? 'active' : ''; ?>">📊 Dashboard</a>
@@ -192,7 +191,6 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
                 <a href="billing.php" class="nav-link <?= ($current_page === 'billing.php') ? 'active' : ''; ?>">🧾 Settlements & Billing</a>
             <?php endif; ?>
 
-            <!-- SHARED MANAGEMENT SHELL: Open operational features for Chef, Managers, and Admins alike[cite: 3] -->
             <a href="order.php" class="nav-link <?= ($current_page === 'order.php') ? 'active' : ''; ?>">🍽️ Take Food Order</a>
             <a href="kitchen.php" class="nav-link <?= ($current_page === 'kitchen.php') ? 'active' : ''; ?>">🍳 Kitchen Orders</a>
             <a href="requisitions.php" class="nav-link <?= ($current_page === 'requisitions.php') ? 'active' : ''; ?>">📦 Material Requests</a>
@@ -203,8 +201,8 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
             <?php endif; ?>
 
             <?php 
-            // RESTRICTED ACCESS GATEWAY: System configuration fields are locked down to Super Admins only[cite: 3]
-            if ($is_super): 
+            // OPEN CONFIGURATIONS ACCESS: Adjusted condition rule so both Admin and Super Admin can manage parameters
+            if ($is_super || $is_manager): 
             ?>
                 <div class="admin-settings-wrapper" style="margin-top: 10px; border-top: 1px solid #cbd5e0; padding-top: 10px; width: 100%;">
                     <div onclick="toggleAdminSubMenu()" class="nav-link" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 700; color: #475569; padding: 10px 16px;">
