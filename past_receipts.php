@@ -25,13 +25,16 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_invoice
                 $priceStmt = $pdo->prepare("SELECT price FROM order_items WHERE id = ?");
                 $priceStmt->execute([$item_id]);
                 $unit_price = floatval($priceStmt->fetchColumn() ?: 0);
+                
                 $item_total = $unit_price * $qty;
                 $subtotal += $item_total;
-                $pdo->prepare("UPDATE order_items SET quantity = ?, total_price = ? WHERE id = ? AND order_id = ?")->execute([$qty, $item_total, $item_id, $order_id]);
+                
+                // Update quantity; we do not rely on a total_price column
+                $pdo->prepare("UPDATE order_items SET quantity = ? WHERE id = ? AND order_id = ?")->execute([$qty, $item_id, $order_id]);
             }
         }
         
-        // Update order total without discount column
+        // Update order total using dynamic calculation (grand_total set to subtotal)
         $pdo->prepare("UPDATE orders SET grand_total = ? WHERE id = ?")->execute([$subtotal, $order_id]);
         
         $pdo->commit();
@@ -44,10 +47,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_invoice
     }
 }
 
-// FIXED SQL: Removed 'o.discount' column reference to prevent "Unknown column" errors
+// FIXED SQL: Calculating 'subtotal' by multiplying quantity * price dynamically to avoid missing column errors
 $orders = $pdo->query("
     SELECT o.id, 
-           (SELECT SUM(total_price) FROM order_items WHERE order_id = o.id) as subtotal,
+           (SELECT SUM(oi.quantity * oi.price) FROM order_items oi WHERE oi.order_id = o.id) as subtotal,
            g.phone_number
     FROM orders o 
     LEFT JOIN guests g ON o.guest_id = g.id 
