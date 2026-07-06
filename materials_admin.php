@@ -7,6 +7,74 @@ if (!isset($_SESSION["role"]) || $_SESSION["role"] !== "Admin") {
     die("Access Denied: Administrative clearance required.");
 }
 
+// AUTOMATED IMAGE RESIZING AND CROPPING GD ENGINE (150x50)
+function resizeAndCropToTargetMetric($source_file_path, $target_file_path, $thumb_w = 150, $thumb_h = 50) {
+    // Get image dimensions and format type
+    list($width, $height, $image_type) = getimagesize($source_file_path);
+    
+    switch ($image_type) {
+        case IMAGETYPE_GIF:
+            $src_img = imagecreatefromgif($source_file_path);
+            break;
+        case IMAGETYPE_JPEG:
+            $src_img = imagecreatefromjpeg($source_file_path);
+            break;
+        case IMAGETYPE_PNG:
+            $src_img = imagecreatefrompng($source_file_path);
+            break;
+        default:
+            return false; // Unsupported layout type format
+    }
+
+    if (!$src_img) return false;
+
+    // Calculate aspect ratios to execute clean center cropping paths
+    $source_aspect_ratio = $width / $height;
+    $thumbnail_aspect_ratio = $thumb_w / $thumb_h;
+
+    if ($source_aspect_ratio > $thumbnail_aspect_ratio) {
+        // Image is wider than destination metrics -> slice sides
+        $src_h = $height;
+        $src_w = intval($height * $thumbnail_aspect_ratio);
+        $src_x = intval(($width - $src_w) / 2);
+        $src_y = 0;
+    } else {
+        // Image is taller than destination metrics -> slice top/bottom
+        $src_w = $width;
+        $src_h = intval($width / $thumbnail_aspect_ratio);
+        $src_x = 0;
+        $src_y = intval(($height - $src_h) / 2);
+    }
+
+    // Generate canvas and apply sampling layers
+    $dst_img = imagecreatetruecolor($thumb_w, $thumb_h);
+
+    // Maintain transparency details if a transparent PNG is uploaded
+    if ($image_type === IMAGETYPE_PNG || $image_type === IMAGETYPE_GIF) {
+        imagealphablending($dst_img, false);
+        imagesavealpha($dst_img, true);
+    }
+
+    imagecopyresampled($dst_img, $src_img, 0, 0, $src_x, $src_y, $thumb_w, $thumb_h, $src_w, $src_h);
+
+    // Save thumbnail out to permanent destination directory
+    switch ($image_type) {
+        case IMAGETYPE_GIF:
+            imagegif($dst_img, $target_file_path);
+            break;
+        case IMAGETYPE_JPEG:
+            imagejpeg($dst_img, $target_file_path, 90); // 90% High quality compression
+            break;
+        case IMAGETYPE_PNG:
+            imagepng($dst_img, $target_file_path, 5); // Balanced compression step
+            break;
+    }
+
+    imagedestroy($src_img);
+    imagedestroy($dst_img);
+    return true;
+}
+
 // Handle Add/Edit catalog submissions with image uploads
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_save_catalog_item"])) {
     $item_id     = isset($_POST["item_id"]) ? intval($_POST["item_id"]) : 0;
@@ -28,7 +96,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_save_catalog_i
             mkdir($target_dir, 0755, true);
         }
         
-        if (move_uploaded_file($file_tmp, $target_dir . $file_name)) {
+        $final_destination = $target_dir . $file_name;
+        
+        // INTERCEPTOR ENGINE: Process image through the dynamic GD cropping resizer
+        if (resizeAndCropToTarget150x50($file_tmp, $target_dir . $file_name)) {
             $image_path = $target_dir . $file_name;
         }
     }
@@ -57,6 +128,7 @@ if (isset($_GET['approve_id'])) {
     exit;
 }
 
+// REPLACEMENT FIX: Standard relational array configuration restored
 $categories = $pdo->query("SELECT * FROM material_categories ORDER BY sort_order ASC")->fetchAll(PDO::FETCH_ASSOC);
 $allItems   = $pdo->query("SELECT rc.*, mc.name as category_name FROM req_catalog rc JOIN material_categories mc ON rc.category_id = mc.id ORDER BY rc.is_verified ASC, rc.item_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
@@ -85,7 +157,7 @@ include "includes/header.php";
                     <table class="admin-data-table" style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
                         <thead>
                             <tr style="background:#f8fafc; border-bottom: 2px solid #cbd5e0; color:#475569;">
-                                <th style="padding:12px; width:70px;">Image</th>
+                                <th style="padding:12px; width:160px;">Image (150x50)</th>
                                 <th style="padding:12px;">Material Item Name</th>
                                 <th style="padding:12px;">Pack Capacity Size</th>
                                 <th style="padding:12px;">Unit Strategy</th>
@@ -102,21 +174,21 @@ include "includes/header.php";
                             ?>
                                 <tr class="item-row" data-search-name="<?= strtolower(htmlspecialchars($item['item_name'])) ?>" style="border-bottom: 1px solid #e2e8f0; <?= $is_pending ? 'background:#fffbeb;' : '' ?>">
                                     <td style="padding:8px 12px; text-align:center;">
-                                        <img src="<?= $img_src ?>" alt="" style="width:36px; height:36px; object-fit:cover; border-radius:6px; background:#f8fafc; border:1px solid #e2e8f0;">
+                                        <img src="<?= $img_src ?>" alt="" style="width:150px; height:50px; object-fit:cover; border-radius:6px; background:#f8fafc; border:1px solid #e2e8f0; display:block; margin:0 auto;">
                                     </td>
-                                    <td class="item-name-cell" style="padding:12px; font-weight:bold; color:#1e293b;"><?= htmlspecialchars($item['item_name']) ?></td>
-                                    <td style="padding:12px; font-weight:600; color:#475569;"><?= floatval($item['pack_size']) ?> <?= htmlspecialchars($item['pack_unit']) ?></td>
-                                    <td style="padding:12px;"><span style="padding:2px 6px; background:#f1f5f9; border-radius:4px; font-size:11px; font-weight:600; color:#475569;"><?= $item['unit_type'] ?></span></td>
-                                    <td style="padding:12px; font-weight:600; color:#334155;"><?= htmlspecialchars($item['unit_label']) ?></td>
-                                    <td style="padding:12px; font-weight:700; color:#0284c7;">₹<?= number_format($item['unit_cost'], 2) ?></td>
-                                    <td style="padding:12px; text-align:center;">
+                                    <td class="item-name-cell" style="padding:12px; font-weight:bold; color:#1e293b; vertical-align:middle;"><?= htmlspecialchars($item['item_name']) ?></td>
+                                    <td style="padding:12px; font-weight:600; color:#475569; vertical-align:middle;"><?= floatval($item['pack_size']) ?> <?= htmlspecialchars($item['pack_unit']) ?></td>
+                                    <td style="padding:12px; vertical-align:middle;"><span style="padding:2px 6px; background:#f1f5f9; border-radius:4px; font-size:11px; font-weight:600; color:#475569;"><?= $item['unit_type'] ?></span></td>
+                                    <td style="padding:12px; font-weight:600; color:#334155; vertical-align:middle;"><?= htmlspecialchars($item['unit_label']) ?></td>
+                                    <td style="padding:12px; font-weight:700; color:#0284c7; vertical-align:middle;">₹<?= number_format($item['unit_cost'], 2) ?></td>
+                                    <td style="padding:12px; text-align:center; vertical-align:middle;">
                                         <?php if ($is_pending): ?>
                                             <span style="padding:2px 8px; font-size:11px; background:#fef3c7; color:#d97706; font-weight:700; border-radius:12px;">Review Needed</span>
                                         <?php else: ?>
                                             <span style="padding:2px 8px; font-size:11px; background:#d1fae5; color:#059669; font-weight:700; border-radius:12px;">Verified Active</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td style="padding:12px; text-align:center;">
+                                    <td style="padding:12px; text-align:center; vertical-align:middle;">
                                         <div style="display:flex; gap:6px; justify-content:center;">
                                             <button type="button" class="btn btn-bill" style="padding:5px 12px; font-size:11px; background:#475569; border-radius:4px;" onclick="openAdminCatalogModal(<?= htmlspecialchars(json_encode($item)) ?>)">✏ Edit</button>
                                             <?php if ($is_pending): ?>
@@ -159,7 +231,6 @@ include "includes/header.php";
                 </select>
             </div>
 
-            <!-- FIXED STRATEGY: Measurement strategy type dropdowns dropped here as requested -->
             <div style="margin-bottom:12px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                 <div>
                     <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">Packaging Volume Capacity Size</label>
@@ -183,7 +254,7 @@ include "includes/header.php";
             </div>
 
             <div style="margin-bottom:20px;">
-                <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">Product Reference Image</label>
+                <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">Product Reference Image (Auto Resized to 150x50)</label>
                 <input type="file" name="item_image" accept="image/*" style="width:100%; font-size:12px; color:#64748b;">
             </div>
 
