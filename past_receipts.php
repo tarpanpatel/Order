@@ -17,17 +17,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_invoice
     try {
         $subtotal = 0;
         
-        // Loop through items to update or remove
         foreach ($item_qtys as $item_id => $qty) {
             $item_id = intval($item_id);
             $qty = intval($qty);
             
             if ($qty <= 0) {
-                // Delete item from order line items if set to 0
                 $stmt = $pdo->prepare("DELETE FROM order_items WHERE id = ? AND order_id = ?");
                 $stmt->execute([$item_id, $order_id]);
             } else {
-                // Fetch unit price to calculate new totals dynamically
                 $priceStmt = $pdo->prepare("SELECT price FROM order_items WHERE id = ?");
                 $priceStmt->execute([$item_id]);
                 $unit_price = floatval($priceStmt->fetchColumn() ?: 0);
@@ -35,7 +32,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_invoice
                 $item_total = $unit_price * $qty;
                 $subtotal += $item_total;
                 
-                // Update quantity and line total
                 $stmt = $pdo->prepare("UPDATE order_items SET quantity = ?, total_price = ? WHERE id = ? AND order_id = ?");
                 $stmt->execute([$qty, $item_total, $item_id, $order_id]);
             }
@@ -43,12 +39,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_invoice
         
         $grand_total = max(0, $subtotal - $custom_discount);
         
-        // Update parent order totals
         $updateOrder = $pdo->prepare("UPDATE orders SET subtotal = ?, discount = ?, grand_total = ? WHERE id = ?");
         $updateOrder->execute([$subtotal, $custom_discount, $grand_total, $order_id]);
         
         $pdo->commit();
-        $_SESSION['invoice_success_toast'] = "Invoice #$order_id updated and recalculated successfully!";
+        $_SESSION['invoice_success_toast'] = "Invoice #$order_id updated successfully!";
         header("Location: past_receipts.php");
         exit;
     } catch (Exception $e) {
@@ -57,9 +52,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_invoice
     }
 }
 
-// Fetch past closed orders/receipts
+// FIXED SQL: Removed non-existent room_number column reference
 $orders = $pdo->query("
-    SELECT o.*, g.phone_number, g.room_number 
+    SELECT o.*, g.phone_number
     FROM orders o 
     LEFT JOIN guests g ON o.guest_id = g.id 
     ORDER BY o.created_at DESC
@@ -89,9 +84,9 @@ include "includes/header.php";
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; gap:20px; flex-wrap:wrap;">
         <div>
             <h2 style="margin:0; color:#1e293b;">📜 Past Receipts Archive Log</h2>
-            <p style="color:var(--text-muted); margin: 5px 0 0 0; font-size:0.9rem;">Review, search, or edit historically closed invoices</p>
+            <p style="color:#64748b; margin: 5px 0 0 0; font-size:0.9rem;">Review, search, or edit historically closed invoices</p>
         </div>
-        <input type="text" id="invoiceSearchInput" onkeyup="searchInvoiceTable()" placeholder="🔍 Search by Invoice ID, Room, or Guest..." class="form-control" style="max-width:320px; padding:10px; border:1px solid #cbd5e0; border-radius:8px; font-size:13px;">
+        <input type="text" id="invoiceSearchInput" onkeyup="searchInvoiceTable()" placeholder="🔍 Search Invoice ID or Guest..." class="form-control" style="max-width:320px; padding:10px; border:1px solid #cbd5e0; border-radius:8px; font-size:13px;">
     </div>
 
     <div class="receipts-dashboard-card">
@@ -101,29 +96,26 @@ include "includes/header.php";
                     <tr>
                         <th>Invoice ID</th>
                         <th>Timestamp Date</th>
-                        <th>Room Assignment</th>
                         <th>Guest Mapping</th>
                         <th>Subtotal Amount</th>
-                        <th>Discount Given</th>
+                        <th>Discount</th>
                         <th>Grand Total (₹)</th>
                         <th style="text-align:center;">Actions Matrix</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (!empty($orders)): foreach ($orders as $order): 
-                        // Fetch order items to pass to JavaScript modal array securely
                         $itemsStmt = $pdo->prepare("SELECT oi.*, mi.name FROM order_items oi JOIN menu_items mi ON oi.menu_item_id = mi.id WHERE oi.order_id = ?");
                         $itemsStmt->execute([$order['id']]);
                         $serializedItems = json_encode($itemsStmt->fetchAll(PDO::FETCH_ASSOC));
                     ?>
-                        <tr class="invoice-data-row" data-search-string="<?= strtolower($order['id'] . ' room ' . ($order['room_number'] ?? '') . ' ' . ($order['phone_number'] ?? '')) ?>">
+                        <tr class="invoice-data-row" data-search-string="<?= strtolower($order['id'] . ' ' . ($order['phone_number'] ?? '')) ?>">
                             <td style="font-weight: bold; color: #0284c7;">#<?= $order['id'] ?></td>
                             <td><?= date('d M Y, h:i A', strtotime($order['created_at'])) ?></td>
-                            <td><span style="padding:4px 8px; background:#f1f5f9; border-radius:6px; font-weight:600;">Room <?= htmlspecialchars($order['room_number'] ?? 'N/A') ?></span></td>
                             <td style="font-family:monospace; font-weight:bold; color:#475569;"><?= htmlspecialchars($order['phone_number'] ?? 'Walk-In Guest') ?></td>
                             <td>₹<?= number_format($order['subtotal'], 2) ?></td>
                             <td style="color:#ef4444;">₹<?= number_format($order['discount'], 2) ?></td>
-                            <td style="font-weight: 800; color: #059669;">Extra ₹<?= number_format($order['grand_total'], 2) ?></td>
+                            <td style="font-weight: 800; color: #059669;">₹<?= number_format($order['grand_total'], 2) ?></td>
                             <td style="text-align: center;">
                                 <button type="button" class="btn btn-start" style="padding: 6px 14px; font-size:12px; font-weight:700; border-radius:6px;" data-items='<?= htmlspecialchars($serializedItems, ENT_QUOTES, 'UTF-8') ?>' onclick="openEditInvoiceModal(<?= $order['id'] ?>, <?= $order['discount'] ?>, this)">
                                     ✏ Edit Bill
@@ -131,7 +123,7 @@ include "includes/header.php";
                             </td>
                         </tr>
                     <?php endforeach; else: ?>
-                        <tr><td colspan="8" style="text-align:center; color:#94a3b8; padding:30px; font-style:italic;">No past invoice records found.</td></tr>
+                        <tr><td colspan="7" style="text-align:center; color:#94a3b8; padding:30px; font-style:italic;">No past invoice records found.</td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
