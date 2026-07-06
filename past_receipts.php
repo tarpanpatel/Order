@@ -33,7 +33,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_invoice
         }
         
         $grand_total = max(0, $subtotal - $custom_discount);
-        // Updating only existing columns
+        // Updating only columns we know exist
         $pdo->prepare("UPDATE orders SET discount = ?, grand_total = ? WHERE id = ?")->execute([$custom_discount, $grand_total, $order_id]);
         
         $pdo->commit();
@@ -46,9 +46,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_invoice
     }
 }
 
-// FIXED SQL: Calculating totals dynamically from order_items since o.subtotal/o.grand_total columns don't exist
+// FIXED SQL: Removed 'o.created_at' to prevent "Unknown column" errors
 $orders = $pdo->query("
-    SELECT o.id, o.created_at, o.discount, 
+    SELECT o.id, o.discount, 
            (SELECT SUM(total_price) FROM order_items WHERE order_id = o.id) as subtotal,
            g.phone_number
     FROM orders o 
@@ -69,6 +69,7 @@ include "includes/header.php";
 </style>
 
 <div class="app-body" style="padding: 20px; font-family: sans-serif; text-align: left;">
+    
     <?php if (isset($_SESSION['invoice_success_toast'])): ?>
         <div style="padding: 12px 24px; background: #10b981; color: white; font-size: 14px; font-weight: 800; text-align: center; border-radius: 8px; margin-bottom: 15px;">
             📢 <strong><?= htmlspecialchars($_SESSION['invoice_success_toast']) ?></strong>
@@ -87,7 +88,7 @@ include "includes/header.php";
             <thead>
                 <tr>
                     <th>Invoice ID</th>
-                    <th>Date</th>
+                    <th>Guest Mapping</th>
                     <th>Subtotal (₹)</th>
                     <th>Discount (₹)</th>
                     <th>Grand Total (₹)</th>
@@ -106,7 +107,7 @@ include "includes/header.php";
                 ?>
                     <tr class="invoice-data-row">
                         <td style="font-weight: bold; color: #0284c7;">#<?= $order['id'] ?></td>
-                        <td><?= date('d M Y', strtotime($order['created_at'])) ?></td>
+                        <td style="font-family:monospace; font-weight:bold; color:#475569;"><?= htmlspecialchars($order['phone_number'] ?? 'Walk-In Guest') ?></td>
                         <td>₹<?= number_format($subtotal, 2) ?></td>
                         <td style="color:#ef4444;">₹<?= number_format($discount, 2) ?></td>
                         <td style="font-weight: 800; color: #059669;">₹<?= number_format($grand_total, 2) ?></td>
@@ -122,18 +123,67 @@ include "includes/header.php";
     </div>
 </div>
 
+<div id="editInvoiceModalPopup" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
+    <div class="modal-content" style="background: white; max-width: 520px; width: 92%; border-radius: 12px; padding: 25px; position: relative; color: #111827; text-align: left;">
+        <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0; font-weight:bold;" onclick="closeEditInvoiceModal()">✕</span>
+        <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; color:#0284c7;" id="modalInvoiceTitle">Modify Invoice #00</h3>
+        
+        <form method="POST" action="past_receipts.php" style="margin: 0;">
+            <input type="hidden" name="action_update_invoice" value="1">
+            <input type="hidden" name="update_order_id" id="mdlInvoiceOrderId">
+            
+            <label style="font-size: 11px; font-weight: 700; color: #475569; display: block; margin-bottom: 6px; text-transform: uppercase;">Line Items Assembly</label>
+            <div id="mdlInvoiceItemsContainer" style="max-height: 220px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px; margin-bottom: 15px; background: #fafafa;"></div>
+            
+            <div style="margin-bottom: 20px;">
+                <label style="font-size: 11px; font-weight: 700; color: #475569; display: block; margin-bottom: 6px; text-transform: uppercase;">Applied Flat Discount (₹)</label>
+                <input type="number" name="invoice_discount" id="mdlInvoiceDiscountInput" required min="0" step="0.01" style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px; font-size:14px; font-weight:bold; color:#ef4444;">
+            </div>
+
+            <div style="display: flex; gap: 10px; justify-content: flex-end; align-items: center;">
+                <button type="button" class="btn btn-log" style="padding: 10px 18px;" onclick="closeEditInvoiceModal()">Cancel</button>
+                <button type="submit" class="btn btn-bill" style="padding: 10px 24px; font-weight: 800; background:#059669; border-color:#059669;">Recalculate & Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
+function searchInvoiceTable() {
+    const input = document.getElementById("invoiceSearchInput").value.toLowerCase().trim();
+    const rows = document.querySelectorAll(".invoice-data-row");
+    
+    rows.forEach(row => {
+        const searchStr = row.getAttribute("data-search-string") || "";
+        if (searchStr.includes(input)) {
+            row.style.display = "";
+        } else {
+            row.style.display = "none";
+        }
+    });
+}
+
 function openEditInvoiceModal(orderId, currentDiscount, element) {
     document.getElementById("mdlInvoiceOrderId").value = orderId;
+    document.getElementById("modalInvoiceTitle").innerText = "Modify Invoice #" + orderId;
     document.getElementById("mdlInvoiceDiscountInput").value = currentDiscount;
+    
     const container = document.getElementById("mdlInvoiceItemsContainer");
     const items = JSON.parse(element.getAttribute("data-items"));
+    
     container.innerHTML = items.map(i => `
         <div class="modal-item-edit-row">
-            <div style="flex:1;">${i.name}</div>
-            <input type="number" name="invoice_item_qty[${i.id}]" value="${i.quantity}" class="modal-qty-field">
+            <div style="flex: 1; text-align: left;">
+                <span style="font-weight:700; font-size:13px; color:#1e293b; display:block;">${i.name}</span>
+                <span style="font-size:11px; color:#64748b; font-weight:600;">Unit Price: ₹${parseFloat(i.price).toFixed(2)}</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px;">
+                <label style="font-size:11px; font-weight:700; color:#475569;">Qty:</label>
+                <input type="number" name="invoice_item_qty[${i.id}]" value="${i.quantity}" min="0" class="modal-qty-field">
+            </div>
         </div>
     `).join('');
+    
     document.getElementById("editInvoiceModalPopup").style.display = "flex";
 }
 function closeEditInvoiceModal() { document.getElementById("editInvoiceModalPopup").style.display = "none"; }
