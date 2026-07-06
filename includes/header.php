@@ -155,7 +155,7 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
         
         <nav style="display: flex; flex-direction: column; gap: 4px;">
             <?php 
-            // SECURITY DEFINITIONS ASSIGNMENT
+            // SYSTEM ROLE CAPTURE DEFINITIONS
             $is_manager = isset($_SESSION["role"]) && $_SESSION["role"] === 'Admin';
             $is_super   = isset($_SESSION["role"]) && $_SESSION["role"] === 'Super Admin';
             
@@ -194,14 +194,13 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
             <a href="order.php" class="nav-link <?= ($current_page === 'order.php') ? 'active' : ''; ?>">🍽️ Take Food Order</a>
             <a href="kitchen.php" class="nav-link <?= ($current_page === 'kitchen.php') ? 'active' : ''; ?>">🍳 Kitchen Orders</a>
             <a href="requisitions.php" class="nav-link <?= ($current_page === 'requisitions.php') ? 'active' : ''; ?>">📦 Material Requests</a>
-            <a href="dashboard_analytics.php" class="nav-link <?= ($current_page === 'dashboard_analytics.php') ? 'active' : ''; ?>">📈 Business Analytics</a>
             
             <?php if ($is_manager || $is_super): ?>
                 <a href="past_receipts.php" class="nav-link <?= ($current_page === 'past_receipts.php') ? 'active' : ''; ?>">📜 Past Receipts Log</a>
             <?php endif; ?>
 
             <?php 
-            // OPEN CONFIGURATIONS ACCESS: Adjusted condition rule so both Admin and Super Admin can manage parameters
+            // SYSTEM SETTINGS DROPDOWN GATEWAY FOR BOTH CONFIGURATION ACCESS LEVELS
             if ($is_super || $is_manager): 
             ?>
                 <div class="admin-settings-wrapper" style="margin-top: 10px; border-top: 1px solid #cbd5e0; padding-top: 10px; width: 100%;">
