@@ -15,8 +15,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_save_catalog_i
     $unit_type   = trim($_POST["unit_type"]);
     $unit_label  = trim($_POST["unit_label"]);
     $unit_cost   = floatval($_POST["unit_cost"]);
+    $pack_size   = floatval($_POST["pack_size"]);
+    $pack_unit   = trim($_POST["pack_unit"]);
     
-    // Process image uploads if a file is provided
     $image_path = "";
     if (isset($_FILES['item_image']) && $_FILES['item_image']['error'] === UPLOAD_ERR_OK) {
         $file_tmp   = $_FILES['item_image']['tmp_name'];
@@ -34,16 +35,16 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_save_catalog_i
 
     if ($item_id > 0) {
         if (!empty($image_path)) {
-            $stmt = $pdo->prepare("UPDATE req_catalog SET item_name = ?, category_id = ?, unit_type = ?, unit_label = ?, unit_cost = ?, image_path = ?, is_verified = 1 WHERE id = ?");
-            $stmt->execute([$item_name, $category_id, $unit_type, $unit_label, $unit_cost, $image_path, $item_id]);
+            $stmt = $pdo->prepare("UPDATE req_catalog SET item_name = ?, category_id = ?, unit_type = ?, unit_label = ?, unit_cost = ?, pack_size = ?, pack_unit = ?, image_path = ?, is_verified = 1 WHERE id = ?");
+            $stmt->execute([$item_name, $category_id, $unit_type, $unit_label, $unit_cost, $pack_size, $pack_unit, $image_path, $item_id]);
         } else {
-            $stmt = $pdo->prepare("UPDATE req_catalog SET item_name = ?, category_id = ?, unit_type = ?, unit_label = ?, unit_cost = ?, is_verified = 1 WHERE id = ?");
-            $stmt->execute([$item_name, $category_id, $unit_type, $unit_label, $unit_cost, $item_id]);
+            $stmt = $pdo->prepare("UPDATE req_catalog SET item_name = ?, category_id = ?, unit_type = ?, unit_label = ?, unit_cost = ?, pack_size = ?, pack_unit = ?, is_verified = 1 WHERE id = ?");
+            $stmt->execute([$item_name, $category_id, $unit_type, $unit_label, $unit_cost, $pack_size, $pack_unit, $item_id]);
         }
     } else {
         $fallback_img = !empty($image_path) ? $image_path : "assets/images/catalog/placeholder.png";
-        $stmt = $pdo->prepare("INSERT INTO req_catalog (item_name, category_id, unit_type, unit_label, unit_cost, image_path, is_verified) VALUES (?, ?, ?, ?, ?, ?, 1)");
-        $stmt->execute([$item_name, $category_id, $unit_type, $unit_label, $unit_cost, $fallback_img]);
+        $stmt = $pdo->prepare("INSERT INTO req_catalog (item_name, category_id, unit_type, unit_label, unit_cost, pack_size, pack_unit, image_path, is_verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)");
+        $stmt->execute([$item_name, $category_id, $unit_type, $unit_label, $unit_cost, $pack_size, $pack_unit, $fallback_img]);
     }
     header("Location: materials_admin.php");
     exit;
@@ -56,7 +57,7 @@ if (isset($_GET['approve_id'])) {
     exit;
 }
 
-$categories = $pdo->query("SELECT * FROM material_categories ORDER BY sort_order ASC")->fetchAll(PDO::FETCH_ASSOC);
+$categories = $pdo->query("SELECT * FROM material_categories ORDER BY sort_order ASC")->fetchAll(PHP_SESSION_NONE);
 $allItems   = $pdo->query("SELECT rc.*, mc.name as category_name FROM req_catalog rc JOIN material_categories mc ON rc.category_id = mc.id ORDER BY rc.is_verified ASC, rc.item_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
 include "includes/header.php";
@@ -86,6 +87,7 @@ include "includes/header.php";
                             <tr style="background:#f8fafc; border-bottom: 2px solid #cbd5e0; color:#475569;">
                                 <th style="padding:12px; width:70px;">Image</th>
                                 <th style="padding:12px;">Material Item Name</th>
+                                <th style="padding:12px;">Pack Capacity Size</th>
                                 <th style="padding:12px;">Unit Strategy</th>
                                 <th style="padding:12px;">Base Metric</th>
                                 <th style="padding:12px;">Unit Cost</th>
@@ -103,6 +105,7 @@ include "includes/header.php";
                                         <img src="<?= $img_src ?>" alt="" style="width:36px; height:36px; object-fit:cover; border-radius:6px; background:#f8fafc; border:1px solid #e2e8f0;">
                                     </td>
                                     <td class="item-name-cell" style="padding:12px; font-weight:bold; color:#1e293b;"><?= htmlspecialchars($item['item_name']) ?></td>
+                                    <td style="padding:12px; font-weight:600; color:#475569;"><?= floatval($item['pack_size']) ?> <?= htmlspecialchars($item['pack_unit']) ?></td>
                                     <td style="padding:12px;"><span style="padding:2px 6px; background:#f1f5f9; border-radius:4px; font-size:11px; font-weight:600; color:#475569;"><?= $item['unit_type'] ?></span></td>
                                     <td style="padding:12px; font-weight:600; color:#334155;"><?= htmlspecialchars($item['unit_label']) ?></td>
                                     <td style="padding:12px; font-weight:700; color:#0284c7;">₹<?= number_format($item['unit_cost'], 2) ?></td>
@@ -123,7 +126,7 @@ include "includes/header.php";
                                     </td>
                                 </tr>
                             <?php endforeach; else: ?>
-                                <tr class="empty-placeholder-row"><td colspan="7" style="text-align: center; color: #a0aec0; padding: 20px; font-style:italic;">No registered products found in this category group.</td></tr>
+                                <tr class="empty-placeholder-row"><td colspan="8" style="text-align: center; color: #a0aec0; padding: 20px; font-style:italic;">No registered products found in this category group.</td></tr>
                             <?php endif; ?>
                         </tbody>
                     </table>
@@ -158,6 +161,23 @@ include "includes/header.php";
 
             <div style="margin-bottom:12px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                 <div>
+                    <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">Packaging Volume Capacity</label>
+                    <input type="number" name="pack_size" id="formPackSize" required step="0.1" value="1" style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px; font-size:13px;">
+                </div>
+                <div>
+                    <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">Capacity Dimension Metric</label>
+                    <select name="pack_unit" id="formPackUnit" style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px; font-size:13px;">
+                        <option value="kg">kg</option>
+                        <option value="gms">gms</option>
+                        <option value="Ltr">Ltr</option>
+                        <option value="ml">ml</option>
+                        <option value="Pcs">Pcs</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="margin-bottom:12px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <div>
                     <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">Unit Strategy Type</label>
                     <select name="unit_type" id="formUnitType" onchange="updateFormUnitLabelOptions()" style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px; font-size:13px;">
                         <option value="Count">Count (Integers)</option>
@@ -181,8 +201,8 @@ include "includes/header.php";
             </div>
 
             <div style="display:flex; gap:10px; justify-content:flex-end;">
-                <button type="button" class="btn btn-log" style="padding:10px 18px; border-radius:6px;" onclick="closeAdminCatalogModal()">Cancel</button>
-                <button type="submit" class="btn btn-start" style="padding:10px 24px; font-weight:800; border-radius:6px;">Save Parameters</button>
+                <button type="button" class="btn btn-log" style="padding:8px 16px; border-radius:6px;" onclick="closeAdminCatalogModal()">Cancel</button>
+                <button type="submit" class="btn btn-start" style="padding:8px 24px; font-weight:800; border-radius:6px;">Save Parameters</button>
             </div>
         </form>
     </div>
@@ -202,7 +222,6 @@ function filterAdminCatalogTable() {
         }
     });
 
-    // Toggle category headers if all rows inside them are hidden
     document.querySelectorAll(".admin-category-block").forEach(block => {
         const totalRows = block.querySelectorAll(".item-row").length;
         const hiddenRows = block.querySelectorAll(".item-row[style='display: none;']").length;
@@ -222,6 +241,8 @@ function openAdminCatalogModal(data) {
     const catId = document.getElementById("formCategoryId");
     const uType = document.getElementById("formUnitType");
     const uCost = document.getElementById("formUnitCost");
+    const pSize = document.getElementById("formPackSize");
+    const pUnit = document.getElementById("formPackUnit");
 
     if (data === 0) {
         title.innerText = "Add Catalog Item";
@@ -229,6 +250,8 @@ function openAdminCatalogModal(data) {
         itemName.value = "";
         uType.value = "Count";
         uCost.value = "0.00";
+        pSize.value = "1";
+        pUnit.value = "kg";
     } else {
         title.innerText = "Edit Catalog Item";
         itemId.value = data.id;
@@ -236,6 +259,8 @@ function openAdminCatalogModal(data) {
         catId.value = data.category_id;
         uType.value = data.unit_type;
         uCost.value = data.unit_cost;
+        pSize.value = data.pack_size || 1;
+        pUnit.value = data.pack_unit || "kg";
     }
 
     updateFormUnitLabelOptions();
