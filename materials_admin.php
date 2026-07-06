@@ -57,7 +57,7 @@ if (isset($_GET['approve_id'])) {
     exit;
 }
 
-$categories = $pdo->query("SELECT * FROM material_categories ORDER BY sort_order ASC")->fetchAll(PHP_SESSION_NONE);
+$categories = $pdo->query("SELECT * FROM material_categories ORDER BY sort_order ASC")->fetchAll(PDO::FETCH_ASSOC);
 $allItems   = $pdo->query("SELECT rc.*, mc.name as category_name FROM req_catalog rc JOIN material_categories mc ON rc.category_id = mc.id ORDER BY rc.is_verified ASC, rc.item_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
 include "includes/header.php";
@@ -66,7 +66,7 @@ include "includes/header.php";
 <div class="app-body" style="padding: 20px; font-family: sans-serif; text-align: left;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; gap:20px; flex-wrap:wrap;">
         <div style="display:flex; align-items:center; gap:20px; flex:1; min-width:300px;">
-            <h2 style="margin:0; color:#1e293b; white-space:nowrap;">🛠️ Master Materials Admin</h2>
+            <h2 style="margin:0; color:#1e293b; white-space:nowrap;">Master Materials Admin</h2>
             <input type="text" id="adminCatalogSearch" onkeyup="filterAdminCatalogTable()" placeholder="🔍 Search product descriptions or variants instantly..." style="width:100%; max-width:400px; padding:10px 14px; border:1px solid #cbd5e0; border-radius:8px; font-size:13px; box-shadow:inset 0 1px 2px rgba(0,0,0,0.02);">
         </div>
         <button class="btn btn-start" style="padding: 10px 20px; font-size:13px; font-weight:700; border-radius:8px;" onclick="openAdminCatalogModal(0)">➕ Add New Material</button>
@@ -161,7 +161,7 @@ include "includes/header.php";
 
             <div style="margin-bottom:12px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                 <div>
-                    <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">Packaging Volume Capacity</label>
+                    <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">Packaging Volume Capacity Size</label>
                     <input type="number" name="pack_size" id="formPackSize" required step="0.1" value="1" style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px; font-size:13px;">
                 </div>
                 <div>
@@ -263,6 +263,7 @@ function openAdminCatalogModal(data) {
         pUnit.value = data.pack_unit || "kg";
     }
 
+    // FIXED CALL: Replaced error evaluation constant reference with valid standard assoc matrix configurations
     updateFormUnitLabelOptions();
     if (data !== 0) {
         document.getElementById("formUnitLabel").value = data.unit_label;
