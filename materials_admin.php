@@ -66,7 +66,7 @@ include "includes/header.php";
 <div class="app-body" style="padding: 20px; font-family: sans-serif; text-align: left;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; gap:20px; flex-wrap:wrap;">
         <div style="display:flex; align-items:center; gap:20px; flex:1; min-width:300px;">
-            <h2 style="margin:0; color:#1e293b; white-space:nowrap;">Master Materials Admin</h2>
+            <h2 style="margin:0; color:#1e293b; white-space:nowrap;">🛠️ Master Materials Admin</h2>
             <input type="text" id="adminCatalogSearch" onkeyup="filterAdminCatalogTable()" placeholder="🔍 Search product descriptions or variants instantly..." style="width:100%; max-width:400px; padding:10px 14px; border:1px solid #cbd5e0; border-radius:8px; font-size:13px; box-shadow:inset 0 1px 2px rgba(0,0,0,0.02);">
         </div>
         <button class="btn btn-start" style="padding: 10px 20px; font-size:13px; font-weight:700; border-radius:8px;" onclick="openAdminCatalogModal(0)">➕ Add New Material</button>
@@ -136,6 +136,7 @@ include "includes/header.php";
     </div>
 </div>
 
+<!-- OVERLAY ADMINISTRATIVE FORM MATRIX WINDOW -->
 <div id="adminCatalogModal" class="modal">
     <div class="modal-content" style="background: white; max-width: 480px; width: 92%; border-radius: 12px; padding: 25px; color: #111827;">
         <span style="float:right; cursor:pointer; font-size:22px; color:#a0aec0; font-weight:bold;" onclick="closeAdminCatalogModal()">✕</span>
@@ -176,6 +177,7 @@ include "includes/header.php";
                 </div>
             </div>
 
+            <!-- Administrative control metrics are securely accessible in this view -->
             <div style="margin-bottom:12px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                 <div>
                     <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">Unit Strategy Type</label>
@@ -201,7 +203,7 @@ include "includes/header.php";
             </div>
 
             <div style="display:flex; gap:10px; justify-content:flex-end;">
-                <button type="button" class="btn btn-log" style="padding:8px 16px; border-radius:6px;" onclick="closeAdminCatalogModal()">Cancel</button>
+                <button type="button" class="btn btn-log" style="padding:10px 18px; border-radius:6px;" onclick="closeAdminCatalogModal()">Cancel</button>
                 <button type="submit" class="btn btn-start" style="padding:8px 24px; font-weight:800; border-radius:6px;">Save Parameters</button>
             </div>
         </form>
@@ -263,7 +265,6 @@ function openAdminCatalogModal(data) {
         pUnit.value = data.pack_unit || "kg";
     }
 
-    // FIXED CALL: Replaced error evaluation constant reference with valid standard assoc matrix configurations
     updateFormUnitLabelOptions();
     if (data !== 0) {
         document.getElementById("formUnitLabel").value = data.unit_label;
