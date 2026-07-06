@@ -12,117 +12,45 @@ if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Chef" && $_SESSION["rol
     exit;
 }
 
-// Automatically loops through items, extracts catalog unit costs, and syncs data blocks downstream
-function syncKitchenInventoryToGoogleSheets($req_id, $pdo) {
-    try {
-        $stmt = $pdo->prepare("SELECT ri.quantity, rc.item_name, rc.category_id, rc.unit_cost, (SELECT name FROM material_categories WHERE id = rc.category_id) as cat_name FROM requisition_items ri JOIN req_catalog rc ON ri.catalog_id = rc.id WHERE ri.requisition_id = ? AND ri.item_status = 'Fulfilled'");
-        $stmt->execute([$req_id]);
-        $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// --- CHEF NEW PRODUCT GENERATOR INTERCEPTOR ---
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_create_chef_product"])) {
+    $item_name = trim($_POST["chef_prod_name"]);
+    $category_id = intval($_POST["chef_prod_category"]);
+    $unit_type = trim($_POST["chef_prod_unit_type"]);
+    $unit_label = trim($_POST["chef_prod_unit_label"]);
 
-        foreach ($items as $item) {
-            $qty = floatval($item['quantity']);
-            $unit_cost = floatval($item['unit_cost']);
-            $total_cost = $qty * $unit_cost;
-
-            $rowPattern = [
-                '', 
-                date('d/m/y'), 
-                $item['cat_name'] ?: 'General', 
-                $item['item_name'], 
-                $qty, 
-                'PKT/KG/L', 
-                $unit_cost, 
-                $total_cost, 
-                'Inventory Vendor Line'
-            ];
-            appendRowToGoogleSheet('Kitchen Exp', $rowPattern);
-        }
-    } catch (Exception $e) {
-        error_log("Automation Sync Exception Raised.");
+    if (!empty($item_name) && $category_id > 0) {
+        $stmt = $pdo->prepare("INSERT INTO req_catalog (item_name, category_id, unit_type, unit_label, is_verified, unit_cost, image_path) VALUES (?, ?, ?, ?, 0, 0.00, 'assets/images/catalog/placeholder.png')");
+        $stmt->execute([$item_name, $category_id, $unit_type, $unit_label]);
+        $_SESSION['requisition_saved_toast'] = "Product requested! Pending verification from Admin panel.";
     }
+    header("Location: requisitions.php");
+    exit;
 }
 
-// --- AUTOMATED DEFICIENCY RESOLUTION ENGINE ---
-function autoResolveDeficiencies($req_id, $pdo) {
-    try {
-        $stmt = $pdo->prepare("SELECT catalog_id, quantity FROM requisition_items WHERE requisition_id = ? AND item_status = 'Fulfilled'");
-        $stmt->execute([$req_id]);
-        $deliveredItems = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        $getDeficiencies  = $pdo->prepare("SELECT id, deficit_qty, delivered_qty FROM deficient_stock_logs WHERE catalog_id = ? AND deficit_qty > 0 ORDER BY logged_at ASC");
-        $updateDeficiency = $pdo->prepare("UPDATE deficient_stock_logs SET deficit_qty = ?, delivered_qty = ? WHERE id = ?");
-
-        foreach ($deliveredItems as $item) {
-            $catalog_id = intval($item['catalog_id']);
-            $available_qty = intval($item['quantity']); 
-
-            if ($available_qty <= 0) continue;
-
-            $getDeficiencies->execute([$catalog_id]);
-            $openDeficiencies = $getDeficiencies->fetchAll(PDO::FETCH_ASSOC);
-
-            foreach ($openDeficiencies as $d) {
-                if ($available_qty <= 0) break;
-
-                $d_id = intval($d['id']);
-                $current_deficit = intval($d['deficit_qty']);
-                $current_delivered = intval($d['delivered_qty']);
-
-                if ($available_qty >= $current_deficit) {
-                    $available_qty -= $current_deficit;
-                    $updateDeficiency->execute([0, $current_delivered + $current_deficit, $d_id]);
-                } else {
-                    $updateDeficiency->execute([$current_deficit - $available_qty, $current_delivered + $available_qty, $d_id]);
-                    $available_qty = 0;
-                }
-            }
-        }
-    } catch (Exception $e) {}
-}
-
-function sendRequisitionFulfilledTelegram($req_id, $pdo) {
-    try {
-        $lines = $pdo->prepare("SELECT ri.quantity, rc.item_name as name FROM requisition_items ri JOIN req_catalog rc ON ri.catalog_id = rc.id WHERE ri.requisition_id = ? AND ri.item_status = 'Fulfilled'");
-        $lines->execute([$req_id]);
-        $items = $lines->fetchAll(PDO::FETCH_ASSOC);
-
-        $itemsBlock = "";
-        foreach ($items as $i) {
-            $itemsBlock .= "✅ *x" . $i['quantity'] . "* " . $i['name'] . "\n";
-        }
-
-        $msg = "📦 ✅ *MATERIAL REQUISITION VERIFIED BY BACKEND*\n";
-        $msg .= "--------------------------------------\n";
-        $msg .= "🆔 *Request ID Reference:* #" . $req_id . "\n";
-        $msg .= "⏰ *Processed At:* " . date('d/m/y • H:i') . "\n";
-        $msg .= "--------------------------------------\n\n";
-        $msg .= !empty($itemsBlock) ? $itemsBlock : "🔹 _No fulfilled items logged._\n";
-        $msg .= "\n--------------------------------------\n";
-        $msg .= "👍 _Materials synced downstream successfully._";
-
-        sendTelegramNotification($msg);
-    } catch (Exception $tgEx) {}
-}
-
+// --- MASTER SAVING BATCH SUBMISSION BLOCK ---
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_requisition"])) {
     $req_id = intval($_POST["update_req_id"]);
     $quantities = $_POST["req_item_qty"] ?? [];
     $item_statuses = $_POST["req_item_status"] ?? [];
+    $chosen_units = $_POST["req_item_unit_label"] ?? [];
 
     $pdo->beginTransaction();
     try {
         $getOriginalQty = $pdo->prepare("SELECT quantity FROM requisition_items WHERE requisition_id = ? AND catalog_id = ?");
         $logDeficiency  = $pdo->prepare("INSERT INTO deficient_stock_logs (requisition_id, catalog_id, ordered_qty, delivered_qty, deficit_qty) VALUES (?, ?, ?, ?, ?)");
-        $updateItem     = $pdo->prepare("UPDATE requisition_items SET quantity = ?, item_status = ? WHERE requisition_id = ? AND catalog_id = ?");
+        $updateItem     = $pdo->prepare("UPDATE requisition_items SET quantity = ?, item_status = ?, chosen_unit_label = ? WHERE requisition_id = ? AND catalog_id = ?");
         $deleteItem     = $pdo->prepare("DELETE FROM requisition_items WHERE requisition_id = ? AND catalog_id = ?");
 
         $all_fulfilled = true;
         
         foreach ($quantities as $cat_id => $qty) {
             $cat_id = intval($cat_id);
-            $new_qty = intval($qty);
+            $new_qty = floatval($qty); 
             $allocated_status = isset($item_statuses[$cat_id]) ? trim($item_statuses[$cat_id]) : 'Pending';
+            $unit_label = isset($chosen_units[$cat_id]) ? trim($chosen_units[$cat_id]) : 'Pcs';
 
+            // Clean rows: completely remove items dropped to 0 or cancelled
             if ($new_qty <= 0 || $allocated_status === 'Cancelled') {
                 $deleteItem->execute([$req_id, $cat_id]);
                 continue;
@@ -133,14 +61,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_requisi
             }
 
             $getOriginalQty->execute([$req_id, $cat_id]);
-            $original_qty = intval($getOriginalQty->fetchColumn() ?: 0);
+            $original_qty = floatval($getOriginalQty->fetchColumn() ?: 0);
 
             if ($new_qty < $original_qty && $allocated_status === 'Fulfilled') {
                 $deficit = $original_qty - $new_qty;
                 $logDeficiency->execute([$req_id, $cat_id, $original_qty, $new_qty, $deficit]);
             }
 
-            $updateItem->execute([$new_qty, $allocated_status, $req_id, $cat_id]);
+            $updateItem->execute([$new_qty, $allocated_status, $unit_label, $req_id, $cat_id]);
         }
 
         $countRemaining = $pdo->prepare("SELECT COUNT(*) FROM requisition_items WHERE requisition_id = ?");
@@ -153,11 +81,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_requisi
             $_SESSION['requisition_saved_toast'] = "Stock order entirely cleared and removed!";
         } else {
             $final_global_status = $all_fulfilled ? 'Fulfilled' : 'Pending';
-            
             $stmt = $pdo->prepare("UPDATE requisitions SET status = ? WHERE id = ?");
-            // FIXED: Added missing dollar sign prefix ($) to clear undefined constant error context
             $stmt->execute([$final_global_status, $req_id]);
-
+            
             if ($final_global_status === 'Fulfilled') {
                 autoResolveDeficiencies($req_id, $pdo);
                 syncKitchenInventoryToGoogleSheets($req_id, $pdo);
@@ -175,10 +101,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_requisi
 }
 
 $categories = $pdo->query("SELECT * FROM material_categories ORDER BY sort_order ASC")->fetchAll(PDO::FETCH_ASSOC);
-$materials  = $pdo->query("SELECT id, item_name as name, category_id, image_path FROM req_catalog ORDER BY item_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+$materials  = $pdo->query("SELECT id, item_name as name, category_id, unit_type, unit_label FROM req_catalog WHERE is_verified = 1 ORDER BY item_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
 $past_requisitions = $pdo->query("SELECT r.id, r.requested_at, r.status,
-                                  (SELECT GROUP_CONCAT(CONCAT(rc.item_name, ' (x', ri.quantity, ')') SEPARATOR ', ')
+                                  (SELECT GROUP_CONCAT(CONCAT(rc.item_name, ' (x', ri.quantity, ' ', COALESCE(ri.chosen_unit_label, rc.unit_label), ')') SEPARATOR ', ')
                                    FROM requisition_items ri
                                    JOIN req_catalog rc ON ri.catalog_id = rc.id
                                    WHERE ri.requisition_id = r.id) as item_summary
@@ -206,19 +132,9 @@ include "includes/header.php";
 .material-item-name { font-size: 12px; font-weight: 600; color: #111827; margin-bottom: 10px; line-height: 1.4; text-align: center; width: 100%; word-wrap: break-word; }
 
 .btn-tab-styled-add { 
-    display: inline-block !important;
-    padding: 5px 14px !important; 
-    font-size: 12px !important; 
-    font-weight: 600 !important; 
-    background: #ffffff !important; 
-    color: #475569 !important; 
-    border: 1px solid #cbd5e0 !important; 
-    border-radius: 6px !important; 
-    cursor: pointer !important; 
-    box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important;
-    transition: all 0.15s ease !important;
-    width: auto !important;
-    margin: 0 auto !important;
+    display: inline-block !important; padding: 5px 14px !important; font-size: 12px !important; font-weight: 600 !important; 
+    background: #ffffff !important; color: #475569 !important; border: 1px solid #cbd5e0 !important; border-radius: 6px !important; 
+    cursor: pointer !important; box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important; transition: all 0.15s ease !important; width: auto !important; margin: 0 auto !important;
 }
 .btn-tab-styled-add:hover { background: #f8fafc !important; border-color: #94a3b8 !important; color: #0f172a !important; }
 
@@ -233,17 +149,8 @@ include "includes/header.php";
 .past-table td { padding: 8px 4px; border-bottom: 1px solid #edf2f7; color: #111827; vertical-align: middle; }
 
 .btn-action-trigger { 
-    display: block !important; 
-    width: 100% !important; 
-    padding: 6px 4px !important; 
-    font-size: 10px !important; 
-    font-weight: 700 !important; 
-    text-transform: uppercase; 
-    border-radius: 6px !important; 
-    cursor: pointer !important; 
-    text-align: center !important; 
-    line-height: 1.3 !important;
-    border: 1px solid transparent !important;
+    display: block !important; width: 100% !important; padding: 6px 4px !important; font-size: 10px !important; font-weight: 700 !important; 
+    text-transform: uppercase; border-radius: 6px !important; cursor: pointer !important; text-align: center !important; line-height: 1.3 !important; border: 1px solid transparent !important;
 }
 .btn-action-trigger span { display: block !important; font-size: 9px !important; font-weight: 800 !important; text-transform: lowercase; }
 
@@ -265,21 +172,21 @@ include "includes/header.php";
 .btn-block-remove:hover { background: #dc2626 !important; }
 .btn-block-remove:disabled { background: #cbd5e0 !important; border-color: #cbd5e0 !important; color: #94a3b8 !important; cursor: not-allowed !important; opacity: 0.7; }
 
-/* Visual feedback states classes mapping styles layout */
 .row-state-greyed-out .item-text-title { color: #94a3b8 !important; text-decoration: line-through; }
 .row-state-green-highlight .item-text-title { color: #10b981 !important; font-weight: 800; }
 
-.modal-input-qty { width: 50px; padding: 6px 4px; border: 1px solid #cbd5e0; text-align: center; font-size: 13px; font-weight: 700; color: #1e293b; border-radius: 0; border-left: none; border-right: none; background: #fff !important; }
+.modal-input-qty { width: 55px; padding: 6px 4px; border: 1px solid #cbd5e0; text-align: center; font-size: 13px; font-weight: 700; color: #1e293b; background: #fff !important; }
 .modal-qty-container { display: flex; align-items: center; border-radius: 6px; overflow: hidden; border: 1px solid #cbd5e0; background: #fff; }
 .modal-qty-btn { width: 28px; height: 31px; background: #f8fafc; border: none; color: #475569; font-weight: bold; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .modal-qty-btn:hover { background: #e2e8f0; color: #0f172a; }
 
 .audit-history-subtitle { font-size: 11px; color: #64748b; font-weight: 600; display: block; margin-top: 2px; font-family: monospace; }
 .global-toast-notification { padding: 12px 24px; background: #10b981; color: white; font-size: 14px; font-weight: 800; text-align: center; border-radius: 8px; box-shadow: 0 4px 12px rgba(16,185,129,0.2); margin-bottom: 15px; border: 1px solid #059669; }
+.unit-selector-dropdown { padding: 4px 6px; font-size: 11px; border: 1px solid #cbd5e0; border-radius: 4px; background: #fff; font-weight: 600; color: #475569; }
 </style>
 
 <div class="app-body" style="max-width: 100% !important; width: 100% !important; display: block !important;">
-   
+    
     <?php if (isset($_SESSION['requisition_saved_toast'])): ?>
         <div class="global-toast-notification">
             📢 <strong><?= htmlspecialchars($_SESSION['requisition_saved_toast']) ?></strong>
@@ -296,10 +203,9 @@ include "includes/header.php";
                 <div class="catalog-tab-header">
                     <button type="button" class="catalog-tab-btn active" onclick="window.filterMaterialCatalog('all', this)">All Items</button>
                     <?php foreach ($categories as $cat): ?>
-                        <button type="button" class="catalog-tab-btn" onclick="window.filterMaterialCatalog('cat_<?= $cat['id'] ?>', this)">
-                            <?= htmlspecialchars($cat['name']) ?>
-                        </button>
+                        <button type="button" class="catalog-tab-btn" onclick="window.filterMaterialCatalog('cat_<?= $cat['id'] ?>', this)"><?= htmlspecialchars($cat['name']) ?></button>
                     <?php endforeach; ?>
+                    <button type="button" class="catalog-tab-btn" style="background:#fffbeb; color:#d97706; border: 1px dashed #f59e0b;" onclick="window.openChefNewProductModal()">➕ New Product</button>
                 </div>
 
                 <div id="materialCatalogContainer">
@@ -358,7 +264,7 @@ include "includes/header.php";
                                 $status_style = $is_fulfilled ? 'btn-status-fulfilled' : 'btn-status-pending';
                                 $status_label = empty($pRow['status']) ? 'Pending' : $pRow['status'];
 
-                                $lines = $pdo->prepare("SELECT ri.catalog_id, ri.quantity, COALESCE(ri.item_status, 'Pending') as item_status, rc.item_name as name FROM requisition_items ri JOIN req_catalog rc ON ri.catalog_id = rc.id WHERE ri.requisition_id = ?");
+                                $lines = $pdo->prepare("SELECT ri.quantity, rc.unit_type, rc.unit_label, ri.chosen_unit_label, COALESCE(ri.item_status, 'Pending') as item_status, rc.item_name as name, ri.catalog_id FROM requisition_items ri JOIN req_catalog rc ON ri.catalog_id = rc.id WHERE ri.requisition_id = ?");
                                 $lines->execute([$pRow['id']]);
                                 $serializedItems = json_encode($lines->fetchAll(PDO::FETCH_ASSOC));
                             ?>
@@ -388,20 +294,57 @@ include "includes/header.php";
 </div>
 
 <div id="editReqModalPopup" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
-    <div class="modal-content" style="background: white; max-width: 540px; width: 92%; border-radius: 12px; padding: 25px; position: relative; color: #111827; text-align: left;">
+    <div class="modal-content" style="background: white; max-width: 580px; width: 92%; border-radius: 12px; padding: 25px; position: relative; color: #111827; text-align: left;">
         <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="window.closeEditReqModal()">✕</span>
-       
         <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; letter-spacing: 0.5px;">Modify Stock Order</h3>
-       
+        
         <form method="POST" action="requisitions.php" style="margin: 0;">
             <input type="hidden" name="action_update_requisition" value="1">
             <input type="hidden" name="update_req_id" id="mdlUpdateId">
-           
             <div id="mdlItemsContainer" style="max-height: 290px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px; margin-bottom: 20px; background: #fafafa;"></div>
-
             <div style="display: flex; gap: 10px; justify-content: flex-end; align-items: center;">
                 <button type="button" class="btn btn-log" style="padding: 10px 18px;" onclick="window.closeEditReqModal()">Cancel</button>
                 <button type="submit" class="btn btn-start" style="padding: 10px 24px; font-weight: 800;">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="chefNewProductModal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
+    <div class="modal-content" style="background: white; max-width: 440px; width: 90%; border-radius: 12px; padding: 25px; color: #111827; text-align: left;">
+        <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="window.closeChefNewProductModal()">✕</span>
+        <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; color: #d97706;">Request Unlisted Product</h3>
+        <form method="POST" action="requisitions.php" style="margin: 0;">
+            <input type="hidden" name="action_create_chef_product" value="1">
+            <div style="margin-bottom: 12px;">
+                <label style="font-size: 11px; font-weight: 700; color: #4b5563; display: block; margin-bottom: 4px;">Product Name Description</label>
+                <input type="text" name="chef_prod_name" required style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0; font-size:13px;" placeholder="e.g. Avocado, White Vinegar">
+            </div>
+            <div style="margin-bottom: 12px;">
+                <label style="font-size: 11px; font-weight: 700; color: #4b5563; display: block; margin-bottom: 4px;">Allocation Category</label>
+                <select name="chef_prod_category" required style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0; font-size:13px;">
+                    <option value="">-- Choose Category --</option>
+                    <?php foreach ($categories as $cat): ?>
+                        <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div style="margin-bottom: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div>
+                    <label style="font-size: 11px; font-weight: 700; color: #4b5563; display: block; margin-bottom: 4px;">Measurement Strategy Type</label>
+                    <select id="chefUnitType" name="chef_prod_unit_type" onchange="window.updateChefUnitLabelDropdown()" style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0; font-size:13px;">
+                        <option value="Count">Count (Integers)</option>
+                        <option value="Weight">Weight / Volume Matrix</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 11px; font-weight: 700; color: #4b5563; display: block; margin-bottom: 4px;">Default Metric</label>
+                    <select id="chefUnitLabel" name="chef_prod_unit_label" style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0; font-size:13px;"></select>
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button type="button" class="btn btn-log" style="padding: 8px 16px;" onclick="window.closeChefNewProductModal()">Cancel</button>
+                <button type="submit" class="btn btn-bill" style="padding: 8px 20px; font-weight: 800; background:#d97706; border-color:#d97706;">Add to List</button>
             </div>
         </form>
     </div>
@@ -491,18 +434,37 @@ window.openEditRequisitionModal = function(reqId, element) {
        
         container.innerHTML = items.map(i => {
             const initialStatus = i.item_status || 'Pending';
+            const unitType = i.unit_type || 'Count';
+            const currentLabel = i.chosen_unit_label || i.unit_label || 'Pcs';
+            
             let rowStateClass = '';
             let fDisabled = '';
             let rDisabled = '';
            
-            if (initialStatus === 'Fulfilled') {
-                rowStateClass = 'row-state-green-highlight';
-                fDisabled = 'disabled';
+            if (initialStatus === 'Fulfilled') { rowStateClass = 'row-state-green-highlight'; fDisabled = 'disabled'; }
+            if (initialStatus === 'Cancelled') { rowStateClass = 'row-state-greyed-out'; rDisabled = 'disabled'; }
+
+            let unitDropdownMarkup = '';
+            if (unitType === 'Weight') {
+                unitDropdownMarkup = `
+                    <select name="req_item_unit_label[${i.catalog_id}]" class="unit-selector-dropdown">
+                        <option value="kg" ${currentLabel === 'kg' ? 'selected' : ''}>kg</option>
+                        <option value="gms" ${currentLabel === 'gms' ? 'selected' : ''}>gms</option>
+                        <option value="Ltr" ${currentLabel === 'Ltr' ? 'selected' : ''}>Ltr</option>
+                        <option value="ml" ${currentLabel === 'ml' ? 'selected' : ''}>ml</option>
+                    </select>
+                `;
+            } else {
+                unitDropdownMarkup = `
+                    <select name="req_item_unit_label[${i.catalog_id}]" class="unit-selector-dropdown">
+                        <option value="Pcs" ${currentLabel === 'Pcs' ? 'selected' : ''}>Pcs</option>
+                        <option value="Packets" ${currentLabel === 'Packets' ? 'selected' : ''}>Packets</option>
+                        <option value="Boxes" ${currentLabel === 'Boxes' ? 'selected' : ''}>Boxes</option>
+                    </select>
+                `;
             }
-            if (initialStatus === 'Cancelled') {
-                rowStateClass = 'row-state-greyed-out';
-                rDisabled = 'disabled';
-            }
+
+            const computationFactor = (unitType === 'Weight') ? 0.25 : 1;
 
             return `
                 <div id="itemVerificationRow_${i.catalog_id}" class="verification-item-row-wrapper ${rowStateClass}" style="display:flex; justify-content:space-between; align-items:center; padding:12px 10px; border-bottom:1px solid #e2e8f0; background:#ffffff; margin-bottom:6px; border-radius:8px; gap:8px;">
@@ -511,14 +473,17 @@ window.openEditRequisitionModal = function(reqId, element) {
                         <span id="qtyAuditSubtitle_${i.catalog_id}" class="audit-history-subtitle" data-original="${i.quantity}">Ordered: ${i.quantity}</span>
                     </div>
                    
-                    <div class="modal-qty-container">
-                        <button type="button" class="modal-qty-btn" onclick="window.adjustVerificationRowQty(${i.catalog_id}, -1)">-</button>
-                        <input type="number" id="mdlQtyInput_${i.catalog_id}" name="req_item_qty[${i.catalog_id}]" value="${i.quantity}" min="0" class="modal-input-qty" oninput="window.handleQuantityInputChangeDirect(${i.catalog_id})">
-                        <button type="button" class="modal-qty-btn" onclick="window.adjustVerificationRowQty(${i.catalog_id}, 1)">+</button>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <div class="modal-qty-container">
+                            <button type="button" class="modal-qty-btn" onclick="window.adjustVerificationRowQty(${i.catalog_id}, -${computationFactor})">-</button>
+                            <input type="number" id="mdlQtyInput_${i.catalog_id}" name="req_item_qty[${i.catalog_id}]" value="${i.quantity}" min="0" step="${computationFactor}" class="modal-input-qty" oninput="window.handleQuantityInputChangeDirect(${i.catalog_id})">
+                            <button type="button" class="modal-qty-btn" onclick="window.adjustVerificationRowQty(${i.catalog_id}, ${computationFactor})">+</button>
+                        </div>
+                        ${unitDropdownMarkup}
                     </div>
 
                     <div class="binary-toggle-container" style="background:transparent; border:none; padding:0;">
-                        <input type="hidden" id="mdlStatusHidden_${i.catalog_id}" name="req_item_status[${i.catalog_id}]" value="${currentStatus}">
+                        <input type="hidden" id="mdlStatusHidden_${i.catalog_id}" name="req_item_status[${i.catalog_id}]" value="${initialStatus}">
                         <button type="button" id="toggleBtn_F_${i.catalog_id}" ${fDisabled} class="toggle-choice-btn btn-block-fulfilled" onclick="window.triggerMemoryStateUpdate(${i.catalog_id}, 'Fulfilled')">Fulfilled</button>
                         <button type="button" id="toggleBtn_C_${i.catalog_id}" ${rDisabled} class="toggle-choice-btn btn-block-remove" onclick="window.triggerMemoryStateUpdate(${i.catalog_id}, 'Cancelled')">Remove</button>
                     </div>
@@ -536,9 +501,9 @@ window.openEditRequisitionModal = function(reqId, element) {
 window.adjustVerificationRowQty = function(catalogId, stepValue) {
     const input = document.getElementById(`mdlQtyInput_${catalogId}`);
     if (input) {
-        let currentVal = parseInt(input.value) || 0;
+        let currentVal = parseFloat(input.value) || 0;
         let finalVal = Math.max(0, currentVal + stepValue);
-        input.value = finalVal;
+        input.value = finalVal % 1 === 0 ? finalVal : finalVal.toFixed(2);
        
         window.reactivateActionRowButtons(catalogId, finalVal);
         window.syncRowAuditText(catalogId);
@@ -548,7 +513,7 @@ window.adjustVerificationRowQty = function(catalogId, stepValue) {
 window.handleQuantityInputChangeDirect = function(catalogId) {
     const input = document.getElementById(`mdlQtyInput_${catalogId}`);
     if (input) {
-        let finalVal = parseInt(input.value) || 0;
+        let finalVal = parseFloat(input.value) || 0;
         if (finalVal < 0) { finalVal = 0; input.value = 0; }
        
         window.reactivateActionRowButtons(catalogId, finalVal);
@@ -580,8 +545,8 @@ window.syncRowAuditText = function(catalogId) {
     const subtitle = document.getElementById(`qtyAuditSubtitle_${catalogId}`);
     if (!input || !subtitle) return;
 
-    const originalCount = parseInt(subtitle.getAttribute("data-original")) || 0;
-    const currentCount  = parseInt(input.value) || 0;
+    const originalCount = parseFloat(subtitle.getAttribute("data-original")) || 0;
+    const currentCount  = parseFloat(input.value) || 0;
 
     if (currentCount === originalCount) {
         subtitle.innerHTML = `Ordered: ${originalCount}`;
@@ -616,6 +581,34 @@ window.triggerMemoryStateUpdate = function(catalogId, targetedState) {
             rowWrapper.classList.add('row-state-green-highlight');
             btnFulfilled.setAttribute('disabled', 'disabled');
         }
+    }
+};
+
+window.openChefNewProductModal = function() {
+    window.updateChefUnitLabelDropdown();
+    document.getElementById("chefNewProductModal").style.display = "flex";
+};
+
+window.closeChefNewProductModal = function() {
+    document.getElementById("chefNewProductModal").style.display = "none";
+};
+
+window.updateChefUnitLabelDropdown = function() {
+    const type = document.getElementById("chefUnitType").value;
+    const labelDropdown = document.getElementById("chefUnitLabel");
+    if(type === 'Weight') {
+        labelDropdown.innerHTML = `
+            <option value="kg">kg</option>
+            <option value="gms">gms</option>
+            <option value="Ltr">Ltr</option>
+            <option value="ml">ml</option>
+        `;
+    } else {
+        labelDropdown.innerHTML = `
+            <option value="Pcs">Pcs</option>
+            <option value="Packets">Packets</option>
+            <option value="Boxes">Boxes</option>
+        `;
     }
 };
 
