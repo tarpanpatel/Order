@@ -94,7 +94,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_requisi
 }
 
 $categories = $pdo->query("SELECT * FROM material_categories ORDER BY sort_order ASC")->fetchAll(PDO::FETCH_ASSOC);
-$materials  = $pdo->query("SELECT id, item_name as name, category_id, unit_type, unit_label, pack_size, pack_unit FROM req_catalog WHERE is_verified = 1 ORDER BY item_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+// UPDATED CORE QUERY: Pulled image_path from database configuration parameters
+$materials  = $pdo->query("SELECT id, item_name as name, category_id, unit_type, unit_label, pack_size, pack_unit, image_path FROM req_catalog WHERE is_verified = 1 ORDER BY item_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
 $past_requisitions = $pdo->query("SELECT r.id, r.requested_at, r.status,
                                   (SELECT GROUP_CONCAT(CONCAT(rc.item_name, ' (', CAST(rc.pack_size AS CHAR), ' ', rc.pack_unit, ') x', ri.quantity, ' ', COALESCE(ri.chosen_unit_label, rc.unit_label)) SEPARATOR ', ')
@@ -120,14 +121,16 @@ include "includes/header.php";
 .catalog-tab-btn:hover { background: #e2e8f0; }
 .catalog-tab-btn.active { background: #06b6d4; color: white; border-color: #06b6d4; }
 
-.material-item-grid { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)) !important; gap: 12px !important; }
-.material-item-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; background: #fff; text-align: center; display: flex; flex-direction: column; justify-content: space-between; align-items: center; min-height: 110px; box-sizing: border-box; }
-.material-item-name { font-size: 12px; font-weight: 600; color: #111827; margin-bottom: 10px; line-height: 1.4; text-align: center; width: 100%; word-wrap: break-word; }
+.material-item-grid { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)) !important; gap: 12px !important; }
+.material-item-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; background: #fff; text-align: center; display: flex; flex-direction: column; justify-content: space-between; align-items: center; min-height: 175px; box-sizing: border-box; }
+.material-item-image-box { width: 100%; height: 50px; overflow: hidden; border-radius: 6px; border: 1px solid #edf2f7; background: #f8fafc; margin-bottom: 8px; }
+.material-item-image-box img { width: 100%; height: 100%; object-fit: cover; }
+.material-item-name { font-size: 12px; font-weight: 600; color: #111827; margin-bottom: 8px; line-height: 1.3; text-align: center; width: 100%; word-wrap: break-word; }
 
 .btn-tab-styled-add { 
     display: inline-block !important; padding: 5px 14px !important; font-size: 12px !important; font-weight: 600 !important; 
     background: #ffffff !important; color: #475569 !important; border: 1px solid #cbd5e0 !important; border-radius: 6px !important; 
-    cursor: pointer !important; box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important; transition: all 0.15s ease !important; width: auto !important; margin: 0 auto !important;
+    cursor: pointer !important; box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important; transition: all 0.15s ease !important; width: 100% !important; margin: 0 auto !important;
 }
 .btn-tab-styled-add:hover { background: #f8fafc !important; border-color: #94a3b8 !important; color: #0f172a !important; }
 
@@ -211,8 +214,13 @@ include "includes/header.php";
                         <div class="category-block" id="cat_<?= $cat['id'] ?>" style="margin-bottom: 25px;">
                             <h4 style="font-size: 13px; text-transform: uppercase; color: #4b5563; text-align: left; margin-bottom: 10px; font-weight: 700;"><?= $cat['name'] ?></h4>
                             <div class="material-item-grid">
-                                <?php foreach ($catItems as $item): ?>
+                                <?php foreach ($catItems as $item): 
+                                    $item_img = !empty($item['image_path']) ? $item['image_path'] : 'assets/images/catalog/placeholder.png';
+                                ?>
                                     <div class="material-item-card">
+                                        <div class="material-item-image-box">
+                                            <img src="<?= $item_img ?>" alt="">
+                                        </div>
                                         <div class="material-item-name">
                                             <?= htmlspecialchars($item['name']) ?>
                                             <div style="font-size:10px; color:#64748b; font-weight:bold; margin-top:2px;">(Size: <?= floatval($item['pack_size']) ?> <?= $item['pack_unit'] ?>)</div>
@@ -260,7 +268,6 @@ include "includes/header.php";
                                 $status_style = $is_fulfilled ? 'btn-status-fulfilled' : 'btn-status-pending';
                                 $status_label = empty($pRow['status']) ? 'Pending' : $pRow['status'];
 
-                                // UPDATED: Injected rc.image_path dynamically to flow asset links downstream to memory map
                                 $lines = $pdo->prepare("SELECT ri.quantity, rc.unit_type, rc.unit_label, ri.chosen_unit_label, COALESCE(ri.item_status, 'Pending') as item_status, rc.item_name as name, ri.catalog_id, rc.pack_size, rc.pack_unit, rc.image_path FROM requisition_items ri JOIN req_catalog rc ON ri.catalog_id = rc.id WHERE ri.requisition_id = ?");
                                 $lines->execute([$pRow['id']]);
                                 $serializedItems = json_encode($lines->fetchAll(PDO::FETCH_ASSOC));
@@ -440,7 +447,6 @@ window.openEditRequisitionModal = function(reqId, element) {
             const currentLabel = i.chosen_unit_label || i.unit_label || 'Pcs';
             const pSize = parseFloat(i.pack_size) || 1;
             const pUnit = i.pack_unit || 'Pcs';
-            // UPDATED fallback strategy handles clean file routing path strings natively
             const imgUrl = i.image_path ? i.image_path : 'assets/images/catalog/placeholder.png';
             
             let rowStateClass = '';
@@ -472,7 +478,6 @@ window.openEditRequisitionModal = function(reqId, element) {
 
             const computationFactor = (unitType === 'Weight') ? 0.25 : 1;
 
-            // UPDATED MARKS: Injected standard responsive widescreen 150x50 product thumbnails cleanly inline 
             return `
                 <div id="itemVerificationRow_${i.catalog_id}" class="verification-item-row-wrapper ${rowStateClass}" style="display:flex; justify-content:space-between; align-items:center; padding:12px 10px; border-bottom:1px solid #e2e8f0; background:#ffffff; margin-bottom:6px; border-radius:8px; gap:12px;">
                     <div style="width:150px; min-width:150px; height:50px; overflow:hidden; border-radius:6px; border:1px solid #edf2f7; background:#f8fafc;">
