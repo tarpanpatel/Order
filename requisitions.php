@@ -14,15 +14,17 @@ if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Chef" && $_SESSION["rol
 
 // --- CHEF NEW PRODUCT GENERATOR INTERCEPTOR ---
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_create_chef_product"])) {
-    $item_name = trim($_POST["chef_prod_name"]);
+    $item_name   = trim($_POST["chef_prod_name"]);
     $category_id = intval($_POST["chef_prod_category"]);
-    $unit_type = trim($_POST["chef_prod_unit_type"]);
-    $unit_label = trim($_POST["chef_prod_unit_label"]);
+    $unit_type   = trim($_POST["chef_prod_unit_type"]);
+    $unit_label  = trim($_POST["chef_prod_unit_label"]);
+    $pack_size   = floatval($_POST["chef_pack_size"]);
+    $pack_unit   = trim($_POST["chef_pack_unit"]);
 
     if (!empty($item_name) && $category_id > 0) {
-        $stmt = $pdo->prepare("INSERT INTO req_catalog (item_name, category_id, unit_type, unit_label, is_verified, unit_cost, image_path) VALUES (?, ?, ?, ?, 0, 0.00, 'assets/images/catalog/placeholder.png')");
-        $stmt->execute([$item_name, $category_id, $unit_type, $unit_label]);
-        $_SESSION['requisition_saved_toast'] = "Product requested! Pending verification from Admin panel.";
+        $stmt = $pdo->prepare("INSERT INTO req_catalog (item_name, category_id, unit_type, unit_label, pack_size, pack_unit, is_verified, unit_cost, image_path) VALUES (?, ?, ?, ?, ?, ?, 0, 0.00, 'assets/images/catalog/placeholder.png')");
+        $stmt->execute([$item_name, $category_id, $unit_type, $unit_label, $pack_size, $pack_unit]);
+        $_SESSION['requisition_saved_toast'] = "Product requested with packing specifications!";
     }
     header("Location: requisitions.php");
     exit;
@@ -50,7 +52,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_requisi
             $allocated_status = isset($item_statuses[$cat_id]) ? trim($item_statuses[$cat_id]) : 'Pending';
             $unit_label = isset($chosen_units[$cat_id]) ? trim($chosen_units[$cat_id]) : 'Pcs';
 
-            // Clean rows: completely remove items dropped to 0 or cancelled
             if ($new_qty <= 0 || $allocated_status === 'Cancelled') {
                 $deleteItem->execute([$req_id, $cat_id]);
                 continue;
@@ -83,12 +84,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_requisi
             $final_global_status = $all_fulfilled ? 'Fulfilled' : 'Pending';
             $stmt = $pdo->prepare("UPDATE requisitions SET status = ? WHERE id = ?");
             $stmt->execute([$final_global_status, $req_id]);
-            
-            if ($final_global_status === 'Fulfilled') {
-                autoResolveDeficiencies($req_id, $pdo);
-                syncKitchenInventoryToGoogleSheets($req_id, $pdo);
-                sendRequisitionFulfilledTelegram($req_id, $pdo);
-            }
             $_SESSION['requisition_saved_toast'] = "Notification Saved successfully!";
         }
 
@@ -101,10 +96,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_requisi
 }
 
 $categories = $pdo->query("SELECT * FROM material_categories ORDER BY sort_order ASC")->fetchAll(PDO::FETCH_ASSOC);
-$materials  = $pdo->query("SELECT id, item_name as name, category_id, unit_type, unit_label FROM req_catalog WHERE is_verified = 1 ORDER BY item_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+$materials  = $pdo->query("SELECT id, item_name as name, category_id, unit_type, unit_label, pack_size, pack_unit FROM req_catalog WHERE is_verified = 1 ORDER BY item_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
 $past_requisitions = $pdo->query("SELECT r.id, r.requested_at, r.status,
-                                  (SELECT GROUP_CONCAT(CONCAT(rc.item_name, ' (x', ri.quantity, ' ', COALESCE(ri.chosen_unit_label, rc.unit_label), ')') SEPARATOR ', ')
+                                  (SELECT GROUP_CONCAT(CONCAT(rc.item_name, ' (', CAST(rc.pack_size AS CHAR), ' ', rc.pack_unit, ') x', ri.quantity, ' ', COALESCE(ri.chosen_unit_label, rc.unit_label)) SEPARATOR ', ')
                                    FROM requisition_items ri
                                    JOIN req_catalog rc ON ri.catalog_id = rc.id
                                    WHERE ri.requisition_id = r.id) as item_summary
@@ -220,7 +215,10 @@ include "includes/header.php";
                             <div class="material-item-grid">
                                 <?php foreach ($catItems as $item): ?>
                                     <div class="material-item-card">
-                                        <div class="material-item-name"><?= htmlspecialchars($item['name']) ?></div>
+                                        <div class="material-item-name">
+                                            <?= htmlspecialchars($item['name']) ?>
+                                            <div style="font-size:10px; color:#64748b; font-weight:bold; margin-top:2px;">(Size: <?= floatval($item['pack_size']) ?> <?= $item['pack_unit'] ?>)</div>
+                                        </div>
                                         <button type="button" class="btn-tab-styled-add" onclick="window.addMaterialToSidebar(<?= $item['id'] ?>, '<?= htmlspecialchars(addslashes($item['name'])) ?>')">+ Add</button>
                                     </div>
                                 <?php endforeach; ?>
@@ -264,7 +262,7 @@ include "includes/header.php";
                                 $status_style = $is_fulfilled ? 'btn-status-fulfilled' : 'btn-status-pending';
                                 $status_label = empty($pRow['status']) ? 'Pending' : $pRow['status'];
 
-                                $lines = $pdo->prepare("SELECT ri.quantity, rc.unit_type, rc.unit_label, ri.chosen_unit_label, COALESCE(ri.item_status, 'Pending') as item_status, rc.item_name as name, ri.catalog_id FROM requisition_items ri JOIN req_catalog rc ON ri.catalog_id = rc.id WHERE ri.requisition_id = ?");
+                                $lines = $pdo->prepare("SELECT ri.quantity, rc.unit_type, rc.unit_label, ri.chosen_unit_label, COALESCE(ri.item_status, 'Pending') as item_status, rc.item_name as name, ri.catalog_id, rc.pack_size, rc.pack_unit FROM requisition_items ri JOIN req_catalog rc ON ri.catalog_id = rc.id WHERE ri.requisition_id = ?");
                                 $lines->execute([$pRow['id']]);
                                 $serializedItems = json_encode($lines->fetchAll(PDO::FETCH_ASSOC));
                             ?>
@@ -311,14 +309,14 @@ include "includes/header.php";
 </div>
 
 <div id="chefNewProductModal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
-    <div class="modal-content" style="background: white; max-width: 440px; width: 90%; border-radius: 12px; padding: 25px; color: #111827; text-align: left;">
+    <div class="modal-content" style="background: white; max-width: 460px; width: 90%; border-radius: 12px; padding: 25px; color: #111827; text-align: left;">
         <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="window.closeChefNewProductModal()">✕</span>
         <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; color: #d97706;">Request Unlisted Product</h3>
         <form method="POST" action="requisitions.php" style="margin: 0;">
             <input type="hidden" name="action_create_chef_product" value="1">
             <div style="margin-bottom: 12px;">
                 <label style="font-size: 11px; font-weight: 700; color: #4b5563; display: block; margin-bottom: 4px;">Product Name Description</label>
-                <input type="text" name="chef_prod_name" required style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0; font-size:13px;" placeholder="e.g. Avocado, White Vinegar">
+                <input type="text" name="chef_prod_name" required style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0; font-size:13px;" placeholder="e.g. Fresh Milk Packets">
             </div>
             <div style="margin-bottom: 12px;">
                 <label style="font-size: 11px; font-weight: 700; color: #4b5563; display: block; margin-bottom: 4px;">Allocation Category</label>
@@ -329,16 +327,34 @@ include "includes/header.php";
                     <?php endforeach; ?>
                 </select>
             </div>
+            
+            <div style="margin-bottom: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div>
+                    <label style="font-size: 11px; font-weight: 700; color: #4b5563; display: block; margin-bottom: 4px;">Packaging Value Size</label>
+                    <input type="number" name="chef_pack_size" required step="0.1" value="1" style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0; font-size:13px;">
+                </div>
+                <div>
+                    <label style="font-size: 11px; font-weight: 700; color: #4b5563; display: block; margin-bottom: 4px;">Capacity Metric</label>
+                    <select name="chef_pack_unit" style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0; font-size:13px;">
+                        <option value="kg">kg</option>
+                        <option value="gms">gms</option>
+                        <option value="Ltr">Ltr</option>
+                        <option value="ml">ml</option>
+                        <option value="Pcs">Pcs</option>
+                    </select>
+                </div>
+            </div>
+
             <div style="margin-bottom: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                 <div>
-                    <label style="font-size: 11px; font-weight: 700; color: #4b5563; display: block; margin-bottom: 4px;">Measurement Strategy Type</label>
+                    <label style="font-size: 11px; font-weight: 700; color: #4b5563; display: block; margin-bottom: 4px;">Measurement Type</label>
                     <select id="chefUnitType" name="chef_prod_unit_type" onchange="window.updateChefUnitLabelDropdown()" style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0; font-size:13px;">
                         <option value="Count">Count (Integers)</option>
                         <option value="Weight">Weight / Volume Matrix</option>
                     </select>
                 </div>
                 <div>
-                    <label style="font-size: 11px; font-weight: 700; color: #4b5563; display: block; margin-bottom: 4px;">Default Metric</label>
+                    <label style="font-size: 11px; font-weight: 700; color: #4b5563; display: block; margin-bottom: 4px;">Default Ordering Metric</label>
                     <select id="chefUnitLabel" name="chef_prod_unit_label" style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0; font-size:13px;"></select>
                 </div>
             </div>
@@ -436,6 +452,8 @@ window.openEditRequisitionModal = function(reqId, element) {
             const initialStatus = i.item_status || 'Pending';
             const unitType = i.unit_type || 'Count';
             const currentLabel = i.chosen_unit_label || i.unit_label || 'Pcs';
+            const pSize = parseFloat(i.pack_size) || 1;
+            const pUnit = i.pack_unit || 'Pcs';
             
             let rowStateClass = '';
             let fDisabled = '';
@@ -470,6 +488,7 @@ window.openEditRequisitionModal = function(reqId, element) {
                 <div id="itemVerificationRow_${i.catalog_id}" class="verification-item-row-wrapper ${rowStateClass}" style="display:flex; justify-content:space-between; align-items:center; padding:12px 10px; border-bottom:1px solid #e2e8f0; background:#ffffff; margin-bottom:6px; border-radius:8px; gap:8px;">
                     <div style="flex:1; min-width:0; text-align:left;">
                         <span class="item-text-title" style="font-size:12px; font-weight:700; color:#1e293b; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; transition:all 0.15s ease;">${i.name}</span>
+                        <span style="font-size:10px; color:#475569; font-weight:bold; display:block; margin-bottom:2px;">Packing Spec: ${pSize} ${pUnit}</span>
                         <span id="qtyAuditSubtitle_${i.catalog_id}" class="audit-history-subtitle" data-original="${i.quantity}">Ordered: ${i.quantity}</span>
                     </div>
                    
@@ -524,8 +543,8 @@ window.handleQuantityInputChangeDirect = function(catalogId) {
 window.reactivateActionRowButtons = function(catalogId, activeValue) {
     const hiddenStatus = document.getElementById(`mdlStatusHidden_${catalogId}`);
     const rowWrapper   = document.getElementById(`itemVerificationRow_${catalogId}`);
-    const btnFulfilled = document.getElementById(`toggleBtn_F_${catalogId}`);
-    const btnCancelled = document.getElementById(`toggleBtn_C_${catalogId}`);
+    const btnFulfilled = document.getElementById("toggleBtn_F_" + catalogId);
+    const btnCancelled = document.getElementById("toggleBtn_C_" + catalogId);
 
     if (!hiddenStatus || !rowWrapper || !btnFulfilled || !btnCancelled) return;
 
@@ -559,8 +578,8 @@ window.triggerMemoryStateUpdate = function(catalogId, targetedState) {
     const hiddenStatus = document.getElementById(`mdlStatusHidden_${catalogId}`);
     const rowWrapper   = document.getElementById(`itemVerificationRow_${catalogId}`);
     const qtyInput     = document.getElementById(`mdlQtyInput_${catalogId}`);
-    const btnFulfilled = document.getElementById(`toggleBtn_F_${catalogId}`);
-    const btnCancelled = document.getElementById(`toggleBtn_C_${catalogId}`);
+    const btnFulfilled = document.getElementById("toggleBtn_F_" + catalogId);
+    const btnCancelled = document.getElementById("toggleBtn_C_" + catalogId);
 
     if (!hiddenStatus || !rowWrapper || !qtyInput || !btnFulfilled || !btnCancelled) return;
 
