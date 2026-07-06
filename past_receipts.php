@@ -1,274 +1,220 @@
 <?php
 // /home/apartment/artistsfarmjaipur.com/Order/past_receipts.php
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
-require_once __DIR__ . '/config/db.php'; 
+require_once "config/db.php";
 
-if (!isset($_SESSION["user_id"])) { 
-    header("Location: login.php"); 
-    exit; 
+if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Admin" && $_SESSION["role"] !== "Super Admin")) {
+    die("Access Denied: Administrative credentials required.");
 }
 
-// Handle AJAX Request for detailed food items breakdown dynamically on row click
-if (isset($_GET['action_fetch_food_breakdown'])) {
-    header('Content-Type: application/json');
-    $bookingId = isset($_GET['booking_id']) ? intval($_GET['booking_id']) : 0;
+// --- BACKEND LOGIC: POST INTERCEPTOR FOR UPDATING PAST INVOICES ---
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_invoice"])) {
+    $order_id = intval($_POST["update_order_id"]);
+    $item_qtys = $_POST["invoice_item_qty"] ?? [];
+    $custom_discount = floatval($_POST["invoice_discount"] ?? 0);
     
-    // Cross-reference using your real schema: order items matching the guest link recorded under farm_bookings
-    $stmt = $pdo->prepare("
-        SELECT mi.name, oi.quantity, oi.returned_qty, mi.price
-        FROM order_items oi
-        JOIN menu_items mi ON oi.menu_item_id = mi.id
-        JOIN orders o ON oi.order_id = o.id
-        JOIN farm_bookings fb ON fb.contact_no = (SELECT phone_number FROM guests WHERE id = o.guest_id LIMIT 1)
-        WHERE fb.id = ?
-    ");
-    $stmt->execute([$bookingId]);
-    $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    echo json_encode($items);
-    exit;
+    $pdo->beginTransaction();
+    try {
+        $subtotal = 0;
+        
+        // Loop through items to update or remove
+        foreach ($item_qtys as $item_id => $qty) {
+            $item_id = intval($item_id);
+            $qty = intval($qty);
+            
+            if ($qty <= 0) {
+                // Delete item from order line items if set to 0
+                $stmt = $pdo->prepare("DELETE FROM order_items WHERE id = ? AND order_id = ?");
+                $stmt->execute([$item_id, $order_id]);
+            } else {
+                // Fetch unit price to calculate new totals dynamically
+                $priceStmt = $pdo->prepare("SELECT price FROM order_items WHERE id = ?");
+                $priceStmt->execute([$item_id]);
+                $unit_price = floatval($priceStmt->fetchColumn() ?: 0);
+                
+                $item_total = $unit_price * $qty;
+                $subtotal += $item_total;
+                
+                // Update quantity and line total
+                $stmt = $pdo->prepare("UPDATE order_items SET quantity = ?, total_price = ? WHERE id = ? AND order_id = ?");
+                $stmt->execute([$qty, $item_total, $item_id, $order_id]);
+            }
+        }
+        
+        $grand_total = max(0, $subtotal - $custom_discount);
+        
+        // Update parent order totals
+        $updateOrder = $pdo->prepare("UPDATE orders SET subtotal = ?, discount = ?, grand_total = ? WHERE id = ?");
+        $updateOrder->execute([$subtotal, $custom_discount, $grand_total, $order_id]);
+        
+        $pdo->commit();
+        $_SESSION['invoice_success_toast'] = "Invoice #$order_id updated and recalculated successfully!";
+        header("Location: past_receipts.php");
+        exit;
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        die("Error updating invoice: " . $e->getMessage());
+    }
 }
 
-// Fetch date filters if selected
-$selectedMonth = isset($_GET['month']) ? intval($_GET['month']) : null;
-$selectedYear  = isset($_GET['year']) ? intval($_GET['year']) : null;
-
-// Build dynamic filtering SQL string
-$sql = "SELECT * FROM farm_bookings";
-$whereClauses = [];
-$params = [];
-
-if ($selectedMonth && $selectedYear) {
-    $whereClauses[] = "MONTH(check_in_date) = :month AND YEAR(check_in_date) = :year";
-    $params[':month'] = $selectedMonth;
-    $params[':year'] = $selectedYear;
-}
-
-if (!empty($whereClauses)) {
-    $sql .= " WHERE " . implode(" AND ", $whereClauses);
-}
-$sql .= " ORDER BY id DESC";
-
-$stmt = $pdo->prepare($sql);
-$stmt->execute($params);
-$receipts = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Fetch date ranges for dropdown filters
-$filterDates = $pdo->query("SELECT DISTINCT MONTH(check_in_date) as m, YEAR(check_in_date) as y FROM farm_bookings WHERE check_in_date IS NOT NULL ORDER BY y DESC, m DESC")->fetchAll(PDO::FETCH_ASSOC);
+// Fetch past closed orders/receipts
+$orders = $pdo->query("
+    SELECT o.*, g.phone_number, g.room_number 
+    FROM orders o 
+    LEFT JOIN guests g ON o.guest_id = g.id 
+    ORDER BY o.created_at DESC
+")->fetchAll(PDO::FETCH_ASSOC);
 
 include "includes/header.php";
 ?>
 
-<div class="main-content" style="padding: 12px; width: 100%; max-width: 100%; box-sizing: border-box; overflow-x: hidden; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
+<style>
+.receipts-dashboard-card { background: #ffffff; border: 1px solid #cbd5e0; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+.receipts-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
+.receipts-table th { background: #f8fafc; padding: 12px; font-weight: 700; color: #475569; border-bottom: 2px solid #cbd5e0; }
+.receipts-table td { padding: 12px; border-bottom: 1px solid #e2e8f0; color: #1e293b; vertical-align: middle; }
+.invoice-search-bar { width: 100%; max-width: 360px; padding: 10px 14px; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 13px; }
+.modal-item-edit-row { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #edf2f7; gap: 10px; }
+.modal-qty-field { width: 60px; padding: 6px; text-align: center; border: 1px solid #cbd5e0; border-radius: 6px; font-weight: bold; }
+</style>
+
+<div class="app-body" style="padding: 20px; font-family: sans-serif; text-align: left;">
     
-    <style>
-        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .page-title { font-size: 20px; font-weight: 700; color: #1e293b; margin: 0; }
-        .filter-form { display: flex; gap: 10px; align-items: center; background: #fff; padding: 10px 15px; border-radius: 8px; border: 1px solid #e2e8f0; }
-        .filter-form select { padding: 6px 12px; border-radius: 6px; border: 1px solid #cbd5e0; background: #fff; font-size: 13px; }
-        .filter-form button, .btn-action { padding: 6px 14px; background: #06b6d4; color: #fff; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px; text-decoration: none; }
-        .filter-form button:hover, .btn-action:hover { background: #0891b2; }
-        .btn-clear { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e0; }
-        .btn-clear:hover { background: #e2e8f0; }
+    <?php if (isset($_SESSION['invoice_success_toast'])): ?>
+        <div style="padding: 12px 24px; background: #10b981; color: white; font-size: 14px; font-weight: 800; text-align: center; border-radius: 8px; margin-bottom: 15px;">
+            📢 <strong><?= htmlspecialchars($_SESSION['invoice_success_toast']) ?></strong>
+        </div>
+    <?php unset($_SESSION['invoice_success_toast']); endif; ?>
 
-        .excel-table-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow-x: auto; max-width: 100%; display: block; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
-        .excel-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; table-layout: auto; }
-        .excel-table th { background: #f8fafc; color: #334155; font-weight: 600; padding: 12px 16px; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
-        .excel-table td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; color: #475569; white-space: nowrap; }
-        .excel-table tr:hover { background-color: #f8fafc; }
-        
-        .badge { padding: 2px 8px; font-size: 11px; font-weight: 600; border-radius: 4px; background: #f1f5f9; color: #475569; }
-        .badge-success { background: rgba(16, 185, 129, 0.1); color: #10b981; }
-
-        /* Modal Styles */
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
-        .modal-content { max-width: 450px; width: 90%; background: white; padding: 24px; border-radius: 12px; font-family: monospace; color: #111827; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
-        .receipt-line { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; }
-        .receipt-divider { border-bottom: 1px dashed #cbd5e0; margin: 12px 0; }
-        .food-item-detail-row { display: flex; justify-content: space-between; font-size: 11px; color: #4b5563; padding-left: 12px; margin-bottom: 3px; font-style: italic; }
-    </style>
-
-    <div class="page-header">
-        <h2 class="page-title">📜 Historical Checkouts & Past Receipts</h2>
-        <form method="GET" action="past_receipts.php" class="filter-form">
-            <select name="month" required>
-                <option value="">-- Select Month --</option>
-                <?php 
-                $monthsLogged = array_unique(array_column($filterDates, 'm'));
-                sort($monthsLogged);
-                foreach ($monthsLogged as $m): 
-                    $dateObj = DateTime::createFromFormat('!m', $m);
-                    echo "<option value='{$m}' ".($m == $selectedMonth ? 'selected' : '').">{$dateObj->format('F')}</option>";
-                endforeach; ?>
-            </select>
-            <select name="year" required>
-                <option value="">-- Select Year --</option>
-                <?php 
-                $yearsLogged = array_unique(array_column($filterDates, 'y'));
-                sort($yearsLogged);
-                foreach ($yearsLogged as $y):
-                    echo "<option value='{$y}' ".($y == $selectedYear ? 'selected' : '').">{$y}</option>";
-                endforeach; ?>
-            </select>
-            <button type="submit">Filter Logs</button>
-            <?php if ($selectedMonth): ?>
-                <a href="past_receipts.php" class="btn-action btn-clear">Clear Filter</a>
-            <?php endif; ?>
-        </form>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; gap:20px; flex-wrap:wrap;">
+        <div>
+            <h2 style="margin:0; color:#1e293b;">📜 Past Receipts Archive Log</h2>
+            <p style="color:var(--text-muted); margin: 5px 0 0 0; font-size:0.9rem;">Review, search, or edit historically closed invoices</p>
+        </div>
+        <input type="text" id="invoiceSearchInput" onkeyup="searchInvoiceTable()" placeholder="🔍 Search by Invoice ID, Room, or Guest..." class="form-control" style="max-width:320px; padding:10px; border:1px solid #cbd5e0; border-radius:8px; font-size:13px;">
     </div>
 
-    <div class="excel-table-box">
-        <table class="excel-table">
-            <thead>
-                <tr>
-                    <th>Check-In</th>
-                    <th>Check-Out</th>
-                    <th>Guest / Source</th>
-                    <th>Contact No.</th>
-                    <th>Stay Nights</th>
-                    <th>Total Settlement</th>
-                    <th>Remarks</th>
-                    <th style="text-align: center;">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php if (empty($receipts)): ?>
-                    <tr><td colspan="8" style="text-align: center; color: #94a3b8; padding: 24px;">No historical checkout logs found for the selection filters.</td></tr>
-                <?php else: foreach ($receipts as $r): 
-                    // Safe logic floor fix: if dates align on the exact same calendar day, ensure stay is tracked as 1 night minimum
-                    $stayNights = max(1, intval($r['total_days']));
-                    $grandTotalBill = floatval($r['total_charge']) + floatval($r['total_food_bill']) + floatval($r['decoration_charges']) + floatval($r['tip_amount']);
-                ?>
+    <div class="receipts-dashboard-card">
+        <div style="overflow-x:auto;">
+            <table class="receipts-table" id="pastReceiptsMasterTable">
+                <thead>
                     <tr>
-                        <td><?= date('d M Y', strtotime($r['check_in_date'])) ?></td>
-                        <td><?= date('d M Y', strtotime($r['check_out_date'])) ?></td>
-                        <td><strong><?= htmlspecialchars($r['booking_source'] ?: 'Offline Guest') ?></strong> <span class="badge"><?= intval($r['no_of_guests']) ?> Pax</span></td>
-                        <td><?= htmlspecialchars($r['contact_no'] ?: 'N/A') ?></td>
-                        <td style="text-align: center;"><?= $stayNights ?> Nights</td>
-                        <td style="font-weight: 700; color: #0f172a;">₹<?= number_format($grandTotalBill, 2) ?></td>
-                        <td><span class="badge badge-success"><?= htmlspecialchars($r['remarks']) ?></span></td>
-                        <td style="text-align: center;">
-                            <button type="button" class="btn-action" 
-                                    onclick="openInvoiceModal(<?= htmlspecialchars(json_encode($r)) ?>)">
-                                🔍 View Receipt
-                            </button>
-                        </td>
+                        <th>Invoice ID</th>
+                        <th>Timestamp Date</th>
+                        <th>Room Assignment</th>
+                        <th>Guest Mapping</th>
+                        <th>Subtotal Amount</th>
+                        <th>Discount Given</th>
+                        <th>Grand Total (₹)</th>
+                        <th style="text-align:center;">Actions Matrix</th>
                     </tr>
-                <?php endforeach; endif; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<!-- POPUP MODAL CONTAINER -->
-<div id="historicalReceiptModal" class="modal">
-    <div class="modal-content">
-        <span style="float: right; cursor: pointer; font-size: 20px; color: #a0aec0; font-family: sans-serif;" onclick="closeInvoiceModal()">✕</span>
-        <h3 style="text-align: center; margin-bottom: 4px; letter-spacing: 1px;">ARTISTIC STHAN</h3>
-        <p style="text-align: center; font-size: 11px; color: #718096; margin-top: 0; margin-bottom: 5px;">Jaipur, Rajasthan</p>
-        <h4 style="text-align: center; margin-bottom: 15px; text-decoration: underline;">INVOICE STATEMENT</h4>
-        
-        <div class="receipt-line"><span>Check-In Date:</span><strong id="rcptCheckIn"></strong></div>
-        <div class="receipt-line"><span>Check-Out Date:</span><strong id="rcptCheckOut"></strong></div>
-        <div class="receipt-line"><span>Guest / Channel:</span><strong id="rcptGuest"></strong></div>
-        <div class="receipt-line"><span>Contact No:</span><strong id="rcptPhone"></strong></div>
-        <div class="receipt-line"><span>Stay Timeline:</span><strong id="rcptDates"></strong></div>
-        
-        <div class="receipt-divider"></div>
-        
-        <!-- Accommodation cost includes baseline charge + advance accommodation payment -->
-        <div class="receipt-line"><span>Accommodation Cost:</span><span id="rcptRoom" style="font-weight: bold;"></span></div>
-        
-        <div class="receipt-divider"></div>
-        
-        <div class="receipt-line" style="font-weight: bold; margin-bottom: 8px;"><span>Kitchen & Food Bill:</span><span id="rcptFoodTotal"></span></div>
-        <!-- Target Hook for dynamic detailed item listing -->
-        <div id="rcptFoodItemsContainer"></div>
-        
-        <div class="receipt-divider"></div>
-        
-        <div class="receipt-line"><span>Decoration Charges:</span><span id="rcptDecor"></span></div>
-        <div class="receipt-line"><span>Staff Tip Gratuity:</span><span id="rcptTip"></span></div>
-        
-        <div class="receipt-divider" style="border-bottom-style: double; border-bottom-width: 3px;"></div>
-        
-        <div class="receipt-line" style="font-size: 15px; font-weight: 800; color: #b91c1c;"><span>Net Collected Amount:</span><span id="rcptNet"></span></div>
-        
-        <div style="margin-top: 25px; display: flex; gap: 8px; justify-content: flex-end; font-family: sans-serif;">
-            <button class="btn-action" style="background: #4a5568;" onclick="window.print()">🖨️ Print</button>
-            <button class="btn-action btn-clear" onclick="closeInvoiceModal()">Close</button>
+                </thead>
+                <tbody>
+                    <?php if (!empty($orders)): foreach ($orders as $order): 
+                        // Fetch order items to pass to JavaScript modal array securely
+                        $itemsStmt = $pdo->prepare("SELECT oi.*, mi.name FROM order_items oi JOIN menu_items mi ON oi.menu_item_id = mi.id WHERE oi.order_id = ?");
+                        $itemsStmt->execute([$order['id']]);
+                        $serializedItems = json_encode($itemsStmt->fetchAll(PDO::FETCH_ASSOC));
+                    ?>
+                        <tr class="invoice-data-row" data-search-string="<?= strtolower($order['id'] . ' room ' . ($order['room_number'] ?? '') . ' ' . ($order['phone_number'] ?? '')) ?>">
+                            <td style="font-weight: bold; color: #0284c7;">#<?= $order['id'] ?></td>
+                            <td><?= date('d M Y, h:i A', strtotime($order['created_at'])) ?></td>
+                            <td><span style="padding:4px 8px; background:#f1f5f9; border-radius:6px; font-weight:600;">Room <?= htmlspecialchars($order['room_number'] ?? 'N/A') ?></span></td>
+                            <td style="font-family:monospace; font-weight:bold; color:#475569;"><?= htmlspecialchars($order['phone_number'] ?? 'Walk-In Guest') ?></td>
+                            <td>₹<?= number_format($order['subtotal'], 2) ?></td>
+                            <td style="color:#ef4444;">₹<?= number_format($order['discount'], 2) ?></td>
+                            <td style="font-weight: 800; color: #059669;">Extra ₹<?= number_format($order['grand_total'], 2) ?></td>
+                            <td style="text-align: center;">
+                                <button type="button" class="btn btn-start" style="padding: 6px 14px; font-size:12px; font-weight:700; border-radius:6px;" data-items='<?= htmlspecialchars($serializedItems, ENT_QUOTES, 'UTF-8') ?>' onclick="openEditInvoiceModal(<?= $order['id'] ?>, <?= $order['discount'] ?>, this)">
+                                    ✏ Edit Bill
+                                </button>
+                            </td>
+                        </tr>
+                    <?php endforeach; else: ?>
+                        <tr><td colspan="8" style="text-align:center; color:#94a3b8; padding:30px; font-style:italic;">No past invoice records found.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
 
+<div id="editInvoiceModalPopup" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
+    <div class="modal-content" style="background: white; max-width: 520px; width: 92%; border-radius: 12px; padding: 25px; position: relative; color: #111827; text-align: left;">
+        <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0; font-weight:bold;" onclick="closeEditInvoiceModal()">✕</span>
+        <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; color:#0284c7;" id="modalInvoiceTitle">Modify Invoice #00</h3>
+        
+        <form method="POST" action="past_receipts.php" style="margin: 0;">
+            <input type="hidden" name="action_update_invoice" value="1">
+            <input type="hidden" name="update_order_id" id="mdlInvoiceOrderId">
+            
+            <label style="font-size: 11px; font-weight: 700; color: #475569; display: block; margin-bottom: 6px; text-transform: uppercase;">Line Items Assembly</label>
+            <div id="mdlInvoiceItemsContainer" style="max-height: 220px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px; margin-bottom: 15px; background: #fafafa;"></div>
+            
+            <div style="margin-bottom: 20px;">
+                <label style="font-size: 11px; font-weight: 700; color: #475569; display: block; margin-bottom: 6px; text-transform: uppercase;">Applied Flat Discount (₹)</label>
+                <input type="number" name="invoice_discount" id="mdlInvoiceDiscountInput" required min="0" step="0.01" style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px; font-size:14px; font-weight:bold; color:#ef4444;">
+            </div>
+
+            <div style="display: flex; gap: 10px; justify-content: flex-end; align-items: center;">
+                <button type="button" class="btn btn-log" style="padding: 10px 18px;" onclick="closeEditInvoiceModal()">Cancel</button>
+                <button type="submit" class="btn btn-bill" style="padding: 10px 24px; font-weight: 800; background:#059669; border-color:#059669;">Recalculate & Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
-function openInvoiceModal(data) {
-    const rawAdvance = parseFloat(data.advance_paid) || 0;
-    const rawRoomCharges = parseFloat(data.total_charge) || 0;
+function searchInvoiceTable() {
+    const input = document.getElementById("invoiceSearchInput").value.toLowerCase().trim();
+    const rows = document.querySelectorAll(".invoice-data-row");
     
-    // Corrective math: merge room charges and advance deposit into final accommodation cost balance
-    const totalAccommodationCost = rawRoomCharges + rawAdvance;
-    
-    const totalFood = parseFloat(data.total_food_bill) || 0;
-    const totalDecor = parseFloat(data.decoration_charges) || 0;
-    const totalTip = parseFloat(data.tip_amount) || 0;
-    
-    // Safety check floor fix: force minimum stay window calculation to 1 night
-    const correctedNights = Math.max(1, parseInt(data.total_days));
+    rows.forEach(row => {
+        const searchStr = row.getAttribute("data-search-string") || "";
+        if (searchStr.includes(input)) {
+            row.style.display = "";
+        } else {
+            row.style.display = "none";
+        }
+    });
+}
 
-    document.getElementById("rcptCheckIn").innerText = data.check_in_date;
-    document.getElementById("rcptCheckOut").innerText = data.check_out_date;
-    document.getElementById("rcptGuest").innerText = data.booking_source;
-    document.getElementById("rcptPhone").innerText = data.contact_no || 'N/A';
-    document.getElementById("rcptDates").innerText = correctedNights + " Nights";
+function openEditInvoiceModal(orderId, currentDiscount, element) {
+    document.getElementById("mdlInvoiceOrderId").value = orderId;
+    document.getElementById("modalInvoiceTitle").innerText = "Modify Invoice #" + orderId;
+    document.getElementById("mdlInvoiceDiscountInput").value = currentDiscount;
     
-    document.getElementById("rcptRoom").innerText = "₹" + totalAccommodationCost.toFixed(2);
-    document.getElementById("rcptFoodTotal").innerText = "₹" + totalFood.toFixed(2);
-    document.getElementById("rcptDecor").innerText = "₹" + totalDecor.toFixed(2);
-    document.getElementById("rcptTip").innerText = "₹" + totalTip.toFixed(2);
+    const container = document.getElementById("mdlInvoiceItemsContainer");
+    const rawItemsData = element.getAttribute("data-items");
     
-    // Net aggregate financial tracking summation balance
-    const netCollected = totalAccommodationCost + totalFood + totalDecor + totalTip;
-    document.getElementById("rcptNet").innerText = "₹" + netCollected.toFixed(2);
-
-    const container = document.getElementById("rcptFoodItemsContainer");
-    container.innerHTML = '<div style="font-size:11px; color:#94a3b8; padding-left:12px;">Loading breakdown items...</div>';
-
-    fetch(`past_receipts.php?action_fetch_food_breakdown=1&booking_id=${data.id}`)
-    .then(res => res.json())
-    .then(dishList => {
-        container.innerHTML = "";
-        if (dishList.length === 0) {
-            container.innerHTML = '<div style="font-size:11px; color:#a0aec0; padding-left:12px;">No food items logged.</div>';
+    try {
+        const items = JSON.parse(rawItemsData);
+        if (!items || items.length === 0) {
+            container.innerHTML = '<p style="text-align:center; color:#ef4444; font-size:12px; padding:15px;">No structural line entries found.</p>';
             return;
         }
-        dishList.forEach(item => {
-            const netQty = intval(item.quantity) - intval(item.returned_qty);
-            if (netQty > 0) {
-                const itemTotalCost = netQty * parseFloat(item.price);
-                container.innerHTML += `
-                    <div class="food-item-detail-row">
-                        <span>↳ ${item.name} (x${netQty})</span>
-                        <span>₹${itemTotalCost.toFixed(2)}</span>
-                    </div>
-                `;
-            }
-        });
-    })
-    .catch(() => {
-        container.innerHTML = '<div style="font-size:11px; color:#ef4444; padding-left:12px;">Failed to load order items.</div>';
-    });
-
-    document.getElementById("historicalReceiptModal").style.display = "flex";
+        
+        container.innerHTML = items.map(i => `
+            <div class="modal-item-edit-row">
+                <div style="flex: 1; text-align: left;">
+                    <span style="font-weight:700; font-size:13px; color:#1e293b; display:block;">${i.name}</span>
+                    <span style="font-size:11px; color:#64748b; font-weight:600;">Unit Price: ₹${parseFloat(i.price).toFixed(2)}</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <label style="font-size:11px; font-weight:700; color:#475569;">Qty:</label>
+                    <input type="number" name="invoice_item_qty[${i.id}]" value="${i.quantity}" min="0" class="modal-qty-field">
+                </div>
+            </div>
+        `).join('');
+        
+        document.getElementById("editInvoiceModalPopup").style.display = "flex";
+    } catch(err) {
+        container.innerHTML = '<p style="text-align:center; color:#ef4444; font-size:12px; padding:15px;">JSON parsing failure.</p>';
+    }
 }
 
-function closeInvoiceModal() {
-    document.getElementById("historicalReceiptModal").style.display = "none";
-}
-
-// Utility function to ensure string digits compute cleanly to integer boundaries
-function intval(val) {
-    return parseInt(val) || 0;
+function closeEditInvoiceModal() {
+    document.getElementById("editInvoiceModalPopup").style.display = "none";
 }
 </script>
 
