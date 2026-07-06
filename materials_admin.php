@@ -136,7 +136,6 @@ include "includes/header.php";
     </div>
 </div>
 
-<!-- OVERLAY ADMINISTRATIVE FORM MATRIX WINDOW -->
 <div id="adminCatalogModal" class="modal">
     <div class="modal-content" style="background: white; max-width: 480px; width: 92%; border-radius: 12px; padding: 25px; color: #111827;">
         <span style="float:right; cursor:pointer; font-size:22px; color:#a0aec0; font-weight:bold;" onclick="closeAdminCatalogModal()">✕</span>
@@ -160,6 +159,7 @@ include "includes/header.php";
                 </select>
             </div>
 
+            <!-- FIXED STRATEGY: Measurement strategy type dropdowns dropped here as requested -->
             <div style="margin-bottom:12px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                 <div>
                     <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">Packaging Volume Capacity Size</label>
@@ -177,21 +177,6 @@ include "includes/header.php";
                 </div>
             </div>
 
-            <!-- Administrative control metrics are securely accessible in this view -->
-            <div style="margin-bottom:12px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                <div>
-                    <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">Unit Strategy Type</label>
-                    <select name="unit_type" id="formUnitType" onchange="updateFormUnitLabelOptions()" style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px; font-size:13px;">
-                        <option value="Count">Count (Integers)</option>
-                        <option value="Weight">Weight / Volume Matrix</option>
-                    </select>
-                </div>
-                <div>
-                    <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">Base Unit Metric Option</label>
-                    <select name="unit_label" id="formUnitLabel" style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px; font-size:13px;"></select>
-                </div>
-            </div>
-
             <div style="margin-bottom:12px;">
                 <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">Baseline Unit Purchasing Cost (₹)</label>
                 <input type="number" name="unit_cost" id="formUnitCost" required step="0.01" min="0" style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px; font-size:13px;">
@@ -203,7 +188,7 @@ include "includes/header.php";
             </div>
 
             <div style="display:flex; gap:10px; justify-content:flex-end;">
-                <button type="button" class="btn btn-log" style="padding:10px 18px; border-radius:6px;" onclick="closeAdminCatalogModal()">Cancel</button>
+                <button type="button" class="btn btn-log" style="padding:8px 16px; border-radius:6px;" onclick="closeAdminCatalogModal()">Cancel</button>
                 <button type="submit" class="btn btn-start" style="padding:8px 24px; font-weight:800; border-radius:6px;">Save Parameters</button>
             </div>
         </form>
@@ -241,7 +226,6 @@ function openAdminCatalogModal(data) {
     const itemId = document.getElementById("formItemId");
     const itemName = document.getElementById("formItemName");
     const catId = document.getElementById("formCategoryId");
-    const uType = document.getElementById("formUnitType");
     const uCost = document.getElementById("formUnitCost");
     const pSize = document.getElementById("formPackSize");
     const pUnit = document.getElementById("formPackUnit");
@@ -250,7 +234,6 @@ function openAdminCatalogModal(data) {
         title.innerText = "Add Catalog Item";
         itemId.value = "0";
         itemName.value = "";
-        uType.value = "Count";
         uCost.value = "0.00";
         pSize.value = "1";
         pUnit.value = "kg";
@@ -259,37 +242,12 @@ function openAdminCatalogModal(data) {
         itemId.value = data.id;
         itemName.value = data.item_name;
         catId.value = data.category_id;
-        uType.value = data.unit_type;
         uCost.value = data.unit_cost;
         pSize.value = data.pack_size || 1;
         pUnit.value = data.pack_unit || "kg";
     }
 
-    updateFormUnitLabelOptions();
-    if (data !== 0) {
-        document.getElementById("formUnitLabel").value = data.unit_label;
-    }
-
     document.getElementById("adminCatalogModal").style.display = "flex";
-}
-
-function updateFormUnitLabelOptions() {
-    const type = document.getElementById("formUnitType").value;
-    const label = document.getElementById("formUnitLabel");
-    if (type === 'Weight') {
-        label.innerHTML = `
-            <option value="kg">kg</option>
-            <option value="gms">gms</option>
-            <option value="Ltr">Ltr</option>
-            <option value="ml">ml</option>
-        `;
-    } else {
-        label.innerHTML = `
-            <option value="Pcs">Pcs</option>
-            <option value="Packets">Packets</option>
-            <option value="Boxes">Boxes</option>
-        `;
-    }
 }
 
 function closeAdminCatalogModal() {
