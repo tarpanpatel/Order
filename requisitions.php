@@ -16,14 +16,13 @@ if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Chef" && $_SESSION["rol
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_create_chef_product"])) {
     $item_name   = trim($_POST["chef_prod_name"]);
     $category_id = intval($_POST["chef_prod_category"]);
-    $unit_type   = trim($_POST["chef_prod_unit_type"]);
-    $unit_label  = trim($_POST["chef_prod_unit_label"]);
     $pack_size   = floatval($_POST["chef_pack_size"]);
     $pack_unit   = trim($_POST["chef_pack_unit"]);
 
     if (!empty($item_name) && $category_id > 0) {
-        $stmt = $pdo->prepare("INSERT INTO req_catalog (item_name, category_id, unit_type, unit_label, pack_size, pack_unit, is_verified, unit_cost, image_path) VALUES (?, ?, ?, ?, ?, ?, 0, 0.00, 'assets/images/catalog/placeholder.png')");
-        $stmt->execute([$item_name, $category_id, $unit_type, $unit_label, $pack_size, $pack_unit]);
+        // Redundant fields dropped from popup UI; implicitly maps a clean default dynamic layout strategy 
+        $stmt = $pdo->prepare("INSERT INTO req_catalog (item_name, category_id, unit_type, unit_label, pack_size, pack_unit, is_verified, unit_cost, image_path) VALUES (?, ?, 'Count', 'Packets', ?, ?, 0, 0.00, 'assets/images/catalog/placeholder.png')");
+        $stmt->execute([$item_name, $category_id, $pack_size, $pack_unit]);
         $_SESSION['requisition_saved_toast'] = "Product requested with packing specifications!";
     }
     header("Location: requisitions.php");
@@ -308,8 +307,9 @@ include "includes/header.php";
     </div>
 </div>
 
+<!-- COMPACTED CHEF INPUT POPUP Form Strategy and Ordering dropdown metrics dropped completely -->
 <div id="chefNewProductModal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
-    <div class="modal-content" style="background: white; max-width: 460px; width: 90%; border-radius: 12px; padding: 25px; color: #111827; text-align: left;">
+    <div class="modal-content" style="background: white; max-width: 440px; width: 90%; border-radius: 12px; padding: 25px; color: #111827; text-align: left;">
         <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="window.closeChefNewProductModal()">✕</span>
         <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; color: #d97706;">Request Unlisted Product</h3>
         <form method="POST" action="requisitions.php" style="margin: 0;">
@@ -328,7 +328,7 @@ include "includes/header.php";
                 </select>
             </div>
             
-            <div style="margin-bottom: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div style="margin-bottom: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                 <div>
                     <label style="font-size: 11px; font-weight: 700; color: #4b5563; display: block; margin-bottom: 4px;">Packaging Value Size</label>
                     <input type="number" name="chef_pack_size" required step="0.1" value="1" style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0; font-size:13px;">
@@ -345,19 +345,6 @@ include "includes/header.php";
                 </div>
             </div>
 
-            <div style="margin-bottom: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <div>
-                    <label style="font-size: 11px; font-weight: 700; color: #4b5563; display: block; margin-bottom: 4px;">Measurement Type</label>
-                    <select id="chefUnitType" name="chef_prod_unit_type" onchange="window.updateChefUnitLabelDropdown()" style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0; font-size:13px;">
-                        <option value="Count">Count (Integers)</option>
-                        <option value="Weight">Weight / Volume Matrix</option>
-                    </select>
-                </div>
-                <div>
-                    <label style="font-size: 11px; font-weight: 700; color: #4b5563; display: block; margin-bottom: 4px;">Default Ordering Metric</label>
-                    <select id="chefUnitLabel" name="chef_prod_unit_label" style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0; font-size:13px;"></select>
-                </div>
-            </div>
             <div style="display: flex; gap: 10px; justify-content: flex-end;">
                 <button type="button" class="btn btn-log" style="padding: 8px 16px;" onclick="window.closeChefNewProductModal()">Cancel</button>
                 <button type="submit" class="btn btn-bill" style="padding: 8px 20px; font-weight: 800; background:#d97706; border-color:#d97706;">Add to List</button>
@@ -600,34 +587,6 @@ window.triggerMemoryStateUpdate = function(catalogId, targetedState) {
             rowWrapper.classList.add('row-state-green-highlight');
             btnFulfilled.setAttribute('disabled', 'disabled');
         }
-    }
-};
-
-window.openChefNewProductModal = function() {
-    window.updateChefUnitLabelDropdown();
-    document.getElementById("chefNewProductModal").style.display = "flex";
-};
-
-window.closeChefNewProductModal = function() {
-    document.getElementById("chefNewProductModal").style.display = "none";
-};
-
-window.updateChefUnitLabelDropdown = function() {
-    const type = document.getElementById("chefUnitType").value;
-    const labelDropdown = document.getElementById("chefUnitLabel");
-    if(type === 'Weight') {
-        labelDropdown.innerHTML = `
-            <option value="kg">kg</option>
-            <option value="gms">gms</option>
-            <option value="Ltr">Ltr</option>
-            <option value="ml">ml</option>
-        `;
-    } else {
-        labelDropdown.innerHTML = `
-            <option value="Pcs">Pcs</option>
-            <option value="Packets">Packets</option>
-            <option value="Boxes">Boxes</option>
-        `;
     }
 };
 
