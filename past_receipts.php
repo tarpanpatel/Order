@@ -11,7 +11,6 @@ if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Admin" && $_SESSION["ro
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_invoice"])) {
     $order_id = intval($_POST["update_order_id"]);
     $item_qtys = $_POST["invoice_item_qty"] ?? [];
-    $custom_discount = floatval($_POST["invoice_discount"] ?? 0);
     
     $pdo->beginTransaction();
     try {
@@ -32,12 +31,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_invoice
             }
         }
         
-        $grand_total = max(0, $subtotal - $custom_discount);
-        // Updating only columns we know exist
-        $pdo->prepare("UPDATE orders SET discount = ?, grand_total = ? WHERE id = ?")->execute([$custom_discount, $grand_total, $order_id]);
+        // Update order total without discount column
+        $pdo->prepare("UPDATE orders SET grand_total = ? WHERE id = ?")->execute([$subtotal, $order_id]);
         
         $pdo->commit();
-        $_SESSION['invoice_success_toast'] = "Invoice #$order_id updated!";
+        $_SESSION['invoice_success_toast'] = "Invoice #$order_id updated successfully!";
         header("Location: past_receipts.php");
         exit;
     } catch (Exception $e) {
@@ -46,9 +44,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_invoice
     }
 }
 
-// FIXED SQL: Removed 'o.created_at' to prevent "Unknown column" errors
+// FIXED SQL: Removed 'o.discount' column reference to prevent "Unknown column" errors
 $orders = $pdo->query("
-    SELECT o.id, o.discount, 
+    SELECT o.id, 
            (SELECT SUM(total_price) FROM order_items WHERE order_id = o.id) as subtotal,
            g.phone_number
     FROM orders o 
@@ -89,8 +87,6 @@ include "includes/header.php";
                 <tr>
                     <th>Invoice ID</th>
                     <th>Guest Mapping</th>
-                    <th>Subtotal (₹)</th>
-                    <th>Discount (₹)</th>
                     <th>Grand Total (₹)</th>
                     <th style="text-align:center;">Actions</th>
                 </tr>
@@ -98,8 +94,6 @@ include "includes/header.php";
             <tbody>
                 <?php if (!empty($orders)): foreach ($orders as $order): 
                     $subtotal = floatval($order['subtotal'] ?? 0);
-                    $discount = floatval($order['discount'] ?? 0);
-                    $grand_total = $subtotal - $discount;
 
                     $itemsStmt = $pdo->prepare("SELECT oi.*, mi.name FROM order_items oi JOIN menu_items mi ON oi.menu_item_id = mi.id WHERE oi.order_id = ?");
                     $itemsStmt->execute([$order['id']]);
@@ -108,15 +102,13 @@ include "includes/header.php";
                     <tr class="invoice-data-row">
                         <td style="font-weight: bold; color: #0284c7;">#<?= $order['id'] ?></td>
                         <td style="font-family:monospace; font-weight:bold; color:#475569;"><?= htmlspecialchars($order['phone_number'] ?? 'Walk-In Guest') ?></td>
-                        <td>₹<?= number_format($subtotal, 2) ?></td>
-                        <td style="color:#ef4444;">₹<?= number_format($discount, 2) ?></td>
-                        <td style="font-weight: 800; color: #059669;">₹<?= number_format($grand_total, 2) ?></td>
+                        <td style="font-weight: 800; color: #059669;">₹<?= number_format($subtotal, 2) ?></td>
                         <td style="text-align: center;">
-                            <button type="button" class="btn btn-start" style="padding: 6px 14px; font-size:12px; border-radius:6px;" data-items='<?= htmlspecialchars($serializedItems, ENT_QUOTES, 'UTF-8') ?>' onclick="openEditInvoiceModal(<?= $order['id'] ?>, <?= $discount ?>, this)">✏ Edit Bill</button>
+                            <button type="button" class="btn btn-start" style="padding: 6px 14px; font-size:12px; border-radius:6px;" data-items='<?= htmlspecialchars($serializedItems, ENT_QUOTES, 'UTF-8') ?>' onclick="openEditInvoiceModal(<?= $order['id'] ?>, this)">✏ Edit Bill</button>
                         </td>
                     </tr>
                 <?php endforeach; else: ?>
-                    <tr><td colspan="6" style="text-align:center; padding:30px; color:#94a3b8;">No records found.</td></tr>
+                    <tr><td colspan="4" style="text-align:center; padding:30px; color:#94a3b8;">No records found.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
@@ -135,11 +127,6 @@ include "includes/header.php";
             <label style="font-size: 11px; font-weight: 700; color: #475569; display: block; margin-bottom: 6px; text-transform: uppercase;">Line Items Assembly</label>
             <div id="mdlInvoiceItemsContainer" style="max-height: 220px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px; margin-bottom: 15px; background: #fafafa;"></div>
             
-            <div style="margin-bottom: 20px;">
-                <label style="font-size: 11px; font-weight: 700; color: #475569; display: block; margin-bottom: 6px; text-transform: uppercase;">Applied Flat Discount (₹)</label>
-                <input type="number" name="invoice_discount" id="mdlInvoiceDiscountInput" required min="0" step="0.01" style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px; font-size:14px; font-weight:bold; color:#ef4444;">
-            </div>
-
             <div style="display: flex; gap: 10px; justify-content: flex-end; align-items: center;">
                 <button type="button" class="btn btn-log" style="padding: 10px 18px;" onclick="closeEditInvoiceModal()">Cancel</button>
                 <button type="submit" class="btn btn-bill" style="padding: 10px 24px; font-weight: 800; background:#059669; border-color:#059669;">Recalculate & Save</button>
@@ -163,10 +150,9 @@ function searchInvoiceTable() {
     });
 }
 
-function openEditInvoiceModal(orderId, currentDiscount, element) {
+function openEditInvoiceModal(orderId, element) {
     document.getElementById("mdlInvoiceOrderId").value = orderId;
     document.getElementById("modalInvoiceTitle").innerText = "Modify Invoice #" + orderId;
-    document.getElementById("mdlInvoiceDiscountInput").value = currentDiscount;
     
     const container = document.getElementById("mdlInvoiceItemsContainer");
     const items = JSON.parse(element.getAttribute("data-items"));
