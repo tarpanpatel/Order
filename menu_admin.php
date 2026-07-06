@@ -1,10 +1,7 @@
 <?php
-require_once "config/db.php";
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
 // /home/apartment/artistsfarmjaipur.com/Order/menu_admin.php
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
+require_once "config/db.php";
 
 if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Admin" && $_SESSION["role"] !== "Super Admin")) {
     die("Access Denied: Administrative credentials required.");
@@ -48,10 +45,11 @@ function cropAndScaleMenuPhoto($source_file, $target_file, $max_w = 150, $max_h 
 
     imagecopyresampled($dst, $src, 0, 0, $src_x, $src_y, $max_w, $max_h, $src_w, $src_h);
 
-    switch ($image_type) {
-        case IMAGETYPE_GIF: imagegif($dst, $target_file); break;
+    // FIXED: Corrected undefined variable pointer to match image type mappings smoothly
+    switch ($type) {
+        case IMAGETYPE_GIF:  imagegif($dst, $target_file); break;
         case IMAGETYPE_JPEG: imagejpeg($dst, $target_file, 90); break;
-        case IMAGETYPE_PNG: imagepng($dst, $target_file, 5); break;
+        case IMAGETYPE_PNG:  imagepng($dst, $target_file, 5); break;
     }
 
     imagedestroy($src);
@@ -63,7 +61,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["update_menu_item"])) 
     $item_id = intval($_POST["edit_item_id"]);
     $final_image_path = trim($_POST["current_image_path"]);
 
-    if (!empty($_FILES["edit_file_upload"]["name"]) && $_FILES["edit_file_upload"]["error'] === UPLOAD_ERR_OK) {
+    // FIXED: Resolved mismatched quote syntax parser crash bug on array element keys
+    if (!empty($_FILES["edit_file_upload"]["name"]) && $_FILES["edit_file_upload"]["error"] === UPLOAD_ERR_OK) {
         $target_dir = "assets/images/";
         if (!is_dir($target_dir)) { mkdir($target_dir, 0755, true); }
         
@@ -71,7 +70,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["update_menu_item"])) 
         $new_filename = "item_" . $item_id . "_" . time() . "." . $file_ext;
         $target_file = $target_dir . $new_filename;
 
-        // Process through the custom widescreen image filter
         if (cropAndScaleMenuPhoto($_FILES["edit_file_upload"]["tmp_name"], $target_file)) {
             $final_image_path = $target_file;
         }
