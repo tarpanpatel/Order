@@ -1,10 +1,11 @@
 <?php
-// /home/apartment/artistsfarmjaipur.com/Order/menu_admin.php
-if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once "config/db.php";
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
+// /home/apartment/artistsfarmjaipur.com/Order/menu_admin.php
+if (session_status() === PHP_SESSION_NONE) { session_start(); }
+
 if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Admin" && $_SESSION["role"] !== "Super Admin")) {
     die("Access Denied: Administrative credentials required.");
 }
