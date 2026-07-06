@@ -3,7 +3,6 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-
 require_once "config/db.php";
 require_once "config/telegram.php"; 
 include_once __DIR__ . '/config/local_db_bridge.php';
@@ -199,7 +198,6 @@ include "includes/header.php";
                     <?php foreach ($categories as $cat): ?>
                         <button type="button" class="catalog-tab-btn" onclick="window.filterMaterialCatalog('cat_<?= $cat['id'] ?>', this)"><?= htmlspecialchars($cat['name']) ?></button>
                     <?php endforeach; ?>
-                    <!-- BUTTON CALL ASSIGNED NATIVELY -->
                     <button type="button" class="catalog-tab-btn" style="background:#fffbeb; color:#d97706; border: 1px dashed #f59e0b;" onclick="window.openChefNewProductModal()">➕ New Product</button>
                 </div>
 
@@ -262,7 +260,8 @@ include "includes/header.php";
                                 $status_style = $is_fulfilled ? 'btn-status-fulfilled' : 'btn-status-pending';
                                 $status_label = empty($pRow['status']) ? 'Pending' : $pRow['status'];
 
-                                $lines = $pdo->prepare("SELECT ri.quantity, rc.unit_type, rc.unit_label, ri.chosen_unit_label, COALESCE(ri.item_status, 'Pending') as item_status, rc.item_name as name, ri.catalog_id, rc.pack_size, rc.pack_unit FROM requisition_items ri JOIN req_catalog rc ON ri.catalog_id = rc.id WHERE ri.requisition_id = ?");
+                                // UPDATED: Injected rc.image_path dynamically to flow asset links downstream to memory map
+                                $lines = $pdo->prepare("SELECT ri.quantity, rc.unit_type, rc.unit_label, ri.chosen_unit_label, COALESCE(ri.item_status, 'Pending') as item_status, rc.item_name as name, ri.catalog_id, rc.pack_size, rc.pack_unit, rc.image_path FROM requisition_items ri JOIN req_catalog rc ON ri.catalog_id = rc.id WHERE ri.requisition_id = ?");
                                 $lines->execute([$pRow['id']]);
                                 $serializedItems = json_encode($lines->fetchAll(PDO::FETCH_ASSOC));
                             ?>
@@ -309,7 +308,7 @@ include "includes/header.php";
 </div>
 
 <div id="chefNewProductModal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
-    <div class="modal-content" style="background: white; max-width: 460px; width: 90%; border-radius: 12px; padding: 25px; color: #111827; text-align: left;">
+    <div class="modal-content" style="background: white; max-width: 440px; width: 90%; border-radius: 12px; padding: 25px; color: #111827; text-align: left;">
         <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="window.closeChefNewProductModal()">✕</span>
         <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; color: #d97706;">Request Unlisted Product</h3>
         <form method="POST" action="requisitions.php" style="margin: 0;">
@@ -441,6 +440,8 @@ window.openEditRequisitionModal = function(reqId, element) {
             const currentLabel = i.chosen_unit_label || i.unit_label || 'Pcs';
             const pSize = parseFloat(i.pack_size) || 1;
             const pUnit = i.pack_unit || 'Pcs';
+            // UPDATED fallback strategy handles clean file routing path strings natively
+            const imgUrl = i.image_path ? i.image_path : 'assets/images/catalog/placeholder.png';
             
             let rowStateClass = '';
             let fDisabled = '';
@@ -471,8 +472,13 @@ window.openEditRequisitionModal = function(reqId, element) {
 
             const computationFactor = (unitType === 'Weight') ? 0.25 : 1;
 
+            // UPDATED MARKS: Injected standard responsive widescreen 150x50 product thumbnails cleanly inline 
             return `
-                <div id="itemVerificationRow_${i.catalog_id}" class="verification-item-row-wrapper ${rowStateClass}" style="display:flex; justify-content:space-between; align-items:center; padding:12px 10px; border-bottom:1px solid #e2e8f0; background:#ffffff; margin-bottom:6px; border-radius:8px; gap:8px;">
+                <div id="itemVerificationRow_${i.catalog_id}" class="verification-item-row-wrapper ${rowStateClass}" style="display:flex; justify-content:space-between; align-items:center; padding:12px 10px; border-bottom:1px solid #e2e8f0; background:#ffffff; margin-bottom:6px; border-radius:8px; gap:12px;">
+                    <div style="width:150px; min-width:150px; height:50px; overflow:hidden; border-radius:6px; border:1px solid #edf2f7; background:#f8fafc;">
+                        <img src="${imgUrl}" alt="" style="width:100%; height:100%; object-fit:cover;">
+                    </div>
+                    
                     <div style="flex:1; min-width:0; text-align:left;">
                         <span class="item-text-title" style="font-size:12px; font-weight:700; color:#1e293b; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; transition:all 0.15s ease;">${i.name}</span>
                         <span style="font-size:10px; color:#475569; font-weight:bold; display:block; margin-bottom:2px;">Packing Spec: ${pSize} ${pUnit}</span>
@@ -504,7 +510,6 @@ window.openEditRequisitionModal = function(reqId, element) {
     }
 };
 
-// FIXED CONTROL ENGINE: Dynamic core function restored natively to structural map definitions
 window.openChefNewProductModal = function() {
     document.getElementById("chefNewProductModal").style.display = "flex";
 };
