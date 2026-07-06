@@ -20,7 +20,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_create_chef_pr
     $pack_unit   = trim($_POST["chef_pack_unit"]);
 
     if (!empty($item_name) && $category_id > 0) {
-        // Redundant fields dropped from popup UI; implicitly maps a clean default dynamic layout strategy 
         $stmt = $pdo->prepare("INSERT INTO req_catalog (item_name, category_id, unit_type, unit_label, pack_size, pack_unit, is_verified, unit_cost, image_path) VALUES (?, ?, 'Count', 'Packets', ?, ?, 0, 0.00, 'assets/images/catalog/placeholder.png')");
         $stmt->execute([$item_name, $category_id, $pack_size, $pack_unit]);
         $_SESSION['requisition_saved_toast'] = "Product requested with packing specifications!";
@@ -199,6 +198,7 @@ include "includes/header.php";
                     <?php foreach ($categories as $cat): ?>
                         <button type="button" class="catalog-tab-btn" onclick="window.filterMaterialCatalog('cat_<?= $cat['id'] ?>', this)"><?= htmlspecialchars($cat['name']) ?></button>
                     <?php endforeach; ?>
+                    <!-- BUTTON CALL ASSIGNED NATIVELY -->
                     <button type="button" class="catalog-tab-btn" style="background:#fffbeb; color:#d97706; border: 1px dashed #f59e0b;" onclick="window.openChefNewProductModal()">➕ New Product</button>
                 </div>
 
@@ -307,9 +307,8 @@ include "includes/header.php";
     </div>
 </div>
 
-<!-- COMPACTED CHEF INPUT POPUP Form Strategy and Ordering dropdown metrics dropped completely -->
 <div id="chefNewProductModal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
-    <div class="modal-content" style="background: white; max-width: 440px; width: 90%; border-radius: 12px; padding: 25px; color: #111827; text-align: left;">
+    <div class="modal-content" style="background: white; max-width: 460px; width: 90%; border-radius: 12px; padding: 25px; color: #111827; text-align: left;">
         <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="window.closeChefNewProductModal()">✕</span>
         <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; color: #d97706;">Request Unlisted Product</h3>
         <form method="POST" action="requisitions.php" style="margin: 0;">
@@ -502,6 +501,15 @@ window.openEditRequisitionModal = function(reqId, element) {
     } catch(err) {
         container.innerHTML = '<p style="text-align:center; color:#ef4444; font-size:12px; padding:15px;">Failed loading data arrays.</p>';
     }
+};
+
+// FIXED CONTROL ENGINE: Dynamic core function restored natively to structural map definitions
+window.openChefNewProductModal = function() {
+    document.getElementById("chefNewProductModal").style.display = "flex";
+};
+
+window.closeChefNewProductModal = function() {
+    document.getElementById("chefNewProductModal").style.display = "none";
 };
 
 window.adjustVerificationRowQty = function(catalogId, stepValue) {
