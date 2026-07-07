@@ -28,9 +28,9 @@ if (empty($inputData['items']) || !is_array($inputData['items'])) {
 try {
     $pdo->beginTransaction();
 
-    // 1. Create a parent envelope container inside the requisitions log
-    $insertParent = $pdo->prepare("INSERT INTO requisitions (requested_by, status, requested_at) VALUES (?, 'Pending', NOW())");
-    $insertParent->execute([$_SESSION['user_id']]);
+    // FIXED: Removed requested_by column to match the database table schema configuration
+    $insertParent = $pdo->prepare("INSERT INTO requisitions (status, requested_at) VALUES ('Pending', NOW())");
+    $insertParent->execute();
     $requisition_id = $pdo->lastInsertId();
 
     $items_summary_list = [];
