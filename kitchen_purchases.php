@@ -23,7 +23,7 @@ if (!in_array("item_detail", $columnCheck)) {
     }
 }
 
-// 2. Verify vendor column name to eliminate the 1054 error
+// 2. Verify vendor column name to eliminate table layout errors
 $target_vendor_column = "vendor";
 if (!in_array("vendor", $columnCheck)) {
     if (in_array("vendor_name", $columnCheck)) {
@@ -43,15 +43,15 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_add_kitchen_ex
     if (!empty($date) && !empty($item_detail) && $qty > 0 && $price_per_unit > 0) {
         $pdo->beginTransaction();
         try {
-            // 1. Insert procurement row dynamically targeting the discovered table schema map
+            // Insert procurement row dynamically targeting the discovered table schema map
             $stmt = $pdo->prepare("
                 INSERT INTO kitchen_expenses (date, category, `{$target_item_column}`, `{$target_vendor_column}`, qty, price_per_unit)
                 VALUES (?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([$date, $category, $item_detail, $vendor, $qty, $price_per_unit]);
             
-            // 2. FIXED AUTOMATED REQUISITION WORKFLOW HOOK:
-            // Find the item catalog ID matching the typed input name
+            // --- AUTOMATED REQUISITION WORKFLOW HANDSHAKE HOOK ---
+            // Find the item catalog ID matching the typed input name safely
             $catalogStmt = $pdo->prepare("SELECT id FROM req_catalog WHERE LOWER(item_name) = LOWER(?) LIMIT 1");
             $catalogStmt->execute([$item_detail]);
             $catalog_id = $catalogStmt->fetchColumn();
@@ -83,19 +83,28 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_add_kitchen_ex
             $message = "❌ System pipeline error: " . $e->getMessage();
         }
     } else {
-        $message = "❌ Please fill out all required numeric fields correctly.";
+        $message = "❌ Please fill out all required fields correctly.";
     }
 }
 
-// Fetch material list dropdown options directly from the SQL table structure safely
+// --- CORE FIX: CENTRALIZED UNIFIED CATALOG SEED LOOP VIA UNION QUERY ---
+// Pulls standard shortlists from materials_registry AND the massive 116 item req_catalog table
 $materials_list = [];
 try {
-    $materials_list = $pdo->query("SELECT item_name, category FROM materials_registry ORDER BY item_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+    $materials_list = $pdo->query("
+        SELECT item_name, category FROM materials_registry
+        UNION
+        SELECT r.item_name, mc.name as category 
+        FROM req_catalog r
+        LEFT JOIN material_categories mc ON r.category_id = mc.id
+        WHERE r.is_verified = 1
+        ORDER BY item_name ASC
+    ")->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     $materials_list = [];
 }
 
-// Fetch recent entries to show logs stream feed
+// Fetch recent entries to show log feed
 $recent_logs = [];
 try {
     $recent_logs = $pdo->query("SELECT * FROM kitchen_expenses ORDER BY id DESC LIMIT 10")->fetchAll(PDO::FETCH_ASSOC);
@@ -134,11 +143,11 @@ include "includes/header.php";
             </div>
 
             <div style="margin-bottom:15px;">
-                <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">INVENTORY ITEM DETAIL (standard name link match)</label>
-                <input type="text" name="item_detail" id="itemDetailInput" list="registryMaterialsList" required placeholder="e.g., Mustard Oil, Basmati Rice" style="width:100%; padding:10px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box; font-weight:600;">
+                <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">INVENTORY ITEM DETAIL (unified catalog map search)</label>
+                <input type="text" name="item_detail" id="itemDetailInput" list="registryMaterialsList" required placeholder="Type to filter... (e.g., Aachar, Mustard Oil, Basmati)" style="width:100%; padding:10px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box; font-weight:600;">
                 <datalist id="registryMaterialsList">
                     <?php foreach ($materials_list as $mat): ?>
-                        <option value="<?= htmlspecialchars($mat['item_name']) ?>"><?= htmlspecialchars($mat['category']) ?></option>
+                        <option value="<?= htmlspecialchars($mat['item_name']) ?>"><?= htmlspecialchars($mat['category'] ?? 'General Sourcing') ?></option>
                     <?php endforeach; ?>
                 </datalist>
             </div>
@@ -154,7 +163,7 @@ include "includes/header.php";
                 </div>
                 <div>
                     <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">VENDOR NAME</label>
-                    <input type="text" name="vendor_name" placeholder="Local Wholesale Mart" style="width:100%; padding:10px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box;">
+                    <input type="text" name="vendor_name" placeholder="Wholesale Supplier Mart" style="width:100%; padding:10px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box;">
                 </div>
             </div>
 
