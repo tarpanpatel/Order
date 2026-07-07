@@ -35,8 +35,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_record_expense
     exit;
 }
 
-// FIXED CORE SQL: Pulls users excluding 'Super Admin' matching column 'role_name'
-$db_staff = $pdo->query("SELECT username FROM users WHERE role_name != 'Super Admin' ORDER BY username ASC")->fetchAll(PDO::FETCH_COLUMN);
+// FIXED: Swapped 'role_name' out for the correct column name 'role' to resolve the PDO Exception
+$db_staff = $pdo->query("SELECT username FROM users WHERE role != 'Super Admin' ORDER BY username ASC")->fetchAll(PDO::FETCH_COLUMN);
 
 // Fetch recent entries to show in logs feed
 $recent_expenses = $pdo->query("SELECT * FROM farm_utility_expenses ORDER BY id DESC LIMIT 10")->fetchAll(PDO::FETCH_ASSOC);
