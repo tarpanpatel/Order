@@ -14,14 +14,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_add_staff"])) 
     $role = $_POST["role"];
 
     if (!empty($username) && !empty($password_raw)) {
-        // Hash password securely to match system authentication standards
         $hashed_password = password_hash($password_raw, PASSWORD_BCRYPT);
         try {
             $stmt = $pdo->prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)");
             $stmt->execute([$username, $hashed_password, $role]);
             $_SESSION['staff_success'] = "Staff member '$username' added successfully!";
         } catch (PDOException $e) {
-            $_SESSION['staff_error'] = "Error: Username might already exist.";
+            $_SESSION['staff_error'] = "Error: Username might already exist or system database exception.";
         }
     }
     header("Location: staff_management.php");
@@ -31,16 +30,16 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_add_staff"])) 
 // --- HANDLE POST: REMOVE STAFF MEMBER ---
 if (isset($_GET["delete_id"])) {
     $delete_id = intval($_GET["delete_id"]);
-    // Protect the currently logged-in account from accidental self-deletion
     if ($delete_id !== intval($_SESSION["user_id"])) {
         $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
         $stmt->execute([$delete_id]);
+        $_SESSION['staff_success'] = "Staff member removed successfully!";
     }
     header("Location: staff_management.php");
     exit;
 }
 
-// Fetch all staff members from database
+// FETCH ALL USERS FROM THE MASTER USERS TABLE
 $staff_list = $pdo->query("SELECT id, username, role FROM users ORDER BY username ASC")->fetchAll(PDO::FETCH_ASSOC);
 
 include "includes/header.php";
@@ -58,7 +57,6 @@ include "includes/header.php";
     <?php endif; ?>
 
     <div style="display:grid; grid-template-columns: 1fr 2fr; gap:30px; align-items:start;">
-        <!-- LEFT COLUMN: ADD STAFF FORM -->
         <div style="background:#fff; border:1px solid #cbd5e0; border-radius:12px; padding:20px;">
             <h4 style="margin-top:0; border-bottom:1px dashed #cbd5e0; padding-bottom:8px; text-transform:uppercase; font-size:12px; color:#475569;">➕ Add New Member</h4>
             <form method="POST" action="staff_management.php">
@@ -73,17 +71,16 @@ include "includes/header.php";
                 </div>
                 <div style="margin-bottom:18px;">
                     <label style="font-size:11px; font-weight:700; display:block; margin-bottom:4px; color:#475569;">Permission Assignment Role</label>
-                    <select name="role" style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px; background:#white;">
+                    <select name="role" style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px; background:white;">
                         <option value="Staff">Staff Terminal</option>
                         <option value="Admin">Admin</option>
                         <option value="Super Admin">Super Admin</option>
                     </select>
                 </div>
-                <button type="submit" class="btn btn-bill" style="width:100%; padding:10px; font-weight:bold; background:#06b6d4; border-color:#06b6d4; color:#white; border-radius:6px;">Save Member Profile</button>
+                <button type="submit" class="btn btn-bill" style="width:100%; padding:10px; font-weight:bold; background:#06b6d4; border-color:#06b6d4; color:white; border-radius:6px;">Save Member Profile</button>
             </form>
         </div>
 
-        <!-- RIGHT COLUMN: ROSTER FEED LIST -->
         <div style="background:#fff; border:1px solid #cbd5e0; border-radius:12px; padding:20px;">
             <h4 style="margin-top:0; border-bottom:1px solid #e2e8f0; padding-bottom:8px; text-transform:uppercase; font-size:12px; color:#475569;">📋 Active System Registry Profiles</h4>
             <table style="width:100%; border-collapse:collapse; font-size:13px;">
@@ -95,10 +92,10 @@ include "includes/header.php";
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($staff_list as $member): ?>
+                    <?php if(!empty($staff_list)): foreach ($staff_list as $member): ?>
                         <tr style="border-bottom:1px solid #f1f5f9;">
                             <td style="padding:10px; font-weight:bold; color:#1e293b;"><?= htmlspecialchars($member['username']) ?></td>
-                            <td style="padding:10px;"><span style="background:#f1f5f9; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:700; color:#475569;"><?= $member['role'] ?></span></td>
+                            <td style="padding:10px;"><span style="background:#f1f5f9; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:700; color:#475569;"><?= htmlspecialchars($member['role']) ?></span></td>
                             <td style="padding:10px; text-align:center;">
                                 <?php if ($member['id'] !== intval($_SESSION["user_id"])): ?>
                                     <a href="staff_management.php?delete_id=<?= $member['id'] ?>" onclick="return confirm('Remove access for this profile?')" style="color:#ef4444; font-weight:bold; text-decoration:none;">🗑️ Delete</a>
@@ -107,7 +104,9 @@ include "includes/header.php";
                                 <?php endif; ?>
                             </td>
                         </tr>
-                    <?php endforeach; ?>
+                    <?php endforeach; else: ?>
+                        <tr><td colspan="3" style="text-align:center; padding:20px; color:#94a3b8; font-style:italic;">No profiles registered in users table.</td></tr>
+                    <?php endif; ?>
                 </tbody>
             </table>
         </div>
