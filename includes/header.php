@@ -12,7 +12,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 // Compile guest listings directly for the native sidebar dropdown controls
 $current_active_guest = $pdo->query("SELECT * FROM guests WHERE status = 'Active' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 
-// FIXED DROPDOWN FILTER: Only displays active or arriving bookings matching today's date
+// DROPDOWN FILTER: Only displays active or arriving bookings matching today's date
 $todaysStmt = $pdo->prepare("
     SELECT id, CONCAT('📱 (', RIGHT(phone_number, 4), ')') as guest_name 
     FROM guests 
@@ -27,13 +27,10 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>POS</title>
+    <title>POS System</title>
     <link rel="stylesheet" href="assets/css/style.css?v=<?= time(); ?>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* ==========================================================================
-           RESPONSIVE SIDEBAR NAVIGATION TOGGLE UI MECHANICS
-           ========================================================================== */
         .mobile-header-strip {
             display: none;
             background: #ffffff;
@@ -54,8 +51,6 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
             font-weight: bold;
             color: var(--text-main, #2d3748);
         }
-
-        /* Desktop Sidebar Styles */
         .desktop-sidebar-title {
             font-size: 11px; 
             font-weight: 700; 
@@ -66,8 +61,6 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
             padding-bottom: 10px;
             border-bottom: 1px dashed #e2e8f0;
         }
-
-        /* Streamlined Sidebar Form Controllers */
         .sidebar-action-card {
             display: flex;
             align-items: center;
@@ -98,15 +91,12 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
         .sb-btn-inactive:hover {
             background: #2f855a;
         }
-
         @media (min-width: 1024px) {
             .nav-bar { top: 0 !important; }
             .close-drawer-btn { display: none !important; }
         }
-
         @media (max-width: 1023px) {
             .mobile-header-strip { display: flex; }
-            
             .sidebar {
                 position: fixed !important; 
                 top: 0; 
@@ -119,7 +109,6 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
                 box-shadow: 4px 0 25px rgba(0,0,0,0.08);
             }
             .sidebar.is-drawer-open { transform: translateX(0) !important; }
-            
             .sidebar-backdrop {
                 position: fixed; 
                 top: 0; 
@@ -155,7 +144,6 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
         
         <nav style="display: flex; flex-direction: column; gap: 4px;">
             <?php 
-            // SYSTEM ROLE CAPTURE DEFINITIONS
             $is_manager = isset($_SESSION["role"]) && $_SESSION["role"] === 'Admin';
             $is_super   = isset($_SESSION["role"]) && $_SESSION["role"] === 'Super Admin';
             
@@ -195,9 +183,7 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
             <a href="kitchen_purchases.php" class="nav-link <?= ($current_page === 'kitchen_purchases.php') ? 'active' : ''; ?>">🛒 Kitchen Purchases</a>
             <a href="expenses.php" class="nav-link <?= ($current_page === 'expenses.php') ? 'active' : ''; ?>">📈 Expenses Workspace</a>
 
-            <?php 
-            if ($is_super || $is_manager): 
-            ?>
+            <?php if ($is_super || $is_manager): ?>
                 <div class="admin-settings-wrapper" style="margin-top: 10px; border-top: 1px solid #cbd5e0; padding-top: 10px; width: 100%;">
                     <div onclick="toggleAdminSubMenu()" class="nav-link" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 700; color: #475569; padding: 10px 16px;">
                         <span>🛠️ Admin Control</span>
@@ -206,6 +192,7 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
 
                     <div id="adminSubMenuContent" style="display: none; flex-direction: column; gap: 4px; padding-left: 20px; margin-top: 5px;">
                         <a href="dashboard_analytics.php" class="nav-link <?= ($current_page === 'dashboard_analytics.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">📊 Dashboard Analytics</a>
+                        <a href="deficient_stock_logs_view.php" class="nav-link <?= ($current_page === 'deficient_stock_logs_view.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">⚠️ Deficit Shortfalls Log</a>
                         <a href="past_receipts.php" class="nav-link <?= ($current_page === 'past_receipts.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">📜 Past Receipts Log</a>
                         <a href="menu_admin.php" class="nav-link <?= ($current_page === 'menu_admin.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">🍽️ Menu Configuration</a>
                         <a href="materials_admin.php" class="nav-link <?= ($current_page === 'materials_admin.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">📦 Material Registry</a>
@@ -220,7 +207,6 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
                 function toggleAdminSubMenu() {
                     const content = document.getElementById("adminSubMenuContent");
                     const chevron = document.getElementById("adminMenuChevron");
-                    
                     if (content.style.display === "none" || content.style.display === "") {
                         content.style.display = "flex";
                         chevron.style.transform = "rotate(90deg)";
@@ -231,7 +217,6 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
                         localStorage.setItem("adminPanelExpanded", "false");
                     }
                 }
-
                 document.addEventListener("DOMContentLoaded", () => {
                     if (localStorage.getItem("adminPanelExpanded") === "true") {
                         const content = document.getElementById("adminSubMenuContent");
