@@ -12,15 +12,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_past_bi
     $guest_id = intval($_POST["update_guest_id"]);
     $base_room_rent = floatval($_POST["base_room_rent"] ?? 0);
     $advance_paid = floatval($_POST["advance_paid"] ?? 0);
-    $advance_received_by = trim($_POST["advance_received_by"] ?? '');
-    $food_received_by = trim($_POST["food_received_by"] ?? '');
     
-    // Process updated food quantities
+    // CAPTURE ALL THREE INDEPENDENT TRIPLE-COLLECTOR STRATEGY COMPONENT SELECTORS
+    $advance_received_by = trim($_POST["advance_received_by"] ?? '');
+    $pending_received_by = trim($_POST["pending_received_by"] ?? '');
+    $food_received_by    = trim($_POST["food_received_by"] ?? '');
+    
     $item_qtys = $_POST["invoice_item_qty"] ?? [];
     
     $pdo->beginTransaction();
     try {
-        // 1. Update individual food line items
+        // 1. Update individual food line items quantities
         foreach ($item_qtys as $item_id => $qty) {
             $item_id = intval($item_id);
             $qty = intval($qty);
@@ -31,10 +33,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_past_bi
             }
         }
 
-        // 2. Process active adjustments update string safely
+        // 2. Process active adjustments payload string safely
         $adjustments_payload = $_POST["applied_adjustments_payload"] ?? '[]';
         
-        // Recalculate totals for verification
         $itemsStmt = $pdo->prepare("
             SELECT oi.quantity, oi.returned_qty, mi.price 
             FROM order_items oi 
@@ -58,13 +59,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_past_bi
         $food_subtotal = max(0, $food_subtotal);
         $pending_amount = max(0, $base_room_rent - $advance_paid);
 
-        // 3. Persist modifications down to guest ledger metrics
+        // 3. Persist modifications down to guest ledger metrics matching all fields
         $updateGuest = $pdo->prepare("
             UPDATE guests 
             SET base_room_rent = ?,
                 advance_paid = ?,
                 advance_received_by = ?,
                 pending_amount = ?,
+                pending_received_by = ?,
                 total_food = ?,
                 food_received_by = ?,
                 food_remark = ?
@@ -75,6 +77,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_past_bi
             $advance_paid, 
             $advance_received_by, 
             $pending_amount, 
+            $pending_received_by,
             $food_subtotal, 
             $food_received_by, 
             $adjustments_payload, 
@@ -112,13 +115,13 @@ include "includes/header.php";
 .receipts-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
 .receipts-table th { background: #f8fafc; padding: 12px; font-weight: 700; color: #475569; border-bottom: 2px solid #cbd5e0; }
 .receipts-table td { padding: 12px; border-bottom: 1px solid #e2e8f0; color: #1e293b; vertical-align: middle; }
-.modal-split-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 10px; }
-.modal-input-group { margin-bottom: 12px; }
-.modal-input-group label { font-size: 11px; font-weight: 700; display: block; color: #475569; margin-bottom: 4px; text-transform: uppercase; }
-.modal-field-control { width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; box-sizing: border-box; font-size: 13px; font-weight: 600; }
-.modal-item-edit-row { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #edf2f7; font-size: 12px; }
-.modal-qty-field { width: 55px; padding: 5px; text-align: center; border: 1px solid #cbd5e0; border-radius: 4px; font-weight: bold; }
-.adj-badge-del { background: none; border: none; color: #ef4444; cursor: pointer; font-weight: bold; font-size: 12px; }
+.modal-split-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 15px; }
+.modal-input-group { margin-bottom: 14px; }
+.modal-input-group label { font-size: 11px; font-weight: 700; display: block; color: #475569; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.3px; }
+.modal-field-control { width: 100%; padding: 10px; border: 1px solid #cbd5e0; border-radius: 8px; box-sizing: border-box; font-size: 13px; font-weight: 600; color: #1e293b; }
+.modal-item-edit-row { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #edf2f7; font-size: 13px; }
+.modal-qty-field { width: 60px; padding: 6px; text-align: center; border: 1px solid #cbd5e0; border-radius: 6px; font-weight: bold; }
+.adj-badge-del { background: none; border: none; color: #ef4444; cursor: pointer; font-weight: bold; font-size: 13px; }
 </style>
 
 <div class="app-body" style="padding: 20px; font-family: sans-serif; text-align: left;">
@@ -156,7 +159,6 @@ include "includes/header.php";
                     $grand_total = $room_rent + $food_total;
                     $display_date = !empty($inv['checkout_date']) ? date('d M Y', strtotime($inv['checkout_date'])) : 'Stay Profile';
 
-                    // Fetch associated order item details line matrix
                     $itemsStmt = $pdo->prepare("
                         SELECT oi.id, oi.quantity, mi.name, mi.price 
                         FROM order_items oi 
@@ -177,7 +179,6 @@ include "includes/header.php";
                         <td>₹<?= number_format($food_total, 2) ?></td>
                         <td style="font-weight: 800; color: #059669;">₹<?= number_format($grand_total, 2) ?></td>
                         <td style="text-align: center;">
-                            <!-- FIXED ATTR: Saved JSON safely inside custom attributes to eliminate unexpected end of input exceptions -->
                             <button type="button" class="btn btn-start" style="padding: 6px 14px; font-size:12px; border-radius:6px;"
                                     data-guest='<?= htmlspecialchars(json_encode($inv), ENT_QUOTES, 'UTF-8') ?>'
                                     data-items='<?= htmlspecialchars($serializedItems, ENT_QUOTES, 'UTF-8') ?>' 
@@ -193,11 +194,12 @@ include "includes/header.php";
     </div>
 </div>
 
-<!-- COMPREHENSIVE PAST RECEIPT BILL WORKSPACE MODAL -->
-<div id="editInvoiceModalPopup" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
-    <div class="modal-content" style="background: white; max-width: 820px; width: 94%; border-radius: 12px; padding: 25px; position: relative; color: #111827; text-align: left; max-height: 90vh; overflow-y: auto;">
-        <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0; font-weight:bold;" onclick="closeEditInvoiceModal()">✕</span>
-        <h3 style="font-size: 15px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; border-bottom: 2px solid #06b6d4; padding-bottom: 8px; color:#0284c7;" id="modalInvoiceTitle">Historical Statement Workspace</h3>
+<!-- FIXED: UPGRADED COMPREHENSIVE FULL-SCREEN WORKSPACE MODAL OVERLAY -->
+<div id="editInvoiceModalPopup" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #ffffff; z-index: 99999; text-align: left; overflow-y: auto;">
+    <div style="padding: 30px; max-width: 1200px; margin: 0 auto; width: 100%; position: relative;">
+        <span style="position: absolute; top: 25px; right: 20px; font-size: 28px; cursor: pointer; color: #64748b; font-weight:bold;" onclick="closeEditInvoiceModal()">✕</span>
+        <h2 style="font-size: 22px; font-weight: 800; margin-top: 0; margin-bottom: 5px; color:#1e293b;" id="modalInvoiceTitle">Historical Statement Workspace</h2>
+        <p style="color:#64748b; margin: 0 0 20px 0; font-size:0.95rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px;">Modify stay contract terms, order logs, or individual staff payment mappings</p>
         
         <form method="POST" action="past_receipts.php" style="margin: 0;" id="masterWorkspaceForm">
             <input type="hidden" name="action_update_past_bill" value="1">
@@ -205,9 +207,9 @@ include "includes/header.php";
             <input type="hidden" name="applied_adjustments_payload" id="mdlAdjustmentsPayload">
 
             <div class="modal-split-layout">
-                <!-- LEFT SIDEBAR COLUMN: STAY LOGISTICS & SYSTEM PARAMETERS -->
+                <!-- LEFT PANEL COLUMN: STAY CONTRACT & DUAL COLLECTORS SPLIT -->
                 <div>
-                    <h4 style="font-size:12px; text-transform:uppercase; color:#475569; border-bottom:1px dashed #cbd5e0; padding-bottom:4px; margin-top:0;">🏡 Stay Rent & Collector Metrics</h4>
+                    <h3 style="font-size:14px; text-transform:uppercase; color:#0284c7; margin-top:0; margin-bottom:15px; border-bottom:1px solid #cbd5e0; padding-bottom:5px;">🏠 Lodging Parameters & Collector Matrix</h3>
                     
                     <div class="modal-input-group">
                         <label>Base Room Tariff Charges (₹)</label>
@@ -215,12 +217,12 @@ include "includes/header.php";
                     </div>
 
                     <div class="modal-input-group">
-                        <label>Advance Deposited Amount (₹)</label>
+                        <label>First Deposit for Accommodation (Advance ₹)</label>
                         <input type="number" step="0.01" name="advance_paid" id="mdlAdvancePaid" class="modal-field-control" oninput="calculateWorkspaceOutstanding()">
                     </div>
 
                     <div class="modal-input-group">
-                        <label>Accommodation Advance Taken By</label>
+                        <label>👤 Who took First Accommodation Deposit?</label>
                         <select name="advance_received_by" id="mdlAdvanceReceivedBy" class="modal-field-control">
                             <option value="Tarpan bhaiya">Tarpan bhaiya</option>
                             <option value="Kamlesh">Kamlesh</option>
@@ -233,8 +235,23 @@ include "includes/header.php";
                         </select>
                     </div>
 
+                    <!-- REFACTORED WORKSPACE INCLUSION: WHO TOOK THE FINAL DEPOSIT FOR ACCOMMODATION -->
                     <div class="modal-input-group">
-                        <label>Food & Incidentals Taken By</label>
+                        <label>👤 Who took Final Accommodation Deposit?</label>
+                        <select name="pending_received_by" id="mdlPendingReceivedBy" class="modal-field-control">
+                            <option value="Tarpan bhaiya">Tarpan bhaiya</option>
+                            <option value="Kamlesh">Kamlesh</option>
+                            <option value="Abhijit">Abhijit</option>
+                            <option value="Kinkar">Kinkar</option>
+                            <option value="Subrata">Subrata</option>
+                            <option value="Rohit">Rohit</option>
+                            <option value="Vikas">Vikas</option>
+                            <option value="Raju">Raju</option>
+                        </select>
+                    </div>
+
+                    <div class="modal-input-group">
+                        <label>👤 Who took Final Bill for Food & Everything Else?</label>
                         <select name="food_received_by" id="mdlFoodReceivedBy" class="modal-field-control">
                             <option value="Tarpan bhaiya">Tarpan bhaiya</option>
                             <option value="Kamlesh">Kamlesh</option>
@@ -248,42 +265,42 @@ include "includes/header.php";
                     </div>
                 </div>
 
-                <!-- RIGHT SIDEBAR COLUMN: FOOD LINE RECEIPTS AND LIVE ADJUSTMENTS SYSTEM -->
-                <div style="display:flex; flex-direction:column; justify-content:space-between;">
-                    <div>
-                        <h4 style="font-size:12px; text-transform:uppercase; color:#475569; border-bottom:1px dashed #cbd5e0; padding-bottom:4px; margin-top:0;">🍽️ Order Lines Assembly</h4>
-                        <div id="mdlInvoiceItemsContainer" style="max-height: 160px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 4px; background: #fafafa; margin-bottom:15px;"></div>
-                        
-                        <h4 style="font-size:12px; text-transform:uppercase; color:#475569; border-bottom:1px dashed #cbd5e0; padding-bottom:4px; margin-top:0;">➕ Add Adjustments Workspace</h4>
-                        <div style="display:grid; grid-template-columns: 100px 1fr 40px; gap:6px; margin-bottom:10px;">
-                            <select id="workspaceAdjType" class="modal-field-control" style="padding:6px;" onchange="handleTypeSelectorSync()">
-                                <option value="charge">Charge (+)</option>
-                                <option value="discount">Discount (-)</option>
-                            </select>
-                            <input type="text" id="workspaceAdjReason" class="modal-field-control" style="padding:6px;" placeholder="Reason descriptor label...">
-                            <input type="number" id="workspaceAdjAmount" class="modal-field-control" style="padding:6px;" placeholder="₹">
-                        </div>
-                        <button type="button" class="btn btn-start" style="padding:6px 12px; font-size:11px; width:100%; border-radius:6px; font-weight:700; margin-bottom:10px;" onclick="addWorkspaceAdjustmentRow()">+ Inject Custom Adjustment Row</button>
-                        
-                        <div id="workspaceAdjustmentsContainer" style="max-height: 110px; overflow-y:auto; border:1px solid #edf2f7; padding:4px; border-radius:6px; background:#fff;"></div>
+                <!-- RIGHT PANEL COLUMN: RESTAURANT LINES & LIVE ADJUSTMENTS SHEET -->
+                <div>
+                    <h3 style="font-size:14px; text-transform:uppercase; color:#0284c7; margin-top:0; margin-bottom:15px; border-bottom:1px solid #cbd5e0; padding-bottom:5px;">🍽️ Incidentals & Adjustments</h3>
+                    
+                    <label style="font-size: 11px; font-weight: 700; display: block; color: #475569; margin-bottom: 5px; text-transform: uppercase;">Order Lines Assembly</label>
+                    <div id="mdlInvoiceItemsContainer" style="max-height: 180px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px; background: #fafafa; margin-bottom:20px;"></div>
+                    
+                    <label style="font-size: 11px; font-weight: 700; display: block; color: #475569; margin-bottom: 5px; text-transform: uppercase;">Add Adjustments Workspace</label>
+                    <div style="display:grid; grid-template-columns: 110px 1fr 70px; gap:8px; margin-bottom:10px;">
+                        <select id="workspaceAdjType" class="modal-field-control" style="padding:8px;" onchange="handleTypeSelectorSync()">
+                            <option value="charge">Charge (+)</option>
+                            <option value="discount">Discount (-)</option>
+                        </select>
+                        <input type="text" id="workspaceAdjReason" class="modal-field-control" style="padding:8px;" placeholder="Reason descriptor label...">
+                        <input type="number" id="workspaceAdjAmount" class="modal-field-control" style="padding:8px;" placeholder="Amount">
                     </div>
+                    <button type="button" class="btn btn-start" style="padding:8px; font-size:12px; width:100%; border-radius:6px; font-weight:700; margin-bottom:15px;" onclick="addWorkspaceAdjustmentRow()">+ Inject Custom Adjustment Row</button>
+                    
+                    <div id="workspaceAdjustmentsContainer" style="max-height: 130px; overflow-y:auto; border:1px solid #edf2f7; padding:6px; border-radius:8px; background:#fff;"></div>
                 </div>
             </div>
 
             <!-- LIVE ARITHMETIC RECALCULATION STATEMENT MATRIX WIDGET -->
-            <div style="margin-top:20px; background:#fafdfd; border:1px solid #06b6d4; padding:15px; border-radius:10px; display:flex; justify-content:space-between; align-items:center;">
-                <div style="font-size:13px; color:#475569; line-height:1.4;">
-                    <div>Stay Rent Outstanding: <span id="summaryStayRent" style="font-weight:700; color:#111827;">₹0.00</span></div>
-                    <div>Food & extras Subtotal: <span id="summaryFoodExtras" style="font-weight:700; color:#0284c7;">₹0.00</span></div>
+            <div style="margin-top:35px; background:#fafdfd; border:2px solid #06b6d4; padding:20px; border-radius:12px; display:flex; justify-content:space-between; align-items:center;">
+                <div style="font-size:14px; color:#475569; line-height:1.5;">
+                    <div>Stay Rent Outstanding Balance: <span id="summaryStayRent" style="font-weight:700; color:#111827;">₹0.00</span></div>
+                    <div>Food & Extras Service Subtotal: <span id="summaryFoodExtras" style="font-weight:700; color:#0284c7;">₹0.00</span></div>
                 </div>
-                <div style="text-align:right; font-size:16px; font-weight:800; color:#1e293b;">
-                    Total Collective due: <span id="summaryGrandTotal" style="color:#059669; border-bottom:4px double #059669; font-size:18px;">₹0.00</span>
+                <div style="text-align:right; font-size:18px; font-weight:800; color:#1e293b;">
+                    Total Outstanding Due: <span id="summaryGrandTotal" style="color:#059669; border-bottom:4px double #059669; font-size:22px; font-weight:900;">₹0.00</span>
                 </div>
             </div>
 
-            <div style="display: flex; gap: 10px; justify-content: flex-end; align-items: center; margin-top:20px;">
-                <button type="button" class="btn btn-log" style="padding: 10px 18px;" onclick="closeEditInvoiceModal()">Cancel</button>
-                <button type="submit" class="btn btn-bill" style="padding: 10px 24px; font-weight: 800; background:#059669; border-color:#059669;">Recalculate & Save Sheet</button>
+            <div style="display: flex; gap: 12px; justify-content: flex-end; align-items: center; margin-top:30px; border-top:1px solid #e2e8f0; padding-top:20px;">
+                <button type="button" class="btn btn-log" style="padding: 12px 24px; font-size:14px;" onclick="closeEditInvoiceModal()">Cancel</button>
+                <button type="submit" class="btn btn-bill" style="padding: 12px 36px; font-size:14px; font-weight: 800; background:#059669; border-color:#059669; border-radius:8px;">Recalculate & Save Sheet</button>
             </div>
         </form>
     </div>
@@ -309,14 +326,16 @@ function handleTypeSelectorSync() {
 }
 
 function openEditInvoiceWorkspace(element) {
-    // FIXED: Safely pulling dataset object dynamically inside JS runtime directly
     const guestData = JSON.parse(element.getAttribute("data-guest"));
     
     document.getElementById("mdlInvoiceGuestId").value = guestData.id;
     document.getElementById("modalInvoiceTitle").innerText = "Modify Bill Metrics: " + guestData.guest_name;
     document.getElementById("mdlBaseRoomRent").value = parseFloat(guestData.base_room_rent || 0);
     document.getElementById("mdlAdvancePaid").value = parseFloat(guestData.advance_paid || 0);
+    
+    // FILL ALL THE PAYMENT HANDLERS DATA NATIVELY
     document.getElementById("mdlAdvanceReceivedBy").value = guestData.advance_received_by || "Tarpan bhaiya";
+    document.getElementById("mdlPendingReceivedBy").value = guestData.pending_received_by || "Tarpan bhaiya";
     document.getElementById("mdlFoodReceivedBy").value = guestData.food_received_by || "Tarpan bhaiya";
 
     workspaceFoodItems = JSON.parse(element.getAttribute("data-items") || "[]");
@@ -327,20 +346,21 @@ function openEditInvoiceWorkspace(element) {
     calculateWorkspaceOutstanding();
     handleTypeSelectorSync();
 
-    document.getElementById("editInvoiceModalPopup").style.display = "flex";
+    document.getElementById("editInvoiceModalPopup").style.display = "block";
+    document.body.style.overflow = "hidden"; // Prevent background body lock lines scrolling
 }
 
 function renderFoodItemRows() {
     const container = document.getElementById("mdlInvoiceItemsContainer");
     if (workspaceFoodItems.length === 0) {
-        container.innerHTML = '<p style="text-align:center; color:#94a3b8; font-style:italic; padding:10px; margin:0;">No restaurant line items recorded.</p>';
+        container.innerHTML = '<p style="text-align:center; color:#94a3b8; font-style:italic; padding:15px; margin:0;">No restaurant line items recorded.</p>';
         return;
     }
     container.innerHTML = workspaceFoodItems.map(i => `
         <div class="modal-item-edit-row">
             <div style="flex:1;">
                 <strong>${i.name}</strong>
-                <span style="color:#64748b; display:block; font-size:10px;">Unit Rate: ₹${parseFloat(i.price).toFixed(2)}</span>
+                <span style="color:#64748b; display:block; font-size:11px;">Unit Rate: ₹${parseFloat(i.price).toFixed(2)}</span>
             </div>
             <input type="number" name="invoice_item_qty[${i.id}]" value="${i.quantity}" min="0" class="modal-qty-field" data-price="${i.price}" oninput="updateFoodQuantityData(${i.id}, this)">
         </div>
@@ -382,11 +402,11 @@ function removeWorkspaceAdjustmentItem(id) {
 function renderWorkspaceAdjustmentsList() {
     const container = document.getElementById("workspaceAdjustmentsContainer");
     if (workspaceAdjustments.length === 0) {
-        container.innerHTML = '<p style="color:#cbd5e0; text-align:center; padding:8px; font-size:11px; margin:0; font-style:italic;">No dynamic variations added.</p>';
+        container.innerHTML = '<p style="color:#94a3b8; text-align:center; padding:12px; font-size:12px; margin:0; font-style:italic;">No dynamic variations added.</p>';
         return;
     }
     container.innerHTML = workspaceAdjustments.map(item => `
-        <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:4px; border-bottom:1px solid #f1f5f9;">
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px; padding:6px; border-bottom:1px solid #f1f5f9;">
             <div><span style="font-weight:700; color:${item.type === 'charge' ? '#e53e3e' : '#38a169'};">[${item.type.toUpperCase()}]</span> ${item.reason} - <b>₹${item.amount}</b></div>
             <button type="button" class="adj-badge-del" onclick="removeWorkspaceAdjustmentItem(${item.id})">✕</button>
         </div>
@@ -426,6 +446,7 @@ function floatval(val) {
 
 function closeEditInvoiceModal() { 
     document.getElementById("editInvoiceModalPopup").style.display = "none"; 
+    document.body.style.overflow = "auto";
 }
 </script>
 
