@@ -1,5 +1,5 @@
 <?php
-// /home/apartment/artistsfarmjaipur.com/Order/kitchen_expenses.php
+// /home/apartment/artistsfarmjaipur.com/Order/kitchen_purchases.php
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once "config/db.php";
 
@@ -12,7 +12,7 @@ $message = "";
 
 // Dynamic Column Discovery Hook to prevent Column Not Found errors
 $columnCheck = $pdo->query("DESCRIBE kitchen_expenses")->fetchAll(PDO::FETCH_COLUMN);
-$target_item_column = "item_detail"; // Default target name
+$target_item_column = "item_detail"; 
 
 if (!in_array("item_detail", $columnCheck)) {
     if (in_array("item_name", $columnCheck)) {
@@ -51,7 +51,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_add_kitchen_ex
             $updateReq->execute([$date, $item_detail, $item_detail]);
 
             $pdo->commit();
-            $message = "✔ Stock entry recorded and pending material requisitions updated successfully!";
+            $message = "✔ Stock purchase entry recorded and pending material requisitions updated successfully!";
         } catch (Exception $e) {
             $pdo->rollBack();
             $message = "❌ System pipeline error: " . $e->getMessage();
@@ -82,18 +82,18 @@ include "includes/header.php";
 
 <div class="app-body" style="padding: 20px; font-family: sans-serif; text-align: left;">
     <div style="max-width: 800px; margin: 0 auto; background: #ffffff; border: 1px solid #cbd5e0; border-radius: 12px; padding: 25px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
-        <h3 style="margin-top:0; color:#1e293b; border-bottom:1px solid #e2e8f0; padding-bottom:10px;">🍳 RECORD KITCHEN PROCUREMENT & STOCK</h3>
+        <h3 style="margin-top:0; color:#1e293b; border-bottom:1px solid #e2e8f0; padding-bottom:10px;">🍳 RECORD KITCHEN PURCHASES & STOCK</h3>
         
         <?php if(!empty($message)): ?>
             <div style="background:#f0fdf4; border:1px solid #bbf7d0; color:#166534; padding:12px; border-radius:8px; margin-bottom:15px; font-size:14px; font-weight:bold;"><?= $message ?></div>
         <?php endif; ?>
 
-        <form method="POST" action="kitchen_expenses.php">
+        <form method="POST" action="kitchen_purchases.php">
             <input type="hidden" name="action_add_kitchen_expense" value="1">
             
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom:15px;">
                 <div>
-                    <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">RECORDED DATE</label>
+                    <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">PURCHASE DATE</label>
                     <input type="date" name="expense_date" required class="form-control" value="<?= date('Y-m-d') ?>" style="width:100%; padding:10px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box;">
                 </div>
                 <div>
@@ -119,7 +119,7 @@ include "includes/header.php";
 
             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom:20px;">
                 <div>
-                    <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">QUANTITY purchased</label>
+                    <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">QUANTITY PURCHASED</label>
                     <input type="number" step="0.01" name="quantity" required placeholder="0" style="width:100%; padding:10px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box;">
                 </div>
                 <div>
@@ -132,12 +132,12 @@ include "includes/header.php";
                 </div>
             </div>
 
-            <button type="submit" style="width:100%; padding:12px; font-size:14px; font-weight:bold; background:#0284c7; border:none; color:white; border-radius:8px; cursor:pointer;">Save Stock Entry & Check Requisitions</button>
+            <button type="submit" style="width:100%; padding:12px; font-size:14px; font-weight:bold; background:#0284c7; border:none; color:white; border-radius:8px; cursor:pointer;">Save Purchase & Check Requisitions</button>
         </form>
     </div>
 
     <div style="max-width:800px; margin:25px auto 0 auto; background:#fff; border:1px solid #cbd5e0; border-radius:12px; padding:20px;">
-        <h4 style="margin-top:0; border-bottom:1px solid #e2e8f0; padding-bottom:8px; text-transform:uppercase; font-size:11px; color:#475569;">Recent Kitchen Stock Procurement Entries</h4>
+        <h4 style="margin-top:0; border-bottom:1px solid #e2e8f0; padding-bottom:8px; text-transform:uppercase; font-size:11px; color:#475569;">Recent Kitchen Purchase Log</h4>
         <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
             <thead>
                 <tr style="background:#f8fafc; border-bottom:2px solid #cbd5e0;">
