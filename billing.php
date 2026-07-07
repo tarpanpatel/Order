@@ -4,7 +4,10 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 require_once "config/db.php";
-require_once "config/telegram.php"; // Native Telegram notification dispatcher engine
+
+if (file_exists(__DIR__ . "/config/telegram.php")) {
+    require_once __DIR__ . "/config/telegram.php";
+}
 include_once __DIR__ . '/config/local_db_bridge.php';
 
 if (!isset($_SESSION["user_id"])) { 
@@ -12,10 +15,8 @@ if (!isset($_SESSION["user_id"])) {
     exit; 
 }
 
-// Identify the single active running resident profile session
 $guest = $pdo->query("SELECT * FROM guests WHERE status = 'Active' LIMIT 1")->fetch();
 
-// Handle direct item quantity reductions (Returns / Cancellations)
 if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["adjust_action"])) {
     $id = intval($_POST["order_item_id"]); 
     $qty = intval($_POST["adjust_qty"]);
@@ -28,7 +29,6 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["adjust_acti
     exit;
 }
 
-// --- HANDLE POST: ASYNC ADDITION OF MISSED ITEMS BY STAFF ---
 if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_add_adjustment"])) {
     $type   = $_POST["adj_type"]; 
     $reason = !empty(trim($_POST["adj_reason"])) ? trim($_POST["adj_reason"]) : ($type === 'discount' ? 'Discount Given' : 'Extra Charge');
@@ -52,7 +52,6 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_add_
     exit;
 }
 
-// --- HANDLE POST: REMOVE ADJUSTMENT ---
 if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_remove_adjustment"])) {
     $adj_id = intval($_POST["adj_id"]);
     if (!empty($guest['food_remark'])) {
@@ -66,7 +65,6 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_remo
     exit;
 }
 
-// --- HANDLE POST: COMMIT COMPLETE CHECKOUT SETTLEMENT & SEND TELEGRAM ---
 if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_finalize_checkout"])) {
     $guest_id = $guest['id'];
     $food_bill_total = floatval($_POST["post_food_bill_total"]);
@@ -75,7 +73,6 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_fina
     $accommodation_collected_by = !empty($guest['advance_received_by']) ? $guest['advance_received_by'] : 'System Ledger';
     $food_collected_by          = trim($_POST["food_received_by_staff"]);
     
-    // Fetch all item lines before changing status to construct the Telegram text template
     $itemsQuery = $pdo->prepare("
         SELECT oi.*, mi.name, mi.price 
         FROM order_items oi 
@@ -86,13 +83,11 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_fina
     $itemsQuery->execute([$guest_id]);
     $items_list = $itemsQuery->fetchAll(PDO::FETCH_ASSOC);
 
-    // Dynamic Adjustments compiler
     $adjustments = [];
     if (!empty($guest['food_remark'])) {
         $adjustments = json_decode($guest['food_remark'], true) ?: [];
     }
 
-    // Update local guest archive logs with distinct collector allocations
     $pdo->prepare("
         UPDATE guests 
         SET status = 'CheckedOut', 
@@ -104,25 +99,18 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_fina
         WHERE id = ?
     ")->execute([$accommodation_pending, $accommodation_collected_by, $food_bill_total, $food_collected_by, $guest_id]);
 
-    // Push separate fields out cleanly to general farm bookings ledger rows
     $pdo->prepare("
         INSERT INTO farm_bookings (booking_source, contact_no, no_of_guests, check_in_date, check_out_date, per_night_charges, advance_paid, advance_received_by, pending_amount, pending_received_by, total_food_bill, food_received_by, remarks)
         VALUES (?, ?, ?, ?, CURRENT_DATE(), ?, ?, ?, ?, ?, ?, ?, 'Checked out from Dual Collector POS')
     ")->execute([
-        $guest['booking_source'],
-        $guest['phone_number'],
-        $guest['no_of_guests'],
-        $guest['checkin_date'],
-        $guest['per_night_charges'],
-        $guest['advance_paid'],
-        $accommodation_collected_by,
-        $accommodation_pending,
-        $accommodation_collected_by,
-        $food_bill_total,
-        $food_collected_by
+        $guest['booking_source'], $guest['phone_number'], $guest['no_of_guests'], $guest['checkin_date'],
+        $guest['per_night_charges'], $guest['advance_paid'], $accommodation_collected_by,
+        $accommodation_pending, $accommodation_collected_by, $food_bill_total, $food_collected_by
     ]);
 
-    // TELEGRAM DISPATCH LOGIC
+    // ==========================================================================
+    // FIXED ROUTING: REDIRECTED SETTLEMENT BREAKDOWN TO sendAdminTelegramMessage
+    // ==========================================================================
     $tg_msg  = "🔔 <b>FARM CHECKOUT SETTLEMENT REPORT</b>\n";
     $tg_msg .= "━━━━━━━━━━━━━━━━━━\n";
     $tg_msg .= "👤 <b>Guest:</b> " . htmlspecialchars($guest['guest_name'] ?: 'Walk-In') . "\n";
@@ -136,7 +124,6 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_fina
     $tg_msg .= "💼 <i>Collected By: " . htmlspecialchars($accommodation_collected_by) . "</i>\n\n";
 
     $tg_msg .= "🍽️ <b>RESTAURANT & KITCHEN BILL</b>\n";
-    // FIXED: Correctly matching $items_list pointer map reference bounds loop
     if (!empty($items_list)) {
         foreach ($items_list as $itm) {
             $net_q = $itm['quantity'] - $itm['returned_qty'];
@@ -159,9 +146,10 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_fina
     $tg_msg .= "━━━━━━━━━━━━━━━━━━\n";
     $tg_msg .= "💰 <b>TOTAL REVENUE PAYABLE: ₹" . number_format(($accommodation_pending + $food_bill_total), 2) . "</b>\n";
 
-    if (function_exists('sendTelegramMessage')) {
-        sendTelegramMessage($tg_msg); 
+    if (function_exists('sendAdminTelegramMessage')) {
+        sendAdminTelegramMessage($tg_msg); 
     }
+    // ==========================================================================
 
     header("Location: index.php");
     exit;
@@ -196,17 +184,10 @@ include "includes/header.php";
         $served_items = $ordersQuery->fetchAll(PDO::FETCH_ASSOC);
 
         $food_subtotal = 0;
-        $cleanItemsForJs = [];
         foreach ($served_items as $item) {
             $net_qty = $item['quantity'] - $item['returned_qty'];
             if ($net_qty > 0) {
-                $item_cost = $net_qty * $item['price'];
-                $food_subtotal += $item_cost;
-                $cleanItemsForJs[] = [
-                    'name' => $item['name'],
-                    'qty' => $net_qty,
-                    'cost' => $item_cost
-                ];
+                $food_subtotal += ($net_qty * $item['price']);
             }
         }
 
@@ -225,7 +206,6 @@ include "includes/header.php";
         }
 
         $total_incidentals_bill = max(0, $food_subtotal + $adjustments_sum);
-        
         $base_rent = floatval($guest['base_room_rent'] ?? 0);
         $advance_paid = floatval($guest['advance_paid'] ?? 0);
         $accommodation_pending = max(0, $base_rent - $advance_paid);
@@ -234,7 +214,6 @@ include "includes/header.php";
 
     <div class="billing-grid-split">
         <div class="workspace-panel-stack">
-            <!-- ACCOMMODATION SUMMARY PANEL -->
             <div class="billing-card">
                 <div class="billing-section-title">🏡 Accommodation Invoice Breakdown</div>
                 <div class="data-display-row">
@@ -251,7 +230,6 @@ include "includes/header.php";
                 </div>
             </div>
 
-            <!-- FOOD AND INCIDENTALS PANEL -->
             <div class="billing-card">
                 <div class="billing-section-title">🍽️ Food Orders & Combined Incidentals Log</div>
                 <table style="width:100%; border-collapse:collapse; font-size:13px; margin-bottom:15px;">
@@ -306,9 +284,7 @@ include "includes/header.php";
             </div>
         </div>
 
-        <!-- RIGHT CONTROL PANEL SIDEBAR -->
         <div class="sidebar-panel-stack">
-            <!-- ADJUSTMENTS CONTROLLER CARD -->
             <div class="billing-card">
                 <div class="billing-section-title">➕ Add Custom Adjustments</div>
                 <form method="POST" style="margin:0;" id="adjustmentEntryForm">
@@ -332,7 +308,6 @@ include "includes/header.php";
                 </form>
             </div>
 
-            <!-- COMMIT CHECKOUT SETTLEMENT CARD -->
             <div class="billing-card" style="border:2px solid #06b6d4; background:#fafdfd;">
                 <div class="billing-section-title" style="color:#0891b2; border-color:#0891b2;">🏁 Final Checkout Settlement</div>
                 
@@ -390,7 +365,6 @@ include "includes/header.php";
     <?php endif; ?>
 </div>
 
-<!-- PRINT-FRIENDLY POPUP DIALOG LAYOUT OVERLAY -->
 <div id="cleanPrintFriendlyModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); z-index:999999; justify-content:center; align-items:center; backdrop-filter:blur(2px);">
     <div style="background:#ffffff; max-width:420px; width:90%; border-radius:8px; padding:25px; box-shadow:0 10px 25px rgba(0,0,0,0.15); text-align:left; color:#000000; font-family:monospace;">
         <div style="text-align:center; margin-bottom:15px; border-bottom:2px dashed #000;">
