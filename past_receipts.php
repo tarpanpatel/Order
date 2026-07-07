@@ -7,9 +7,9 @@ if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Admin" && $_SESSION["ro
     die("Access Denied: Administrative credentials required.");
 }
 
-// --- BACKEND LOGIC: POST INTERCEPTOR FOR UPDATING PAST INVOICES ---
+// --- BACKEND LOGIC: POST INTERCEPTOR FOR UPDATING PAST CHECKOUT INVOICES ---
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_invoice"])) {
-    $order_id = intval($_POST["update_order_id"]);
+    $guest_id = intval($_POST["update_guest_id"]);
     $item_qtys = $_POST["invoice_item_qty"] ?? [];
     
     $pdo->beginTransaction();
@@ -19,15 +19,15 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_invoice
             $qty = intval($qty);
             
             if ($qty <= 0) {
-                $pdo->prepare("DELETE FROM order_items WHERE id = ? AND order_id = ?")->execute([$item_id, $order_id]);
+                $pdo->prepare("DELETE FROM order_items WHERE id = ?")->execute([$item_id]);
             } else {
-                // Update quantity inside order_items table lines
-                $pdo->prepare("UPDATE order_items SET quantity = ? WHERE id = ? AND order_id = ?")->execute([$qty, $item_id, $order_id]);
+                // Adjust food quantities directly for the selected checkout transaction line
+                $pdo->prepare("UPDATE order_items SET quantity = ? WHERE id = ?")->execute([$qty, $item_id]);
             }
         }
         
         $pdo->commit();
-        $_SESSION['invoice_success_toast'] = "Invoice #$order_id updated successfully!";
+        $_SESSION['invoice_success_toast'] = "Invoice updated and recalculated successfully!";
         header("Location: past_receipts.php");
         exit;
     } catch (Exception $e) {
@@ -36,17 +36,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_invoice
     }
 }
 
-// FIXED SQL: Joined order_items with menu_items to multiply quantity * mi.price accurately
-$orders = $pdo->query("
-    SELECT o.id, 
-           (SELECT SUM(oi.quantity * mi.price) 
-            FROM order_items oi 
-            JOIN menu_items mi ON oi.menu_item_id = mi.id 
-            WHERE oi.order_id = o.id) as grand_total,
-           g.phone_number
-    FROM orders o 
-    LEFT JOIN guests g ON o.guest_id = g.id 
-    ORDER BY o.id DESC
+// FIXED SQL: Selects checked out invoice profiles generated via billing.php
+$invoices = $pdo->query("
+    SELECT g.id, g.guest_name, g.phone_number, g.checkin_date, g.checkout_date, g.total_charge as room_charge,
+           COALESCE((SELECT SUM((oi.quantity - oi.returned_qty) * mi.price) 
+                     FROM order_items oi 
+                     JOIN menu_items mi ON oi.menu_item_id = mi.id 
+                     JOIN orders o ON oi.order_id = o.id 
+                     WHERE o.guest_id = g.id), 0) as food_total
+    FROM guests g 
+    WHERE g.status = 'CheckedOut'
+    ORDER BY g.id DESC
 ")->fetchAll(PDO::FETCH_ASSOC);
 
 include "includes/header.php";
@@ -72,39 +72,53 @@ include "includes/header.php";
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">
         <div>
             <h2 style="margin:0; color:#1e293b;">📜 Past Receipts Archive Log</h2>
+            <p style="color:#64748b; margin: 5px 0 0 0; font-size:0.9rem;">Review or modify invoices generated via billing checkout settlements</p>
         </div>
-        <input type="text" id="invoiceSearchInput" onkeyup="searchInvoiceTable()" placeholder="🔍 Search Invoice ID..." style="padding:10px; border:1px solid #cbd5e0; border-radius:8px; font-size:13px;">
+        <input type="text" id="invoiceSearchInput" onkeyup="searchInvoiceTable()" placeholder="🔍 Search Guest Phone/Name..." style="padding:10px; border:1px solid #cbd5e0; border-radius:8px; font-size:13px; max-width: 280px; width:100%;">
     </div>
 
     <div class="receipts-dashboard-card">
         <table class="receipts-table" id="pastReceiptsMasterTable">
             <thead>
                 <tr>
-                    <th>Invoice ID</th>
+                    <th>Settlement Date</th>
                     <th>Guest Mapping</th>
-                    <th>Grand Total (₹)</th>
+                    <th>Grand Total (Room + Food)</th>
                     <th style="text-align:center;">Actions</th>
                 </tr>
             </thead>
             <tbody>
-                <?php if (!empty($orders)): foreach ($orders as $order): 
-                    $total_amount = floatval($order['grand_total'] ?? 0);
+                <?php if (!empty($invoices)): foreach ($invoices as $inv): 
+                    $room_charge = floatval($inv['room_charge'] ?? 0);
+                    $food_total = floatval($inv['food_total'] ?? 0);
+                    $grand_total = $room_charge + $food_total;
+                    
+                    $display_date = !empty($inv['checkout_date']) ? date('d M Y', strtotime($inv['checkout_date'])) : date('d M Y', strtotime($inv['checkin_date']));
 
-                    // Pull menu line prices properly from mi.price relation 
-                    $itemsStmt = $pdo->prepare("SELECT oi.id, oi.quantity, mi.name, mi.price FROM order_items oi JOIN menu_items mi ON oi.menu_item_id = mi.id WHERE oi.order_id = ?");
-                    $itemsStmt->execute([$order['id']]);
+                    // Fetch associated kitchen details to modify seamlessly from model layer templates
+                    $itemsStmt = $pdo->prepare("
+                        SELECT oi.id, oi.quantity, mi.name, mi.price 
+                        FROM order_items oi 
+                        JOIN menu_items mi ON oi.menu_item_id = mi.id 
+                        JOIN orders o ON oi.order_id = o.id 
+                        WHERE o.guest_id = ?
+                    ");
+                    $itemsStmt->execute([$inv['id']]);
                     $serializedItems = json_encode($itemsStmt->fetchAll(PDO::FETCH_ASSOC));
                 ?>
-                    <tr class="invoice-data-row" data-search-string="<?= strtolower($order['id'] . ' ' . ($order['phone_number'] ?? '')) ?>">
-                        <td style="font-weight: bold; color: #0284c7;">#<?= $order['id'] ?></td>
-                        <td style="font-family:monospace; font-weight:bold; color:#475569;"><?= htmlspecialchars($order['phone_number'] ?? 'Walk-In Guest') ?></td>
-                        <td style="font-weight: 800; color: #059669;">₹<?= number_format($total_amount, 2) ?></td>
+                    <tr class="invoice-data-row" data-search-string="<?= strtolower($inv['guest_name'] . ' ' . $inv['phone_number']) ?>">
+                        <td style="font-weight: bold; color: #475569;"><?= $display_date ?></td>
+                        <td style="font-weight: 600; color:#334155;">
+                            <?= htmlspecialchars($inv['guest_name']) ?> 
+                            <span style="font-family:monospace; display:block; font-size:11px; color:#64748b;">📱 <?= htmlspecialchars($inv['phone_number']) ?></span>
+                        </td>
+                        <td style="font-weight: 800; color: #059669;">₹<?= number_format($grand_total, 2) ?></td>
                         <td style="text-align: center;">
-                            <button type="button" class="btn btn-start" style="padding: 6px 14px; font-size:12px; border-radius:6px;" data-items='<?= htmlspecialchars($serializedItems, ENT_QUOTES, 'UTF-8') ?>' onclick="openEditInvoiceModal(<?= $order['id'] ?>, this)">✏ Edit Bill</button>
+                            <button type="button" class="btn btn-start" style="padding: 6px 14px; font-size:12px; border-radius:6px;" data-items='<?= htmlspecialchars($serializedItems, ENT_QUOTES, 'UTF-8') ?>' onclick="openEditInvoiceModal(<?= $inv['id'] ?>, '${{ $inv['guest_name'] }}', this)">✏ Edit Bill</button>
                         </td>
                     </tr>
                 <?php endforeach; else: ?>
-                    <tr><td colspan="4" style="text-align:center; padding:30px; color:#94a3b8;">No records found.</td></tr>
+                    <tr><td colspan="4" style="text-align:center; padding:30px; color:#94a3b8;">No checkout logs found.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
@@ -114,18 +128,18 @@ include "includes/header.php";
 <div id="editInvoiceModalPopup" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
     <div class="modal-content" style="background: white; max-width: 520px; width: 92%; border-radius: 12px; padding: 25px; position: relative; color: #111827; text-align: left;">
         <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0; font-weight:bold;" onclick="closeEditInvoiceModal()">✕</span>
-        <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; color:#0284c7;" id="modalInvoiceTitle">Modify Invoice #00</h3>
+        <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; color:#0284c7;" id="modalInvoiceTitle">Modify Invoice</h3>
         
         <form method="POST" action="past_receipts.php" style="margin: 0;">
             <input type="hidden" name="action_update_invoice" value="1">
-            <input type="hidden" name="update_order_id" id="mdlInvoiceOrderId">
+            <input type="hidden" name="update_guest_id" id="mdlInvoiceGuestId">
             
             <label style="font-size: 11px; font-weight: 700; color: #475569; display: block; margin-bottom: 6px; text-transform: uppercase;">Line Items Assembly</label>
-            <div id="mdlInvoiceItemsContainer" style="max-height: 220px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px; margin-bottom: 20px; background: #fafafa;"></div>
+            <div id="mdlInvoiceItemsContainer" style="max-height: 240px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px; margin-bottom: 20px; background: #fafafa;"></div>
             
             <div style="display: flex; gap: 10px; justify-content: flex-end; align-items: center;">
                 <button type="button" class="btn btn-log" style="padding: 10px 18px;" onclick="closeEditInvoiceModal()">Cancel</button>
-                <button type="submit" class="btn btn-bill" style="padding: 10px 24px; font-weight: 800; background:#059669; border-color:#059669;">Recalculate & Save</button>
+                <button type="submit" class="btn btn-bill" style="padding: 10px 24px; font-weight: 800; background:#059669; border-color:#059669;">Save Changes</button>
             </div>
         </form>
     </div>
@@ -146,25 +160,29 @@ function searchInvoiceTable() {
     });
 }
 
-function openEditInvoiceModal(orderId, element) {
-    document.getElementById("mdlInvoiceOrderId").value = orderId;
-    document.getElementById("modalInvoiceTitle").innerText = "Modify Invoice #" + orderId;
+function openEditInvoiceModal(guestId, guestName, element) {
+    document.getElementById("mdlInvoiceGuestId").value = guestId;
+    document.getElementById("modalInvoiceTitle").innerText = "Modify Invoice Summary";
     
     const container = document.getElementById("mdlInvoiceItemsContainer");
     const items = JSON.parse(element.getAttribute("data-items"));
     
-    container.innerHTML = items.map(i => `
-        <div class="modal-item-edit-row">
-            <div style="flex: 1; text-align: left;">
-                <span style="font-weight:700; font-size:13px; color:#1e293b; display:block;">${i.name}</span>
-                <span style="font-size:11px; color:#64748b; font-weight:600;">Unit Price: ₹${parseFloat(i.price).toFixed(2)}</span>
+    if (!items || items.length === 0) {
+        container.innerHTML = '<p style="text-align:center; color:#64748b; font-size:12px; padding:15px; font-style:italic;">No restaurant order items attached to this invoice.</p>';
+    } else {
+        container.innerHTML = items.map(i => `
+            <div class="modal-item-edit-row">
+                <div style="flex: 1; text-align: left;">
+                    <span style="font-weight:700; font-size:13px; color:#1e293b; display:block;">${i.name}</span>
+                    <span style="font-size:11px; color:#64748b; font-weight:600;">Unit Price: ₹${parseFloat(i.price).toFixed(2)}</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <label style="font-size:11px; font-weight:700; color:#475569;">Qty:</label>
+                    <input type="number" name="invoice_item_qty[${i.id}]" value="${i.quantity}" min="0" class="modal-qty-field">
+                </div>
             </div>
-            <div style="display:flex; align-items:center; gap:6px;">
-                <label style="font-size:11px; font-weight:700; color:#475569;">Qty:</label>
-                <input type="number" name="invoice_item_qty[${i.id}]" value="${i.quantity}" min="0" class="modal-qty-field">
-            </div>
-        </div>
-    `).join('');
+        `).join('');
+    }
     
     document.getElementById("editInvoiceModalPopup").style.display = "flex";
 }
