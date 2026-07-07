@@ -4,9 +4,12 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 require_once "config/db.php";
+
+if (file_exists(__DIR__ . "/config/telegram.php")) {
+    require_once __DIR__ . "/config/telegram.php";
+}
 include_once __DIR__ . '/config/local_db_bridge.php';
 
-// Allow access if they are logged in as either Admin or Chef
 if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Admin" && $_SESSION["role"] !== "Chef")) {
     header("Location: login.php");
     exit;
@@ -49,11 +52,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_register_guest
                 $pdo->rollBack();
             } else {
                 $sql = "INSERT INTO guests (phone_number, adults, children, checkin_date, checkout_date, expected_checkout, notes, advance_paid, pending_amount, booking_source, no_of_guests, per_night_charges, total_charge, base_room_rent, advance_received_by, pending_received_by, status) 
-                        VALUES (?, 1, 0, ?, ?, CONCAT(?, ' 11:00:00'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Booked')";
+                        VALUES (?, ?, 0, ?, ?, CONCAT(?, ' 11:00:00'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Booked')";
                 
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
-                    $phone_number, $checkin, $checkout, $checkout, $notes, $advance, $pending, 
+                    $phone_number, 1, $checkin, $checkout, $checkout, $notes, $advance, $pending, 
                     $booking_source, $no_of_guests, $per_night_charges, $per_night_charges, 
                     $per_night_charges, $advance_received_by, $pending_received_by
                 ]);
@@ -139,7 +142,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_booking
 // --- 4. DATA COMPILATION FOR UI RENDERING ---
 $current_active_guest = $pdo->query("SELECT * FROM guests WHERE status = 'Active' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 
-// Filter to get ONLY today's entries for the quick action menu
 $todaysStmt = $pdo->prepare("
     SELECT id, CONCAT('📱 (', RIGHT(phone_number, 4), ')') as guest_label 
     FROM guests 
@@ -151,7 +153,6 @@ $todays_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
 
 $bookings = $pdo->query("SELECT *, DATE(checkin_date) as cid, DATE(checkout_date) as cod FROM guests WHERE status != 'CheckedOut'")->fetchAll(PDO::FETCH_ASSOC);
 
-// Parse dates into JSON array strings for calendar availability configurations
 $disabledDatesArray = [];
 foreach ($bookings as $b) {
     if (!empty($b['cid']) && !empty($b['cod'])) {
@@ -166,8 +167,41 @@ foreach ($bookings as $b) {
 }
 $disabledDatesJson = json_encode($disabledDatesArray);
 
-// FETCH ALL TEAM PROFILES DYNAMICALLY FROM THE UNIFIED DATABASE USERS TABLE
 $db_staff = $pdo->query("SELECT username FROM users ORDER BY username ASC")->fetchAll(PDO::FETCH_COLUMN);
+
+// ==========================================================================
+// BACKGROUND AUTOMATION: 1-DAY BEFORE ADVANCE ARRIVAL NOTIFIER REMINDER
+// ==========================================================================
+$lastNotificationSentDate = $_SESSION['last_reminder_broadcast_date'] ?? '';
+if ($lastNotificationSentDate !== $todayString) {
+    $tomorrowDateString = date('Y-m-d', strtotime('+1 day'));
+    
+    $tomorrowQuery = $pdo->prepare("SELECT * FROM guests WHERE DATE(checkin_date) = ? AND status = 'Booked'");
+    $tomorrowQuery->execute([$tomorrowDateString]);
+    $tomorrow_arrivals = $tomorrowQuery->fetchAll(PDO::FETCH_ASSOC);
+    
+    if (!empty($tomorrow_arrivals) && function_exists('sendAdminTelegramMessage')) {
+        $rem_msg = "🗓️ <b>TOMORROW'S ARRIVALS REMINDER SHEET</b>\n";
+        $rem_msg .= "📅 Check-in Date: <b>" . date('d M Y', strtotime($tomorrowDateString)) . "</b>\n";
+        $rem_msg .= "━━━━━━━━━━━━━━━━━━\n\n";
+        
+        foreach ($tomorrow_arrivals as $index => $res) {
+            $num = $index + 1;
+            $rem_msg .= "<b>{$num}. Phone:</b> 📱 (" . substr($res['phone_number'], -4) . ")\n";
+            $rem_msg .= "• Source: " . htmlspecialchars($res['booking_source']) . " | Headcount: " . $res['no_of_guests'] . " Pax\n";
+            $rem_msg .= "• Total Tariff: ₹" . number_format($res['per_night_charges'], 2) . "\n";
+            $rem_msg .= "• Advance Paid: ₹" . number_format($res['advance_paid'], 2) . " (" . htmlspecialchars($res['advance_received_by']) . ")\n";
+            if (!empty($res['notes'])) {
+                $rem_msg .= "• <i>Notes: " . htmlspecialchars($res['notes']) . "</i>\n";
+            }
+            $rem_msg .= "⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n";
+        }
+        
+        sendAdminTelegramMessage($rem_msg);
+    }
+    $_SESSION['last_reminder_broadcast_date'] = $todayString;
+}
+// ==========================================================================
 
 include "includes/header.php";
 ?>
