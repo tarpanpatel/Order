@@ -18,6 +18,8 @@
         
         if ($is_manager || $is_super): 
         ?>
+            <a href="index.php" class="nav-link <?= ($current_page === 'index.php') ? 'active' : ''; ?>">📊 Dashboard</a>
+
             <?php if (!empty($current_active_guest)): ?>
                 <div style="margin: 6px 0; background: #fdfaf7; border: 1px solid #cbd5e0; border-radius: 8px; padding: 8px;">
                     <div style="font-size:11px; font-weight:bold; color:#0891b2; margin-bottom:5px; text-align:center; text-transform:uppercase;">● Active: 📱 (<?= substr($current_active_guest['phone_number'], -4) ?>)</div>
@@ -46,7 +48,7 @@
         <a href="kitchen.php" class="nav-link <?= ($current_page === 'kitchen.php') ? 'active' : ''; ?>">🍳 Kitchen Orders</a>
         <a href="requisitions.php" class="nav-link <?= ($current_page === 'requisitions.php') ? 'active' : ''; ?>">📦 Material Requests</a>
         <a href="kitchen_purchases.php" class="nav-link <?= ($current_page === 'kitchen_purchases.php') ? 'active' : ''; ?>">🛒 Kitchen Purchases</a>
-        <a href="expenses.php" class="nav-link <?= ($current_page === 'expenses.php') ? 'active' : ''; ?>">📈 Expenses Workspace</a>
+        <a href="expenses.php" class="nav-link <?= ($current_page === 'expenses.php') ? 'active' : ''; ?>">📈 Expenses</a>
 
         <?php if ($is_super || $is_manager): ?>
             <div class="admin-settings-wrapper" style="margin-top: 10px; border-top: 1px solid #cbd5e0; padding-top: 10px; width: 100%;">
@@ -74,14 +76,11 @@
     </nav>
 </div>
 
-<!-- FIXED: Injected the required runtime sub-menu toggle behavior mechanism directly here -->
 <script>
 function toggleAdminSubMenu() {
     const content = document.getElementById("adminSubMenuContent");
     const chevron = document.getElementById("adminMenuChevron");
-    
     if (!content || !chevron) return;
-    
     if (content.style.display === "none" || content.style.display === "") {
         content.style.display = "flex";
         chevron.style.transform = "rotate(90deg)";
@@ -92,7 +91,6 @@ function toggleAdminSubMenu() {
         localStorage.setItem("adminPanelExpanded", "false");
     }
 }
-
 document.addEventListener("DOMContentLoaded", () => {
     if (localStorage.getItem("adminPanelExpanded") === "true") {
         const content = document.getElementById("adminSubMenuContent");
