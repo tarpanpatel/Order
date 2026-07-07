@@ -23,6 +23,8 @@ $filterDates = $pdo->query("
     UNION 
     SELECT DISTINCT MONTH(date) as m, YEAR(date) as y FROM farm_expenses WHERE date IS NOT NULL
     UNION
+    SELECT DISTINCT MONTH(expense_date) as m, YEAR(expense_date) as y FROM farm_utility_expenses WHERE expense_date IS NOT NULL
+    UNION
     SELECT DISTINCT MONTH(check_in_date) as m, YEAR(check_in_date) as y FROM farm_bookings WHERE check_in_date IS NOT NULL
     ORDER BY y DESC, m DESC
 ")->fetchAll(PDO::FETCH_ASSOC);
@@ -31,29 +33,43 @@ if (empty($filterDates)) {
     $filterDates[] = ['m' => intval(date('m')), 'y' => intval(date('Y'))];
 }
 
-// 3. COMPUTE EXECUTIVE FINANCIAL METRICS VIA FINALIZED TABLES
+// 3. COMPUTE EXECUTIVE FINANCIAL METRICS COMBINING LEGACY AND NEW RECORDS
 $bookingIncomeStmt = $pdo->prepare("SELECT COALESCE(SUM(total_charge + decoration_charges + tip_amount), 0) FROM guests WHERE MONTH(checkin_date) = :m AND YEAR(checkin_date) = :y");
 $bookingIncomeStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
 $totalBookingIncome = $bookingIncomeStmt->fetchColumn();
 
-// Pull food income directly from finalized farm booking receipts table
 $foodIncomeStmt = $pdo->prepare("SELECT COALESCE(SUM(total_food_bill), 0) FROM farm_bookings WHERE MONTH(check_in_date) = :m AND YEAR(check_in_date) = :y");
 $foodIncomeStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
 $totalFoodIncome = $foodIncomeStmt->fetchColumn();
 
 $farmTotalRevenue = $totalBookingIncome + $totalFoodIncome;
 
+// Kitchen Procurement sum
 $kitExpStmt = $pdo->prepare("SELECT COALESCE(SUM(qty * price_per_unit), 0) FROM kitchen_expenses WHERE MONTH(date) = :m AND YEAR(date) = :y");
 $kitExpStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
 $kitchenExpensesSum = $kitExpStmt->fetchColumn();
 
-$farmMaintenanceStmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM farm_expenses WHERE MONTH(date) = :m AND YEAR(date) = :y AND date != '1970-01-01' AND category != 'Salary'");
-$farmMaintenanceStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
-$farmUpkeepExpensesSum = $farmMaintenanceStmt->fetchColumn();
+// UNIFIED UPKEEP: Pull non-salary entries from legacy table + 'Bills' and 'Other' from new table
+$upkeepLegacyStmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM farm_expenses WHERE MONTH(date) = :m AND YEAR(date) = :y AND date != '1970-01-01' AND category NOT IN ('Salary', 'Salaries')");
+$upkeepLegacyStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
+$upkeepLegacy = $upkeepLegacyStmt->fetchColumn();
 
-$salaryStmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM farm_expenses WHERE MONTH(date) = :m AND YEAR(date) = :y AND date != '1970-01-01' AND category = 'Salary'");
-$salaryStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
-$totalSalaries = $salaryStmt->fetchColumn();
+$upkeepNewStmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM farm_utility_expenses WHERE MONTH(expense_date) = :m AND YEAR(expense_date) = :y AND category IN ('Bills', 'Other', 'Utility', 'Water Tanker', 'Maintenance', 'Rations')");
+$upkeepNewStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
+$upkeepNew = $upkeepNewStmt->fetchColumn();
+
+$farmUpkeepExpensesSum = $upkeepLegacy + $upkeepNew;
+
+// UNIFIED SALARIES: Pull both 'Salary' and 'Salaries' across both tables
+$salaryLegacyStmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM farm_expenses WHERE MONTH(date) = :m AND YEAR(date) = :y AND date != '1970-01-01' AND category IN ('Salary', 'Salaries')");
+$salaryLegacyStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
+$salaryLegacy = $salaryLegacyStmt->fetchColumn();
+
+$salaryNewStmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM farm_utility_expenses WHERE MONTH(expense_date) = :m AND YEAR(expense_date) = :y AND category = 'Salaries'");
+$salaryNewStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
+$salaryNew = $salaryNewStmt->fetchColumn();
+
+$totalSalaries = $salaryLegacy + $salaryNew;
 
 $totalExpenses = $kitchenExpensesSum + $farmUpkeepExpensesSum + $totalSalaries;
 $netProfitLoss = $farmTotalRevenue - $totalExpenses;
@@ -73,7 +89,7 @@ if (!$is_ajax) { include 'includes/header.php'; }
         .filter-form button { padding: 6px 14px; background: #06b6d4; color: #fff; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px; }
         
         .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
-        .metric-card { background: #fff; padding: 16px; border-radius: 10px; border: 1px solid #e2e8f0; border-left: 4px solid #cbd5e0; }
+        .metric-card { background: #fff; padding: 16px; border-radius: 10px; border: 1px solid #e2e8f0; border-left: 4px solid #cbd5e0; text-align: left; }
         .metric-card h3 { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin: 0 0 8px 0; letter-spacing: 0.5px; }
         .metric-card .value { font-size: 22px; font-weight: 700; color: #1e293b; }
         
@@ -94,7 +110,7 @@ if (!$is_ajax) { include 'includes/header.php'; }
     </style>
 
     <div class="page-header">
-        <h2 class="page-title">📈 Central Operations & Analytics</h2>
+        <h2 class="page-title"> Central Operations & Analytics</h2>
         <form method="GET" action="dashboard_analytics.php" class="filter-form">
             <input type="hidden" name="tab" value="<?= htmlspecialchars($activeTab) ?>">
             <select name="month">
@@ -140,7 +156,6 @@ if (!$is_ajax) { include 'includes/header.php'; }
         <a href="dashboard_analytics.php?tab=kitchen_expenses&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" class="excel-tab-link <?= $activeTab === 'kitchen_expenses' ? 'is-active' : '' ?>">🍳 Kitchen Inventory Expenses</a>
         <a href="dashboard_analytics.php?tab=farm_upkeep&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" class="excel-tab-link <?= $activeTab === 'farm_upkeep' ? 'is-active' : '' ?>">🛠️ Farm Upkeep</a>
         <a href="dashboard_analytics.php?tab=salaries&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" class="excel-tab-link <?= $activeTab === 'salaries' ? 'is-active' : '' ?>">💼 Salaries Registry</a>
-        <a href="dashboard_analytics.php?tab=dish_stats&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" class="excel-tab-link <?= $activeTab === 'dish_stats' ? 'is-active' : '' ?>">🔥 Popular Dishes</a>
     </div>
 
     <div class="excel-table-box">
@@ -159,8 +174,6 @@ if (!$is_ajax) { include 'includes/header.php'; }
                         <th>Recorded Date</th><th>Classification Category</th><th>Voucher Narration Description</th><th>Vendor Name</th><th>Amount Disbursed</th>
                     <?php elseif ($activeTab === 'salaries'): ?>
                         <th>Disbursed Date</th><th>Classification Profile</th><th>Voucher Reference/Notes</th><th>Employee Name</th><th>Net Salary Disbursed</th>
-                    <?php elseif ($activeTab === 'dish_stats'): ?>
-                        <th>Dish Popularity Rank</th><th>Menu Item Name</th><th>Total Quantity Ordered</th><th>Total Net Sales Revenue Generated</th>
                     <?php endif; ?>
                 </tr>
             </thead>

@@ -12,13 +12,22 @@ $message = "";
 
 // Dynamic Column Discovery Hook to prevent Column Not Found errors
 $columnCheck = $pdo->query("DESCRIBE kitchen_expenses")->fetchAll(PDO::FETCH_COLUMN);
-$target_item_column = "item_detail"; 
 
+// 1. Verify item descriptor column name
+$target_item_column = "item_detail"; 
 if (!in_array("item_detail", $columnCheck)) {
     if (in_array("item_name", $columnCheck)) {
         $target_item_column = "item_name";
     } elseif (in_array("description", $columnCheck)) {
         $target_item_column = "description";
+    }
+}
+
+// 2. Verify vendor column name to eliminate the 1054 error
+$target_vendor_column = "vendor";
+if (!in_array("vendor", $columnCheck)) {
+    if (in_array("vendor_name", $columnCheck)) {
+        $target_vendor_column = "vendor_name";
     }
 }
 
@@ -34,14 +43,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_add_kitchen_ex
     if (!empty($date) && !empty($item_detail) && $qty > 0 && $price_per_unit > 0) {
         $pdo->beginTransaction();
         try {
-            // 1. Insert procurement row dynamically targeting the verified column name
+            // Insert procurement row dynamically targeting the discovered table schema map
             $stmt = $pdo->prepare("
-                INSERT INTO kitchen_expenses (date, category, `{$target_item_column}`, vendor, qty, price_per_unit)
+                INSERT INTO kitchen_expenses (date, category, `{$target_item_column}`, `{$target_vendor_column}`, qty, price_per_unit)
                 VALUES (?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([$date, $category, $item_detail, $vendor, $qty, $price_per_unit]);
             
-            // 2. AUTOMATED REQUISITION WORKFLOW HOOK:
+            // AUTOMATED REQUISITION WORKFLOW HOOK:
             $updateReq = $pdo->prepare("
                 UPDATE material_requests 
                 SET status = 'Fulfilled', fulfillment_date = ? 
@@ -151,11 +160,12 @@ include "includes/header.php";
             <tbody>
                 <?php if (!empty($recent_logs)): foreach ($recent_logs as $row): 
                     $display_name = $row['item_detail'] ?? $row['item_name'] ?? $row['description'] ?? 'Unnamed Asset';
+                    $display_vendor = $row['vendor'] ?? $row['vendor_name'] ?? 'Market';
                 ?>
                     <tr style="border-bottom:1px solid #edf2f7;">
                         <td style="padding:10px; color:#64748b;"><?= $row['date'] ?></td>
                         <td style="padding:10px;"><span style="font-weight:700; color:#ea580c;"><?= htmlspecialchars($row['category']) ?></span></td>
-                        <td style="padding:10px;"><strong><?= htmlspecialchars($display_name) ?></strong> <span style="font-size:11px; color:#64748b;">(via <?= htmlspecialchars($row['vendor'] ?? 'Market') ?>)</span></td>
+                        <td style="padding:10px;"><strong><?= htmlspecialchars($display_name) ?></strong> <span style="font-size:11px; color:#64748b;">(via <?= htmlspecialchars($display_vendor) ?>)</span></td>
                         <td style="padding:10px; text-align:right; font-weight:600;"><?= $row['qty'] ?></td>
                         <td style="padding:10px; text-align:right; font-weight:800; color:#1e293b;">₹<?= number_format($row['qty'] * $row['price_per_unit'], 2) ?></td>
                     </tr>
