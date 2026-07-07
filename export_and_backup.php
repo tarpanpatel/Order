@@ -1,5 +1,7 @@
 <?php
 // /home/apartment/artistsfarmjaipur.com/Order/export_and_backup.php
+// WARNING: Ensure there are absolutely no spaces or blank lines above this line!
+
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/config/db.php';
 
@@ -9,9 +11,7 @@ if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Admin" && $_SESSION["ro
 
 $action = $_GET['action'] ?? '';
 
-// ==========================================================================
-// 1. ENGINE: EXCEL CSV EXPORT GENERATOR
-// ==========================================================================
+// --- CSV EXPORT ---
 if ($action === 'export_excel') {
     $tab   = $_GET['tab'] ?? 'overview';
     $month = isset($_GET['month']) ? intval($_GET['month']) : intval(date('m'));
@@ -20,11 +20,18 @@ if ($action === 'export_excel') {
     $dateObj = DateTime::createFromFormat('!m', $month);
     $monthName = $dateObj ? $dateObj->format('F') : 'Month';
     
-    // Set headers to force instant browser file download
+    // Clear out any previous buffering anomalies
+    if (ob_get_level()) { ob_end_clean(); }
+    
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename="Farm_Report_' . $tab . '_' . $monthName . '_' . $year . '.csv"');
+    header('Pragma: no-cache');
+    header('Expires: 0');
     
     $output = fopen('php://output', 'w');
+    
+    // Add UTF-8 BOM flag to ensure Excel opens Hindi/Urdu descriptions or names without character breaking
+    fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
     
     if ($tab === 'bookings') {
         fputcsv($output, ['Guest Name', 'Booking Source', 'Phone', 'Guests', 'Check-In', 'Check-Out', 'Room Rent', 'Advance Paid', 'Advance Received By', 'Pending Amount', 'Pending Received By', 'Decoration', 'Tips']);
@@ -74,26 +81,19 @@ if ($action === 'export_excel') {
             fputcsv($output, [$row['recorded_date'], 'Salaries', $row['description'], $row['vendor_name'] ?? 'Teammate', $row['amount']]);
         }
     } 
-    else {
-        // Fallback or Summary Statement export block
-        fputcsv($output, ['Financial Metric Category', 'Statement Balance Value']);
-        fputcsv($output, ['Accommodations Booking Gross Revenue', $_GET['booking_rev'] ?? '0.00']);
-        fputcsv($output, ['Kitchen Food Orders Gross Revenue', $_GET['food_rev'] ?? '0.00']);
-        fputcsv($output, ['Kitchen Procurement Inventory Costs', $_GET['kitchen_exp'] ?? '0.00']);
-        fputcsv($output, ['Property Operational Bills & Utilities', $_GET['upkeep_exp'] ?? '0.00']);
-        fputcsv($output, ['Staff Salaries Gross Disbursed Ledger', $_GET['salary_exp'] ?? '0.00']);
-    }
     
     fclose($output);
     exit;
 }
 
-// ==========================================================================
-// 2. ENGINE: INSTANT NATIVE SQL BACKEND DUMPER (BACKUP)
-// ==========================================================================
+// --- SQL SYSTEM DUMP BACKUP ---
 if ($action === 'backup_db') {
-    header('Content-Type: text/plain');
+    if (ob_get_level()) { ob_end_clean(); }
+    
+    header('Content-Type: application/octet-stream');
     header('Content-Disposition: attachment; filename="Backup_Apartment_Blue_' . date('Y-m-d_H-i-s') . '.sql"');
+    header('Pragma: no-cache');
+    header('Expires: 0');
     
     echo "-- ======================================================\n";
     echo "-- AUTOMATED BACKUP DISPATCH FOR APARTMENT_BLUE DATABASE\n";
