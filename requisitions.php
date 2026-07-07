@@ -20,7 +20,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_create_chef_pr
     $pack_unit   = trim($_POST["chef_pack_unit"]);
 
     if (!empty($item_name) && $category_id > 0) {
-        $stmt = $pdo->prepare("INSERT INTO req_catalog (item_name, category_id, unit_type, unit_label, pack_size, pack_unit, is_verified, unit_cost, image_path) VALUES (?, ?, 'Count', 'Packets', ?, ?, 0, 0.00, 'assets/images/catalog/placeholder.png')");
+        // FIXED: Replaced missing local image path with an un-failing public placeholder URL
+        $stmt = $pdo->prepare("INSERT INTO req_catalog (item_name, category_id, unit_type, unit_label, pack_size, pack_unit, is_verified, unit_cost, image_path) VALUES (?, ?, 'Count', 'Packets', ?, ?, 0, 0.00, 'https://placehold.co/150x100?text=No+Image')");
         $stmt->execute([$item_name, $category_id, $pack_size, $pack_unit]);
         $_SESSION['requisition_saved_toast'] = "Product requested with packing specifications!";
     }
@@ -65,7 +66,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_requisi
                 $logDeficiency->execute([$req_id, $cat_id, $original_qty, $new_qty, $deficit]);
             }
 
-            // Excluded updates to ri.chosen_unit_label to keep things locked down
             $updateItem->execute([$new_qty, $allocated_status, $req_id, $cat_id]);
         }
 
@@ -80,7 +80,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_requisi
         } else {
             $final_global_status = $all_fulfilled ? 'Fulfilled' : 'Pending';
             $stmt = $pdo->prepare("UPDATE requisitions SET status = ? WHERE id = ?");
-            $stmt->execute([$final_global_status, $req_id]);
+            $stmt->execute([final_global_status, $req_id]);
             $_SESSION['requisition_saved_toast'] = "Notification Saved successfully!";
         }
 
@@ -223,11 +223,12 @@ include "includes/header.php";
                             <h4 class="category-block-title" style="font-size: 13px; text-transform: uppercase; color: #4b5563; text-align: left; margin-bottom: 10px; font-weight: 700;"><?= $cat['name'] ?></h4>
                             <div class="material-item-grid">
                                 <?php foreach ($catItems as $item): 
-                                    $item_img = !empty($item['image_path']) ? $item['image_path'] : 'assets/images/catalog/placeholder.png';
+                                    // FIXED: If local server path is empty, point safely to placehold.co to clear 404 console errors
+                                    $item_img = !empty($item['image_path']) ? $item['image_path'] : 'https://placehold.co/150x100?text=No+Image';
                                 ?>
                                     <div class="material-item-card" data-search-name="<?= strtolower(htmlspecialchars($item['name'])) ?>">
                                         <div class="material-item-image-box">
-                                            <img src="<?= $item_img ?>" alt="">
+                                            <img src="<?= $item_img ?>" alt="" onerror="this.src='https://placehold.co/150x100?text=No+Image';">
                                         </div>
                                         <div class="material-item-name">
                                             <?= htmlspecialchars($item['name']) ?>
@@ -506,7 +507,6 @@ window.openEditRequisitionModal = function(reqId, element) {
 
             const computationFactor = (unitType === 'Weight') ? 0.25 : 1;
 
-            // FIXED ROW BLOCK: Removed the dropdown column completely from verification view matrix
             return `
                 <div id="itemVerificationRow_${i.catalog_id}" class="verification-item-row-wrapper ${rowStateClass}" style="display:flex; justify-content:space-between; align-items:center; padding:12px 10px; border-bottom:1px solid #e2e8f0; background:#ffffff; margin-bottom:6px; border-radius:8px; gap:12px;">
                     <div style="flex:1; min-width:0; text-align:left;">
@@ -663,7 +663,6 @@ window.triggerMemoryStateUpdate = function(catalogId, targetedState) {
             window.syncRowAuditText(catalogId);
         } else if (targetedState === 'Fulfilled') {
             rowWrapper.classList.add('row-state-green-highlight');
-            btnFulfilled.setAttribute('disabled', 'disabled');
         }
     }
 };
