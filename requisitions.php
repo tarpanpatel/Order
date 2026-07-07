@@ -79,7 +79,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_requisi
         } else {
             $final_global_status = $all_fulfilled ? 'Fulfilled' : 'Pending';
             $stmt = $pdo->prepare("UPDATE requisitions SET status = ? WHERE id = ?");
-            $stmt->execute([final_global_status, $req_id]);
+            $stmt->execute([$final_global_status, $req_id]);
             $_SESSION['requisition_saved_toast'] = "Notification Saved successfully!";
         }
 
@@ -221,7 +221,6 @@ include "includes/header.php";
                             <h4 class="category-block-title" style="font-size: 13px; text-transform: uppercase; color: #4b5563; text-align: left; margin-bottom: 10px; font-weight: 700;"><?= $cat['name'] ?></h4>
                             <div class="material-item-grid">
                                 <?php foreach ($catItems as $item): 
-                                    // FIXED: Clear 404 placeholder error logs dynamically via un-breaking CDN
                                     $item_img = !empty($item['image_path']) ? $item['image_path'] : 'https://placehold.co/150x100?text=No+Image';
                                 ?>
                                     <div class="material-item-card" data-search-name="<?= strtolower(htmlspecialchars($item['name'])) ?>">
@@ -370,7 +369,6 @@ include "includes/header.php";
 window.reqCart = [];
 let activeFilteredTabId = 'all';
 
-// --- LIVE QUICK FILTER REGISTRY FILTER ENGINE ---
 window.quickSearchCatalogRegistry = function() {
     const inputVal = document.getElementById("catalogQuickSearchInput").value.toLowerCase().trim();
     const blocks = document.querySelectorAll(".category-block");
@@ -506,7 +504,6 @@ window.openEditRequisitionModal = function(reqId, element) {
 
             const computationFactor = (unitType === 'Weight') ? 0.25 : 1;
 
-            // FIXED ROW BLOCK: Stripped out layout space blocks (images and custom metric selector columns)
             return `
                 <div id="itemVerificationRow_${i.catalog_id}" class="verification-item-row-wrapper ${rowStateClass}" style="display:flex; justify-content:space-between; align-items:center; padding:12px 10px; border-bottom:1px solid #e2e8f0; background:#ffffff; margin-bottom:6px; border-radius:8px; gap:12px; width:100%; box-sizing:border-box;">
                     <div style="flex:1; min-width:0; text-align:left;">
