@@ -21,57 +21,9 @@ include "includes/header.php";
 <style>
 .order-layout-split { display: grid; grid-template-columns: 1fr 360px; gap: 20px; width: 100%; align-items: start; }
 .menu-items-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
-
-/* RE-ENGINEERED COMPACT IMAGE CONTAINER CARD */
-.menu-card-item { 
-    background: #fff; 
-    border: 1px solid #e2e8f0; 
-    border-radius: 10px; 
-    overflow: hidden; 
-    cursor: pointer; 
-    transition: transform 0.15s ease, border-color 0.15s ease; 
-    display: flex; 
-    flex-direction: column; 
-    justify-content: space-between; 
-    min-height: 210px; 
-    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
-}
-.menu-card-item:hover { transform: translateY(-3px); border-color: #06b6d4; box-shadow: 0 4px 12px rgba(6,182,212,0.08); }
-
-/* MAXIMUM VISIBILITY IMAGE CANVAS HEADER */
-.menu-card-img-wrapper {
-    width: 100%;
-    height: 110px;
-    background: #f8fafc;
-    position: relative;
-    border-bottom: 1px solid #edf2f7;
-}
-.menu-card-img { 
-    width: 100%; 
-    height: 100%; 
-    object-fit: cover; 
-    display: block;
-}
-.menu-card-img-placeholder {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px;
-    color: #94a3b8;
-    font-weight: 600;
-    background: #f1f5f9;
-}
-
-.menu-card-body-content {
-    padding: 10px 12px;
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    justify-content: space-between;
-}
-
+.menu-card-item { background: #fff; border: 1px solid #cbd5e0; border-radius: 8px; padding: 12px; text-align: left; cursor: pointer; transition: transform 0.15s; display: flex; flex-direction: column; justify-content: space-between; min-height: 140px; }
+.menu-card-item:hover { transform: translateY(-2px); border-color: #06b6d4; }
+.menu-card-img { width: 50px; height: 50px; object-fit: cover; border-radius: 50%; background: #f7fafc; padding: 2px; border: 1px solid #e2e8f0; margin-bottom: 8px; }
 .cart-sticky-panel { background: #f8fafc; border: 1px solid #cbd5e0; border-radius: 12px; padding: 16px; position: sticky; top: 130px; max-height: calc(100vh - 160px); display: flex; flex-direction: column; }
 </style>
 
