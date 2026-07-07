@@ -204,7 +204,7 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
 
                     <div id="adminSubMenuContent" style="display: none; flex-direction: column; gap: 4px; padding-left: 20px; margin-top: 5px;">
-                        <a href="index.php" class="nav-link <?= ($current_page === 'index.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">📊 Dashboard Analytics</a>
+                        <a href="dashboard_analytics.php" class="nav-link <?= ($current_page === 'dashboard_analytics.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">📊 Dashboard Analytics</a>
                         <a href="past_receipts.php" class="nav-link <?= ($current_page === 'past_receipts.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">📜 Past Receipts Log</a>
                         <a href="menu_admin.php" class="nav-link <?= ($current_page === 'menu_admin.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">🍽️ Menu Configuration</a>
                         <a href="materials_admin.php" class="nav-link <?= ($current_page === 'materials_admin.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">📦 Material Registry</a>
