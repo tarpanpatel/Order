@@ -39,6 +39,15 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_receive_defici
     }
 }
 
+// --- CENTRAL ANALYTICS ROUTER: EVALUATE MATERIAL STOCK THRESHOLDS ---
+$stock_alerts = $pdo->query("
+    SELECT m.item_name, m.min_threshold_qty, COALESCE(SUM(k.qty), 0) as current_available_stock
+    FROM materials_registry m
+    LEFT JOIN kitchen_expenses k ON LOWER(m.item_name) = LOWER(k.item_detail)
+    GROUP BY m.item_name, m.min_threshold_qty
+    HAVING current_available_stock <= m.min_threshold_qty
+")->fetchAll(PDO::FETCH_ASSOC);
+
 // 1. FETCH ACTIVE GUEST CARD DETAILED LEDGER DATA
 $guest = $pdo->query("SELECT * FROM guests WHERE status = 'Active' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 
@@ -62,7 +71,7 @@ $recent_requisitions = $pdo->query("SELECT r.id, r.requested_at, r.status,
                                     WHERE r.status = 'Pending' OR r.status = '' 
                                     ORDER BY r.id DESC LIMIT 5")->fetchAll(PDO::FETCH_ASSOC);
 
-// 4. FIXED: FETCH ONLY ACTIVE DEFICIENCIES WHERE DEFICIT QUANTITY IS GREATER THAN 0
+// 4. FETCH ONLY ACTIVE DEFICIENCIES WHERE DEFICIT QUANTITY IS GREATER THAN 0
 $deficient_items = $pdo->query("SELECT d.*, rc.item_name 
                                 FROM deficient_stock_logs d 
                                 JOIN req_catalog rc ON d.catalog_id = rc.id 
@@ -188,6 +197,19 @@ include "includes/header.php";
         <p style="color: var(--text-muted); margin-bottom: 1.5rem; font-size: 13px;">The Artists Farm Admin Panel Hub</p>
     </div>
 
+    <?php if (!empty($stock_alerts)): ?>
+        <div style="padding: 14px; background: #fef2f2; border: 1px dashed #ef4444; border-radius: 12px; color: #b91c1c; font-size: 12px; font-weight: bold; margin-bottom: 20px; text-align: left;">
+            <span style="font-size:13px; display:block; margin-bottom:6px;">⚠️ INVENTORY STOCK ALERT BOUNDARY THRESHOLDS:</span>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                <?php foreach ($stock_alerts as $alert): ?>
+                    <span style="background: #fee2e2; border: 1px solid #fca5a5; padding: 4px 8px; border-radius: 6px; font-size: 11px;">
+                        <strong><?= htmlspecialchars($alert['item_name']) ?></strong> (Low: <?= $alert['current_available_stock'] ?> units left)
+                    </span>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    <?php endif; ?>
+
     <div class="dashboard-grid-matrix">
 
         <div class="widget-card" style="border-top: 3px solid #38a169 !important;">
@@ -212,11 +234,11 @@ include "includes/header.php";
                         </tr>
                         <tr>
                             <th>Advance Paid:</th>
-                            <td style="color: #38a169; font-weight: 700;">₹<?= number_format($advance_paid ?? $guest["advance_paid"], 0) ?></td>
+                            <td style="color: #38a169; font-weight: 700;">₹<?= number_format($guest["advance_paid"], 0) ?></td>
                         </tr>
                         <tr>
                             <th>Balance Pending:</th>
-                            <td style="color: #e53e3e; font-weight: 700;">₹<?= number_format($pending_amount ?? $guest["pending_amount"], 0) ?></td>
+                            <td style="color: #e53e3e; font-weight: 700;">₹<?= number_format($guest["pending_amount"], 0) ?></td>
                         </tr>
                     </table>
                 <?php else: ?>
