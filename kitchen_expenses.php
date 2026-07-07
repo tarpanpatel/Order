@@ -10,6 +10,18 @@ if (!isset($_SESSION["user_id"])) {
 
 $message = "";
 
+// Dynamic Column Discovery Hook to prevent Column Not Found errors
+$columnCheck = $pdo->query("DESCRIBE kitchen_expenses")->fetchAll(PDO::FETCH_COLUMN);
+$target_item_column = "item_detail"; // Default target name
+
+if (!in_array("item_detail", $columnCheck)) {
+    if (in_array("item_name", $columnCheck)) {
+        $target_item_column = "item_name";
+    } elseif (in_array("description", $columnCheck)) {
+        $target_item_column = "description";
+    }
+}
+
 // --- BACKEND LOGIC: POST INTERCEPTOR FOR RECORDING PROCUREMENT INVENTORY ---
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_add_kitchen_expense"])) {
     $date           = $_POST["expense_date"];
@@ -22,15 +34,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_add_kitchen_ex
     if (!empty($date) && !empty($item_detail) && $qty > 0 && $price_per_unit > 0) {
         $pdo->beginTransaction();
         try {
-            // 1. Insert procurement row into log database
+            // 1. Insert procurement row dynamically targeting the verified column name
             $stmt = $pdo->prepare("
-                INSERT INTO kitchen_expenses (date, category, item_detail, vendor, qty, price_per_unit)
+                INSERT INTO kitchen_expenses (date, category, `{$target_item_column}`, vendor, qty, price_per_unit)
                 VALUES (?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([$date, $category, $item_detail, $vendor, $qty, $price_per_unit]);
             
             // 2. AUTOMATED REQUISITION WORKFLOW HOOK:
-            // Scan for pending material requests matching the exact name substring or item name
             $updateReq = $pdo->prepare("
                 UPDATE material_requests 
                 SET status = 'Fulfilled', fulfillment_date = ? 
@@ -50,7 +61,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_add_kitchen_ex
     }
 }
 
-// Fetch material list dropdown options directly from the SQL table structure
+// Fetch material list dropdown options directly from the SQL table structure safely
 $materials_list = [];
 try {
     $materials_list = $pdo->query("SELECT item_name, category FROM materials_registry ORDER BY item_name ASC")->fetchAll(PDO::FETCH_ASSOC);
@@ -139,7 +150,6 @@ include "includes/header.php";
             </thead>
             <tbody>
                 <?php if (!empty($recent_logs)): foreach ($recent_logs as $row): 
-                    // FIXED: Fallback arrays safely catch variance between item_detail, item_name, and description keys
                     $display_name = $row['item_detail'] ?? $row['item_name'] ?? $row['description'] ?? 'Unnamed Asset';
                 ?>
                     <tr style="border-bottom:1px solid #edf2f7;">
