@@ -136,6 +136,7 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_fina
     $tg_msg .= "💼 <i>Collected By: " . htmlspecialchars($accommodation_collected_by) . "</i>\n\n";
 
     $tg_msg .= "🍽️ <b>RESTAURANT & KITCHEN BILL</b>\n";
+    // FIXED: Correctly matching $items_list pointer map reference bounds loop
     if (!empty($items_list)) {
         foreach ($items_list as $itm) {
             $net_q = $itm['quantity'] - $itm['returned_qty'];
@@ -143,6 +144,8 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_fina
                 $tg_msg .= "• " . htmlspecialchars($itm['name']) . " (x" . $net_q . "): ₹" . number_format($net_q * $itm['price'], 2) . "\n";
             }
         }
+    } else {
+        $tg_msg .= "• No food orders recorded.\n";
     }
     
     if (!empty($adjustments)) {
@@ -231,6 +234,7 @@ include "includes/header.php";
 
     <div class="billing-grid-split">
         <div class="workspace-panel-stack">
+            <!-- ACCOMMODATION SUMMARY PANEL -->
             <div class="billing-card">
                 <div class="billing-section-title">🏡 Accommodation Invoice Breakdown</div>
                 <div class="data-display-row">
@@ -247,6 +251,7 @@ include "includes/header.php";
                 </div>
             </div>
 
+            <!-- FOOD AND INCIDENTALS PANEL -->
             <div class="billing-card">
                 <div class="billing-section-title">🍽️ Food Orders & Combined Incidentals Log</div>
                 <table style="width:100%; border-collapse:collapse; font-size:13px; margin-bottom:15px;">
@@ -301,7 +306,9 @@ include "includes/header.php";
             </div>
         </div>
 
+        <!-- RIGHT CONTROL PANEL SIDEBAR -->
         <div class="sidebar-panel-stack">
+            <!-- ADJUSTMENTS CONTROLLER CARD -->
             <div class="billing-card">
                 <div class="billing-section-title">➕ Add Custom Adjustments</div>
                 <form method="POST" style="margin:0;" id="adjustmentEntryForm">
@@ -310,7 +317,7 @@ include "includes/header.php";
                         <label style="font-size:11px; font-weight:700; display:block; margin-bottom:4px;">Adjustment Strategy Type</label>
                         <select name="adj_type" id="adjTypeSelector" onchange="toggleLabelRequirement()" style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px;">
                             <option value="charge">Extra Charge (+)</option>
-                            <option value="discount" selected>Discount / Rebate (-)</option>
+                            <option value="discount">Discount / Rebate (-)</option>
                         </select>
                     </div>
                     <div style="margin-bottom:10px;">
@@ -325,10 +332,11 @@ include "includes/header.php";
                 </form>
             </div>
 
+            <!-- COMMIT CHECKOUT SETTLEMENT CARD -->
             <div class="billing-card" style="border:2px solid #06b6d4; background:#fafdfd;">
                 <div class="billing-section-title" style="color:#0891b2; border-color:#0891b2;">🏁 Final Checkout Settlement</div>
                 
-                <form method="POST" style="margin:0;" onsubmit="return confirm('Archive statement and complete checkout?');">
+                <form method="POST" style="margin:0;">
                     <input type="hidden" name="action_finalize_checkout" value="1">
                     <input type="hidden" name="post_food_bill_total" value="<?= $total_incidentals_bill ?>">
                     <input type="hidden" name="post_accommodation_pending" value="<?= $accommodation_pending ?>">
@@ -353,7 +361,7 @@ include "includes/header.php";
                         <input type="hidden" name="accommodation_received_by_staff" value="<?= htmlspecialchars($auto_accommodation_staff) ?>">
                     </div>
 
-                    <div style="margin-bottom:15px;">
+                    <div style="margin-bottom:20px;">
                         <label style="font-size:11px; font-weight:700; display:block; color:#475569;">👤 Food & Incidentals Collected By:</label>
                         <select name="food_received_by_staff" required class="staff-selector">
                             <option value="">-- Choose Collector --</option>
@@ -382,7 +390,8 @@ include "includes/header.php";
     <?php endif; ?>
 </div>
 
-<div id="cleanPrintFriendlyModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:999999; justify-content:center; align-items:center; backdrop-filter:blur(2px);">
+<!-- PRINT-FRIENDLY POPUP DIALOG LAYOUT OVERLAY -->
+<div id="cleanPrintFriendlyModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); z-index:999999; justify-content:center; align-items:center; backdrop-filter:blur(2px);">
     <div style="background:#ffffff; max-width:420px; width:90%; border-radius:8px; padding:25px; box-shadow:0 10px 25px rgba(0,0,0,0.15); text-align:left; color:#000000; font-family:monospace;">
         <div style="text-align:center; margin-bottom:15px; border-bottom:2px dashed #000;">
             <h3 style="margin:0 0 5px 0; font-size:16px; text-transform:uppercase; letter-spacing:1px;">ARTISTS FARM JAIPUR</h3>
@@ -415,56 +424,17 @@ include "includes/header.php";
             <span>Total Outstanding Payable:</span>
             <span style="font-size:15px; border-bottom:4px double #000;">₹<?= number_format(($accommodation_pending + $total_incidentals_bill), 2) ?></span>
         </div>
-
-        <div style="margin-top:25px; display:flex; gap:10px;" class="no-print-actions">
-            <button type="button" style="flex:1; padding:8px; background:#4a5568; color:#fff; border:none; border-radius:4px; font-weight:bold; cursor:pointer;" onclick="window.print()">🖨️ System Print</button>
-            <button type="button" style="flex:1; padding:8px; background:#e2e8f0; color:#000; border:none; border-radius:4px; font-weight:bold; cursor:pointer;" onclick="document.getElementById('cleanPrintFriendlyModal').style.display='none'">✕ Close</button>
+        <div style="margin-top: 20px; display: flex; gap: 8px; justify-content: flex-end;">
+            <button class="btn" style="background: #4a5568; max-width: 80px; color: white; padding:6px 12px; font-size:12px; cursor:pointer;" onclick="window.print()">Print</button>
+            <button class="btn" style="background: #e2e8f0; max-width: 80px; color: #111827; padding:6px 14px; border:none; cursor:pointer; font-size:12px;" onclick="closeEditInvoiceModal()">Close</button>
         </div>
     </div>
 </div>
 
 <script>
-// Expose parameters dynamically to allow zero-distraction layout processing arrays
-window.menuSubtotal = <?= $food_subtotal ?>;
-window.accommodationPending = <?= $accommodation_pending ?>;
-window.cleanItems = <?= json_encode($cleanItemsForJs) ?>;
-window.dynamicAdjustments = <?= json_encode($adjustments) ?>;
-
-window.openCleanBillPopup = function() {
-    const itemsContainer = document.getElementById("popupReceiptItems"); 
-    if(!itemsContainer) return;
-    itemsContainer.innerHTML = "";
-    
-    window.cleanItems.forEach(item => { 
-        itemsContainer.innerHTML += `
-            <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 12px;">
-                <span>${item.name} (x${item.qty})</span>
-                <span>₹${parseFloat(item.cost).toFixed(2)}</span>
-            </div>`; 
-    });
-    
-    let cumulativeSum = window.menuSubtotal;
-    window.dynamicAdjustments.forEach(item => {
-        const sign = item.type === "charge" ? "+" : "-";
-        cumulativeSum += (item.type === "charge" ? parseFloat(item.amount) : -parseFloat(item.amount));
-        itemsContainer.innerHTML += `
-            <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 12px; color: #444; font-style: italic;">
-                <span>↳ ${item.reason}</span>
-                <span>${sign}₹${parseFloat(item.amount).toFixed(2)}</span>
-            </div>`;
-    });
-
-    if(window.cleanItems.length === 0 && window.dynamicAdjustments.length === 0) {
-        itemsContainer.innerHTML = '<div style="font-size:11px; font-style:italic; color:#777;">No food items recorded.</div>';
-    }
-    
-    document.getElementById("cleanPrintFriendlyModal").style.display = "flex";
-};
-
 function toggleLabelRequirement() {
     const typeSelector = document.getElementById("adjTypeSelector");
     const reasonInput = document.getElementById("adjReasonInput");
-    
     if (typeSelector && reasonInput) {
         if (typeSelector.value === "discount") {
             reasonInput.removeAttribute("required");
@@ -475,6 +445,32 @@ function toggleLabelRequirement() {
         }
     }
 }
+
+window.openCleanBillPopup = function() {
+    const itemsContainer = document.getElementById("popupReceiptItems"); 
+    itemsContainer.innerHTML = "";
+    
+    const cleanItems = <?php echo json_encode(array_values($served_items ?? [])); ?>;
+    cleanItems.forEach(item => { 
+        let net = item.quantity - item.returned_qty;
+        if(net > 0) {
+            itemsContainer.innerHTML += `<div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px;"><span>${item.name} x${net}</span><span>` + "₹" + (net * item.price).toFixed(2) + `</span></div>`; 
+        }
+    });
+    
+    const adjustments = <?php echo json_encode($adjustments ?? []); ?>;
+    adjustments.forEach(item => {
+        const sign = item.type === "charge" ? "+" : "-";
+        itemsContainer.innerHTML += `<div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px; color: #444; font-style: italic;"><span>↳ ${item.reason}</span><span>${sign}₹${parseFloat(item.amount).toFixed(2)}</span></div>`;
+    });
+    
+    document.getElementById("cleanPrintFriendlyModal").style.display = "flex";
+};
+
+function closeEditInvoiceModal() {
+    document.getElementById("cleanPrintFriendlyModal").style.display = "none";
+}
+
 document.addEventListener("DOMContentLoaded", toggleLabelRequirement);
 </script>
 
