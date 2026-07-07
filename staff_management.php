@@ -3,6 +3,7 @@
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once "config/db.php";
 
+// FIXED: Session checking to read natively from role_name column parameter mapping
 if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Admin" && $_SESSION["role"] !== "Super Admin")) {
     die("Access Denied: Administrative credentials required.");
 }
@@ -11,16 +12,17 @@ if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Admin" && $_SESSION["ro
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_add_staff"])) {
     $username = trim($_POST["username"]);
     $password_raw = trim($_POST["password"]);
-    $role = $_POST["role"];
+    $role_name = $_POST["role_name"]; // FIXED: Matches database schema column
 
     if (!empty($username) && !empty($password_raw)) {
         $hashed_password = password_hash($password_raw, PASSWORD_BCRYPT);
         try {
-            $stmt = $pdo->prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)");
-            $stmt->execute([$username, $hashed_password, $role]);
+            // FIXED SCHEMA QUERY: Insert into role_name instead of role
+            $stmt = $pdo->prepare("INSERT INTO users (username, password, role_name) VALUES (?, ?, ?)");
+            $stmt->execute([$username, $hashed_password, $role_name]);
             $_SESSION['staff_success'] = "Staff member '$username' added successfully!";
         } catch (PDOException $e) {
-            $_SESSION['staff_error'] = "Error: Username might already exist or system database exception.";
+            $_SESSION['staff_error'] = "Error: Username might already exist or table constraint exception.";
         }
     }
     header("Location: staff_management.php");
@@ -39,15 +41,15 @@ if (isset($_GET["delete_id"])) {
     exit;
 }
 
-// FETCH ALL USERS FROM THE MASTER USERS TABLE NATIVELY
-$staff_list = $pdo->query("SELECT id, username, role FROM users ORDER BY username ASC")->fetchAll(PDO::FETCH_ASSOC);
+// FIXED SCHEMA QUERY: SELECT id, username, role_name FROM users
+$staff_list = $pdo->query("SELECT id, username, role_name FROM users ORDER BY username ASC")->fetchAll(PDO::FETCH_ASSOC);
 
 include "includes/header.php";
 ?>
 
 <div class="app-body" style="padding: 20px; font-family: sans-serif; text-align: left;">
     <h2>👥 Team & Staff Roster Registry</h2>
-    <p style="color:#64748b; margin-top:-10px; margin-bottom:20px;">Manage operational property roles, system credentials, and expense mappings.</p>
+    <p style="color:#64748b; margin-top:-10px; margin-bottom:20px;">Manage operational property roles, system credentials, and expense mappings inside the unified users ledger table.</p>
 
     <?php if (isset($_SESSION['staff_success'])): ?>
         <div style="padding:10px; background:#10b981; color:white; border-radius:6px; margin-bottom:15px; font-weight:bold;">📢 <?= htmlspecialchars($_SESSION['staff_success']); unset($_SESSION['staff_success']); ?></div>
@@ -71,7 +73,7 @@ include "includes/header.php";
                 </div>
                 <div style="margin-bottom:18px;">
                     <label style="font-size:11px; font-weight:700; display:block; margin-bottom:4px; color:#475569;">Permission Assignment Role</label>
-                    <select name="role" style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px; background:white;">
+                    <select name="role_name" style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px; background:white;">
                         <option value="Staff">Staff Terminal</option>
                         <option value="Admin">Admin</option>
                         <option value="Super Admin">Super Admin</option>
@@ -95,7 +97,7 @@ include "includes/header.php";
                     <?php if(!empty($staff_list)): foreach ($staff_list as $member): ?>
                         <tr style="border-bottom:1px solid #f1f5f9;">
                             <td style="padding:10px; font-weight:bold; color:#1e293b;"><?= htmlspecialchars($member['username']) ?></td>
-                            <td style="padding:10px;"><span style="background:#f1f5f9; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:700; color:#475569;"><?= htmlspecialchars($member['role']) ?></span></td>
+                            <td style="padding:10px;"><span style="background:#f1f5f9; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:700; color:#475569;"><?= htmlspecialchars($member['role_name'] ?? 'Staff') ?></span></td>
                             <td style="padding:10px; text-align:center;">
                                 <?php if ($member['id'] !== intval($_SESSION["user_id"])): ?>
                                     <a href="staff_management.php?delete_id=<?= $member['id'] ?>" onclick="return confirm('Remove access for this profile?')" style="color:#ef4444; font-weight:bold; text-decoration:none;">🗑️ Delete</a>
