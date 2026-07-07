@@ -1,4 +1,10 @@
 <?php
+// Report all PHP errors
+error_reporting(E_ALL);
+
+// Display errors directly on the screen
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
 // /home/apartment/artistsfarmjaipur.com/Order/billing.php
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
