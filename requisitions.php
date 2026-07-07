@@ -373,12 +373,10 @@ include "includes/header.php";
 let activeCartStateMap = {};
 let activeFilteredTabId = 'all';
 
-// --- ASYNCHRONOUS ENGINE: LIVE SEARCH FILTERS ---
 window.quickSearchCatalogRegistry = function() {
     const inputVal = document.getElementById("catalogQuickSearchInput").value.toLowerCase().trim();
     const blocks = document.querySelectorAll(".category-block");
     
-    // Automatically reset category tab back to 'All Items' when filtering text string to maximize results matching visibility
     if (inputVal !== "" && activeFilteredTabId !== 'all') {
         activeFilteredTabId = 'all';
         document.querySelectorAll(".catalog-tab-btn").forEach(b => b.classList.remove("active"));
@@ -408,7 +406,7 @@ window.quickSearchCatalogRegistry = function() {
 
 window.filterMaterialCatalog = function(catId, btn) {
     activeFilteredTabId = catId;
-    document.getElementById("catalogQuickSearchInput").value = ""; // Flush query line on explicit tab selection
+    document.getElementById("catalogQuickSearchInput").value = ""; 
 
     document.querySelectorAll(".catalog-tab-btn").forEach(b => b.classList.remove("active"));
     if (btn) btn.classList.add("active");
@@ -500,7 +498,6 @@ window.openEditRequisitionModal = function(reqId, element) {
             const currentLabel = i.chosen_unit_label || i.unit_label || 'Pcs';
             const pSize = parseFloat(i.pack_size) || 1;
             const pUnit = i.pack_unit || 'Pcs';
-            const imgUrl = i.image_path ? i.image_path : 'assets/images/catalog/placeholder.png';
             
             let rowStateClass = '';
             let fDisabled = '';
@@ -531,12 +528,10 @@ window.openEditRequisitionModal = function(reqId, element) {
 
             const computationFactor = (unitType === 'Weight') ? 0.25 : 1;
 
+            // FIXED ROW:
+            // Stripped the 150px wide image thumbnail block to optimize space layout performance
             return `
                 <div id="itemVerificationRow_${i.catalog_id}" class="verification-item-row-wrapper ${rowStateClass}" style="display:flex; justify-content:space-between; align-items:center; padding:12px 10px; border-bottom:1px solid #e2e8f0; background:#ffffff; margin-bottom:6px; border-radius:8px; gap:12px;">
-                    <div style="width:150px; min-width:150px; height:50px; overflow:hidden; border-radius:6px; border:1px solid #edf2f7; background:#f8fafc;">
-                        <img src="${imgUrl}" alt="" style="width:100%; height:100%; object-fit:cover;">
-                    </div>
-                    
                     <div style="flex:1; min-width:0; text-align:left;">
                         <span class="item-text-title" style="font-size:12px; font-weight:700; color:#1e293b; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; transition:all 0.15s ease;">${i.name}</span>
                         <span style="font-size:10px; color:#475569; font-weight:bold; display:block; margin-bottom:2px;">Packing Spec: ${pSize} ${pUnit}</span>
@@ -554,8 +549,8 @@ window.openEditRequisitionModal = function(reqId, element) {
 
                     <div class="binary-toggle-container" style="background:transparent; border:none; padding:0;">
                         <input type="hidden" id="mdlStatusHidden_${i.catalog_id}" name="req_item_status[${i.catalog_id}]" value="${initialStatus}">
-                        <button type="button" id="toggleBtn_F_${i.catalog_id}" ${fDisabled} class="toggle-choice-btn btn-block-fulfilled" onclick="window.triggerMemoryStateUpdate(${i.catalog_id}, 'Fulfilled')">Fulfilled</button>
-                        <button type="button" id="toggleBtn_C_${i.catalog_id}" ${rDisabled} class="toggle-choice-btn btn-block-remove" onclick="window.triggerMemoryStateUpdate(${i.catalog_id}, 'Cancelled')">Remove</button>
+                        <button type="button" id="toggleBtn_F_" class="toggle-choice-btn btn-block-fulfilled" onclick="window.triggerMemoryStateUpdate(${i.catalog_id}, 'Fulfilled')">Fulfilled</button>
+                        <button type="button" id="toggleBtn_C_" class="toggle-choice-btn btn-block-remove" onclick="window.triggerMemoryStateUpdate(${i.catalog_id}, 'Cancelled')">Remove</button>
                     </div>
                 </div>
             `;
@@ -602,22 +597,31 @@ window.handleQuantityInputChangeDirect = function(catalogId) {
 window.reactivateActionRowButtons = function(catalogId, activeValue) {
     const hiddenStatus = document.getElementById(`mdlStatusHidden_${catalogId}`);
     const rowWrapper   = document.getElementById(`itemVerificationRow_${catalogId}`);
-    const btnFulfilled = document.getElementById("toggleBtn_F_" + catalogId);
-    const btnCancelled = document.getElementById("toggleBtn_C_" + catalogId);
 
-    if (!hiddenStatus || !rowWrapper || !btnFulfilled || !btnCancelled) return;
+    if (!hiddenStatus || !rowWrapper) return;
 
     rowWrapper.classList.remove('row-state-greyed-out', 'row-state-green-highlight');
-    btnFulfilled.removeAttribute('disabled');
-    btnCancelled.removeAttribute('disabled');
-
     hiddenStatus.value = (activeValue > 0) ? 'Pending' : 'Cancelled';
     if (activeValue === 0) {
         rowWrapper.classList.add('row-state-greyed-out');
-        btnCancelled.setAttribute('disabled', 'disabled');
         window.syncRowAuditText(catalogId);
     }
-}
+};
+
+window.syncRowAuditText = function(catalogId) {
+    const input = document.getElementById(`mdlQtyInput_${catalogId}`);
+    const subtitle = document.getElementById(`qtyAuditSubtitle_${catalogId}`);
+    if (!input || !subtitle) return;
+
+    const originalCount = parseFloat(subtitle.getAttribute("data-original")) || 0;
+    const currentCount  = parseFloat(input.value) || 0;
+
+    if (currentCount === originalCount) {
+        subtitle.innerHTML = `Ordered: ${originalCount}`;
+    } else {
+        subtitle.innerHTML = `Ordered: <del>${originalCount}</del> <strong style="color:#0284c7;">${currentCount}</strong>`;
+    }
+};
 
 window.saveInlineFieldChange = function(rowId, type, fallbackValue) {
     const targetCell = document.getElementById(`cell-${type}-${rowId}`);
@@ -657,14 +661,10 @@ window.triggerMemoryStateUpdate = function(catalogId, targetedState) {
     const hiddenStatus = document.getElementById(`mdlStatusHidden_${catalogId}`);
     const rowWrapper   = document.getElementById(`itemVerificationRow_${catalogId}`);
     const qtyInput     = document.getElementById(`mdlQtyInput_${catalogId}`);
-    const btnFulfilled = document.getElementById("toggleBtn_F_" + catalogId);
-    const btnCancelled = document.getElementById("toggleBtn_C_" + catalogId);
 
-    if (!hiddenStatus || !rowWrapper || !qtyInput || !btnFulfilled || !btnCancelled) return;
+    if (!hiddenStatus || !rowWrapper || !qtyInput) return;
 
     rowWrapper.classList.remove('row-state-greyed-out', 'row-state-green-highlight');
-    btnFulfilled.removeAttribute('disabled');
-    btnCancelled.removeAttribute('disabled');
 
     if (hiddenStatus.value === targetedState) {
         hiddenStatus.value = 'Pending';
@@ -673,11 +673,9 @@ window.triggerMemoryStateUpdate = function(catalogId, targetedState) {
         if (targetedState === 'Cancelled') {
             qtyInput.value = 0;
             rowWrapper.classList.add('row-state-greyed-out');
-            btnCancelled.setAttribute('disabled', 'disabled');
             window.syncRowAuditText(catalogId);
         } else if (targetedState === 'Fulfilled') {
             rowWrapper.classList.add('row-state-green-highlight');
-            btnFulfilled.setAttribute('disabled', 'disabled');
         }
     }
 };
