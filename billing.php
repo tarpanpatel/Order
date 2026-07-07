@@ -4,6 +4,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 require_once "config/db.php";
+require_once "config/telegram.php"; // Native Telegram notification dispatcher engine
 include_once __DIR__ . '/config/local_db_bridge.php';
 
 if (!isset($_SESSION["user_id"])) { 
@@ -27,10 +28,9 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["adjust_acti
     exit;
 }
 
-// --- HANDLE POST: ASYNC ADDITION MODIFICATIONS ---
+// --- HANDLE POST: ASYNC ADDITION OF MISSED ITEMS BY STAFF ---
 if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_add_adjustment"])) {
     $type   = $_POST["adj_type"]; 
-    // FIXED: Default to "Discount Given" text string dynamically if the field is left blank by user
     $reason = !empty(trim($_POST["adj_reason"])) ? trim($_POST["adj_reason"]) : ($type === 'discount' ? 'Discount Given' : 'Extra Charge');
     $amount = floatval($_POST["adj_amount"]);
 
@@ -66,16 +66,32 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_remo
     exit;
 }
 
-// --- HANDLE POST: COMMIT COMPLETE CHECKOUT SETTLEMENT ---
+// --- HANDLE POST: COMMIT COMPLETE CHECKOUT SETTLEMENT & SEND TELEGRAM ---
 if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_finalize_checkout"])) {
     $guest_id = $guest['id'];
     $food_bill_total = floatval($_POST["post_food_bill_total"]);
     $accommodation_pending = floatval($_POST["post_accommodation_pending"]);
     
-    // PULL AUTOMATICALLY: Retain persistent historical advance registry fields natively
     $accommodation_collected_by = !empty($guest['advance_received_by']) ? $guest['advance_received_by'] : 'System Ledger';
     $food_collected_by          = trim($_POST["food_received_by_staff"]);
     
+    // Fetch all item lines before changing status to construct the Telegram text template
+    $itemsQuery = $pdo->prepare("
+        SELECT oi.*, mi.name, mi.price 
+        FROM order_items oi 
+        JOIN menu_items mi ON oi.menu_item_id = mi.id 
+        JOIN orders o ON oi.order_id = o.id 
+        WHERE o.guest_id = ? AND oi.item_status = 'Served'
+    ");
+    $itemsQuery->execute([$guest_id]);
+    $items_list = $itemsQuery->fetchAll(PDO::FETCH_ASSOC);
+
+    // Dynamic Adjustments compiler
+    $adjustments = [];
+    if (!empty($guest['food_remark'])) {
+        $adjustments = json_decode($guest['food_remark'], true) ?: [];
+    }
+
     // Update local guest archive logs with distinct collector allocations
     $pdo->prepare("
         UPDATE guests 
@@ -99,12 +115,50 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_fina
         $guest['checkin_date'],
         $guest['per_night_charges'],
         $guest['advance_paid'],
-        $accommodation_collected_by, // Automated
+        $accommodation_collected_by,
         $accommodation_pending,
-        $accommodation_collected_by, // Automated
+        $accommodation_collected_by,
         $food_bill_total,
         $food_collected_by
     ]);
+
+    // TELEGRAM DISPATCH LOGIC
+    $tg_msg  = "🔔 <b>FARM CHECKOUT SETTLEMENT REPORT</b>\n";
+    $tg_msg .= "━━━━━━━━━━━━━━━━━━\n";
+    $tg_msg .= "👤 <b>Guest:</b> " . htmlspecialchars($guest['guest_name'] ?: 'Walk-In') . "\n";
+    $tg_msg .= "📱 <b>Contact:</b> " . htmlspecialchars($guest['phone_number'] ?: 'N/A') . "\n";
+    $tg_msg .= "🗓️ <b>Check-In:</b> " . $guest['checkin_date'] . "\n\n";
+
+    $tg_msg .= "🏠 <b>ACCOMMODATION BILLING</b>\n";
+    $tg_msg .= "• Total Tariff: ₹" . number_format($guest['base_room_rent'], 2) . "\n";
+    $tg_msg .= "• Advance Paid: ₹" . number_format($guest['advance_paid'], 2) . "\n";
+    $tg_msg .= "• Pending Due Taken: <b>₹" . number_format($accommodation_pending, 2) . "</b>\n";
+    $tg_msg .= "💼 <i>Collected By: " . htmlspecialchars($accommodation_collected_by) . "</i>\n\n";
+
+    $tg_msg .= "🍽️ <b>RESTAURANT & KITCHEN BILL</b>\n";
+    if (!empty($items_list)) {
+        foreach ($items_list as $itm) {
+            $net_q = $itm['quantity'] - $itm['returned_qty'];
+            if ($net_q > 0) {
+                $tg_msg .= "• " . htmlspecialchars($itm['name']) . " (x" . $net_q . "): ₹" . number_format($net_q * $itm['price'], 2) . "\n";
+            }
+        }
+    }
+    
+    if (!empty($adjustments)) {
+        foreach ($adjustments as $adj) {
+            $prefix = ($adj['type'] === 'charge') ? "+" : "-";
+            $tg_msg .= "• [Adj] " . htmlspecialchars($adj['reason']) . ": " . $prefix . "₹" . number_format($adj['amount'], 2) . "\n";
+        }
+    }
+    $tg_msg .= "• Total Kitchen Settlement: <b>₹" . number_format($food_bill_total, 2) . "</b>\n";
+    $tg_msg .= "👤 <i>Collected By: " . htmlspecialchars($food_collected_by) . "</i>\n";
+    $tg_msg .= "━━━━━━━━━━━━━━━━━━\n";
+    $tg_msg .= "💰 <b>TOTAL REVENUE PAYABLE: ₹" . number_format(($accommodation_pending + $food_bill_total), 2) . "</b>\n";
+
+    if (function_exists('sendTelegramMessage')) {
+        sendTelegramMessage($tg_msg); 
+    }
 
     header("Location: index.php");
     exit;
@@ -139,8 +193,18 @@ include "includes/header.php";
         $served_items = $ordersQuery->fetchAll(PDO::FETCH_ASSOC);
 
         $food_subtotal = 0;
+        $cleanItemsForJs = [];
         foreach ($served_items as $item) {
-            $food_subtotal += ($item['quantity'] - $item['returned_qty']) * $item['price'];
+            $net_qty = $item['quantity'] - $item['returned_qty'];
+            if ($net_qty > 0) {
+                $item_cost = $net_qty * $item['price'];
+                $food_subtotal += $item_cost;
+                $cleanItemsForJs[] = [
+                    'name' => $item['name'],
+                    'qty' => $net_qty,
+                    'cost' => $item_cost
+                ];
+            }
         }
 
         $adjustments = [];
@@ -285,11 +349,11 @@ include "includes/header.php";
                     </div>
 
                     <div style="margin-bottom:15px; background:#f1f5f9; padding:8px 12px; border-radius:6px; border:1px dashed #cbd5e0; font-size:12px; color:#475569;">
-                        💼 <strong>Accommodation Collector:</strong> <span style="float:right; font-weight:bold; color:#1e293b;"><?= htmlspecialchars($auto_accommodation_staff) ?></span>
+                        💼 <strong>Accommodation Collector:</strong> <span style="float:right; font-weight:bold; color:#1e293b"><?= htmlspecialchars($auto_accommodation_staff) ?></span>
                         <input type="hidden" name="accommodation_received_by_staff" value="<?= htmlspecialchars($auto_accommodation_staff) ?>">
                     </div>
 
-                    <div style="margin-bottom:20px;">
+                    <div style="margin-bottom:15px;">
                         <label style="font-size:11px; font-weight:700; display:block; color:#475569;">👤 Food & Incidentals Collected By:</label>
                         <select name="food_received_by_staff" required class="staff-selector">
                             <option value="">-- Choose Collector --</option>
@@ -304,6 +368,10 @@ include "includes/header.php";
                         </select>
                     </div>
 
+                    <button type="button" class="btn btn-log" style="width:100%; padding:10px; margin-bottom:10px; font-weight:700; background:#f1f5f9; color:#475569; border:1px solid #cbd5e0; border-radius:6px;" onclick="window.openCleanBillPopup()">
+                        🖨️ View Print-Friendly Receipt
+                    </button>
+
                     <button type="submit" class="btn btn-bill" style="width:100%; padding:12px; border-radius:8px; font-size:14px; font-weight:800; background:#06b6d4; border-color:#06b6d4;">
                         Complete Checkout & Archive Bill
                     </button>
@@ -314,8 +382,85 @@ include "includes/header.php";
     <?php endif; ?>
 </div>
 
+<div id="cleanPrintFriendlyModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:999999; justify-content:center; align-items:center; backdrop-filter:blur(2px);">
+    <div style="background:#ffffff; max-width:420px; width:90%; border-radius:8px; padding:25px; box-shadow:0 10px 25px rgba(0,0,0,0.15); text-align:left; color:#000000; font-family:monospace;">
+        <div style="text-align:center; margin-bottom:15px; border-bottom:2px dashed #000;">
+            <h3 style="margin:0 0 5px 0; font-size:16px; text-transform:uppercase; letter-spacing:1px;">ARTISTS FARM JAIPUR</h3>
+            <span style="font-size:11px; color:#555;">Official Bill Invoice Copy</span>
+            <div style="margin:10px 0; font-size:12px; text-align:left;">
+                <div><b>Guest:</b> <span id="pGuestName"><?= htmlspecialchars($guest['guest_name'] ?? '') ?></span></div>
+                <div><b>Phone:</b> <span id="pGuestPhone"><?= htmlspecialchars($guest['phone_number'] ?? '') ?></span></div>
+                <div><b>Date:</b> <span><?= date('d M Y, h:i A') ?></span></div>
+            </div>
+        </div>
+
+        <div style="font-size:12px; font-weight:bold; text-transform:uppercase; margin-bottom:6px; border-bottom:1px solid #000;">Stay Logistics</div>
+        <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
+            <span>Room Tariff (Contract Base):</span>
+            <span>₹<?= number_format($base_rent, 2) ?></span>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; color:#2f855a;">
+            <span>[-] Advance Received:</span>
+            <span>₹<?= number_format($advance_paid, 2) ?></span>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:bold; margin-bottom:15px; border-bottom:1px dashed #000; padding-bottom:6px;">
+            <span>Stay Balance Due:</span>
+            <span>₹<?= number_format($accommodation_pending, 2) ?></span>
+        </div>
+
+        <div style="font-size:12px; font-weight:bold; text-transform:uppercase; margin-bottom:6px; border-bottom:1px solid #000;">KOT Food & Incidentals</div>
+        <div id="popupReceiptItems" style="border-bottom:2px dashed #000; padding-bottom:8px; margin-bottom:12px;"></div>
+
+        <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:bold; text-transform:uppercase;">
+            <span>Total Outstanding Payable:</span>
+            <span style="font-size:15px; border-bottom:4px double #000;">₹<?= number_format(($accommodation_pending + $total_incidentals_bill), 2) ?></span>
+        </div>
+
+        <div style="margin-top:25px; display:flex; gap:10px;" class="no-print-actions">
+            <button type="button" style="flex:1; padding:8px; background:#4a5568; color:#fff; border:none; border-radius:4px; font-weight:bold; cursor:pointer;" onclick="window.print()">🖨️ System Print</button>
+            <button type="button" style="flex:1; padding:8px; background:#e2e8f0; color:#000; border:none; border-radius:4px; font-weight:bold; cursor:pointer;" onclick="document.getElementById('cleanPrintFriendlyModal').style.display='none'">✕ Close</button>
+        </div>
+    </div>
+</div>
+
 <script>
-// Toggle function validation mapping to ensure smooth headless form execution arrays
+// Expose parameters dynamically to allow zero-distraction layout processing arrays
+window.menuSubtotal = <?= $food_subtotal ?>;
+window.accommodationPending = <?= $accommodation_pending ?>;
+window.cleanItems = <?= json_encode($cleanItemsForJs) ?>;
+window.dynamicAdjustments = <?= json_encode($adjustments) ?>;
+
+window.openCleanBillPopup = function() {
+    const itemsContainer = document.getElementById("popupReceiptItems"); 
+    if(!itemsContainer) return;
+    itemsContainer.innerHTML = "";
+    
+    window.cleanItems.forEach(item => { 
+        itemsContainer.innerHTML += `
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 12px;">
+                <span>${item.name} (x${item.qty})</span>
+                <span>₹${parseFloat(item.cost).toFixed(2)}</span>
+            </div>`; 
+    });
+    
+    let cumulativeSum = window.menuSubtotal;
+    window.dynamicAdjustments.forEach(item => {
+        const sign = item.type === "charge" ? "+" : "-";
+        cumulativeSum += (item.type === "charge" ? parseFloat(item.amount) : -parseFloat(item.amount));
+        itemsContainer.innerHTML += `
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 12px; color: #444; font-style: italic;">
+                <span>↳ ${item.reason}</span>
+                <span>${sign}₹${parseFloat(item.amount).toFixed(2)}</span>
+            </div>`;
+    });
+
+    if(window.cleanItems.length === 0 && window.dynamicAdjustments.length === 0) {
+        itemsContainer.innerHTML = '<div style="font-size:11px; font-style:italic; color:#777;">No food items recorded.</div>';
+    }
+    
+    document.getElementById("cleanPrintFriendlyModal").style.display = "flex";
+};
+
 function toggleLabelRequirement() {
     const typeSelector = document.getElementById("adjTypeSelector");
     const reasonInput = document.getElementById("adjReasonInput");
@@ -330,8 +475,6 @@ function toggleLabelRequirement() {
         }
     }
 }
-
-// Fire runtime verification sweep automatically on initial document bootstrap
 document.addEventListener("DOMContentLoaded", toggleLabelRequirement);
 </script>
 
