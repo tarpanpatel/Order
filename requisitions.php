@@ -12,7 +12,7 @@ if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Chef" && $_SESSION["rol
     exit;
 }
 
-// --- CHEF NEW PRODUCT GENERATOR INTERCEPTOR ---
+// --- CHEF NEW PRODUCT GENERATOR INTERCEPTOR ---[cite: 3]
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_create_chef_product"])) {
     $item_name   = trim($_POST["chef_prod_name"]);
     $category_id = intval($_POST["chef_prod_category"]);
@@ -28,7 +28,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_create_chef_pr
     exit;
 }
 
-// --- MASTER SAVING BATCH SUBMISSION BLOCK ---
+// --- MASTER SAVING BATCH SUBMISSION BLOCK ---[cite: 3]
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_requisition"])) {
     $req_id = intval($_POST["update_req_id"]);
     $quantities = $_POST["req_item_qty"] ?? [];
@@ -459,7 +459,8 @@ window.submitSidebarRequisition = function() {
     if (window.reqCart.length === 0) return alert("Please select material choices first.");
     if (!confirm("Dispatch this material request list to inventory history logs?")) return;
 
-    fetch("api/process_requisition.php", {
+    // FIXED PATH TARGET: Points directly to the matching root processing script handler
+    fetch("process_requisition.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ items: window.reqCart })
@@ -471,9 +472,9 @@ window.submitSidebarRequisition = function() {
             window.reqCart = [];
             location.reload();
         } else {
-            alert("❌ Connection error.");
+            alert("❌ Connection error: " + (data.error || "Unknown validation exception"));
         }
-    }).catch(err => alert("❌ Network connection failure."));
+    }).catch(err => alert("❌ Network connection failure. Check if process_requisition.php is missing."));
 };
 
 window.openEditRequisitionModal = function(reqId, element) {
