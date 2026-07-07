@@ -43,24 +43,41 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_add_kitchen_ex
     if (!empty($date) && !empty($item_detail) && $qty > 0 && $price_per_unit > 0) {
         $pdo->beginTransaction();
         try {
-            // Insert procurement row dynamically targeting the discovered table schema map
+            // 1. Insert procurement row dynamically targeting the discovered table schema map
             $stmt = $pdo->prepare("
                 INSERT INTO kitchen_expenses (date, category, `{$target_item_column}`, `{$target_vendor_column}`, qty, price_per_unit)
                 VALUES (?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([$date, $category, $item_detail, $vendor, $qty, $price_per_unit]);
             
-            // AUTOMATED REQUISITION WORKFLOW HOOK:
-            $updateReq = $pdo->prepare("
-                UPDATE material_requests 
-                SET status = 'Fulfilled', fulfillment_date = ? 
-                WHERE status = 'Pending' 
-                AND (LOWER(item_name) LIKE LOWER(?) OR LOWER(?) LIKE CONCAT('%', LOWER(item_name), '%'))
-            ");
-            $updateReq->execute([$date, $item_detail, $item_detail]);
+            // 2. FIXED AUTOMATED REQUISITION WORKFLOW HOOK:
+            // Find the item catalog ID matching the typed input name
+            $catalogStmt = $pdo->prepare("SELECT id FROM req_catalog WHERE LOWER(item_name) = LOWER(?) LIMIT 1");
+            $catalogStmt->execute([$item_detail]);
+            $catalog_id = $catalogStmt->fetchColumn();
+
+            if ($catalog_id) {
+                // Update the single items inside the open request list
+                $updateItems = $pdo->prepare("UPDATE requisition_items SET item_status = 'Fulfilled' WHERE catalog_id = ? AND item_status = 'Pending'");
+                $updateItems->execute([$catalog_id]);
+
+                // Find any master requisitions that now have all their underlying items fulfilled
+                $checkMasters = $pdo->query("
+                    SELECT DISTINCT requisition_id FROM requisition_items 
+                    WHERE requisition_id NOT IN (
+                        SELECT DISTINCT requisition_id FROM requisition_items WHERE item_status = 'Pending'
+                    )
+                ")->fetchAll(PDO::FETCH_COLUMN);
+
+                if (!empty($checkMasters)) {
+                    // Automatically mark the main request envelope complete
+                    $inClause = implode(',', array_map('intval', $checkMasters));
+                    $pdo->query("UPDATE requisitions SET status = 'Fulfilled' WHERE id IN ($inClause) AND status = 'Pending'");
+                }
+            }
 
             $pdo->commit();
-            $message = "✔ Stock purchase entry recorded and pending material requisitions updated successfully!";
+            $message = "✔ Stock purchase entry recorded and native kitchen requisitions updated successfully!";
         } catch (Exception $e) {
             $pdo->rollBack();
             $message = "❌ System pipeline error: " . $e->getMessage();
