@@ -177,10 +177,12 @@ include "includes/header.php";
                         <td>₹<?= number_format($food_total, 2) ?></td>
                         <td style="font-weight: 800; color: #059669;">₹<?= number_format($grand_total, 2) ?></td>
                         <td style="text-align: center;">
+                            <!-- FIXED ATTR: Saved JSON safely inside custom attributes to eliminate unexpected end of input exceptions -->
                             <button type="button" class="btn btn-start" style="padding: 6px 14px; font-size:12px; border-radius:6px;"
+                                    data-guest='<?= htmlspecialchars(json_encode($inv), ENT_QUOTES, 'UTF-8') ?>'
                                     data-items='<?= htmlspecialchars($serializedItems, ENT_QUOTES, 'UTF-8') ?>' 
                                     data-adjustments='<?= htmlspecialchars($inv['food_remark'] ?? '[]', ENT_QUOTES, 'UTF-8') ?>'
-                                    onclick="openEditInvoiceWorkspace(<?= json_encode($inv) ?>, this)">✏ Edit Bill</button>
+                                    onclick="openEditInvoiceWorkspace(this)">✏ Edit Bill</button>
                         </td>
                     </tr>
                 <?php endforeach; else: ?>
@@ -191,6 +193,7 @@ include "includes/header.php";
     </div>
 </div>
 
+<!-- COMPREHENSIVE PAST RECEIPT BILL WORKSPACE MODAL -->
 <div id="editInvoiceModalPopup" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
     <div class="modal-content" style="background: white; max-width: 820px; width: 94%; border-radius: 12px; padding: 25px; position: relative; color: #111827; text-align: left; max-height: 90vh; overflow-y: auto;">
         <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0; font-weight:bold;" onclick="closeEditInvoiceModal()">✕</span>
@@ -202,6 +205,7 @@ include "includes/header.php";
             <input type="hidden" name="applied_adjustments_payload" id="mdlAdjustmentsPayload">
 
             <div class="modal-split-layout">
+                <!-- LEFT SIDEBAR COLUMN: STAY LOGISTICS & SYSTEM PARAMETERS -->
                 <div>
                     <h4 style="font-size:12px; text-transform:uppercase; color:#475569; border-bottom:1px dashed #cbd5e0; padding-bottom:4px; margin-top:0;">🏡 Stay Rent & Collector Metrics</h4>
                     
@@ -244,6 +248,7 @@ include "includes/header.php";
                     </div>
                 </div>
 
+                <!-- RIGHT SIDEBAR COLUMN: FOOD LINE RECEIPTS AND LIVE ADJUSTMENTS SYSTEM -->
                 <div style="display:flex; flex-direction:column; justify-content:space-between;">
                     <div>
                         <h4 style="font-size:12px; text-transform:uppercase; color:#475569; border-bottom:1px dashed #cbd5e0; padding-bottom:4px; margin-top:0;">🍽️ Order Lines Assembly</h4>
@@ -265,6 +270,7 @@ include "includes/header.php";
                 </div>
             </div>
 
+            <!-- LIVE ARITHMETIC RECALCULATION STATEMENT MATRIX WIDGET -->
             <div style="margin-top:20px; background:#fafdfd; border:1px solid #06b6d4; padding:15px; border-radius:10px; display:flex; justify-content:space-between; align-items:center;">
                 <div style="font-size:13px; color:#475569; line-height:1.4;">
                     <div>Stay Rent Outstanding: <span id="summaryStayRent" style="font-weight:700; color:#111827;">₹0.00</span></div>
@@ -302,7 +308,10 @@ function handleTypeSelectorSync() {
     else if (reason.value === "Discount") { reason.value = ""; }
 }
 
-function openEditInvoiceWorkspace(guestData, element) {
+function openEditInvoiceWorkspace(element) {
+    // FIXED: Safely pulling dataset object dynamically inside JS runtime directly
+    const guestData = JSON.parse(element.getAttribute("data-guest"));
+    
     document.getElementById("mdlInvoiceGuestId").value = guestData.id;
     document.getElementById("modalInvoiceTitle").innerText = "Modify Bill Metrics: " + guestData.guest_name;
     document.getElementById("mdlBaseRoomRent").value = parseFloat(guestData.base_room_rent || 0);
@@ -410,7 +419,6 @@ function calculateWorkspaceOutstanding() {
     document.getElementById("mdlAdjustmentsPayload").value = JSON.stringify(workspaceAdjustments);
 }
 
-// Global runtime floating point conversion macro alignment helper function
 function floatval(val) {
     let f = parseFloat(val);
     return isNaN(f) ? 0 : f;
