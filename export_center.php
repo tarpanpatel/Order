@@ -236,7 +236,7 @@ include "includes/header.php";
                 <h4 class="action-card-title">🏠 Accommodations Booking Spreadsheet</h4>
                 <p class="action-card-desc">Extracts comprehensive check-in logs, occupancy timelines, advance splits, and room collections.</p>
             </div>
-            <a href="export_and_backup.php?action=export_excel&tab=bookings&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" class="btn-export-trigger btn-excel">Export Sheets</a>
+            <a href="export_and_backup.php?action=export_excel&tab=bookings&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" download class="btn-export-trigger btn-excel">Export Sheets</a>
         </div>
 
         <div class="action-row-card">
@@ -244,7 +244,7 @@ include "includes/header.php";
                 <h4 class="action-card-title">🍳 Kitchen Purchases Workbook</h4>
                 <p class="action-card-desc">Downloads inventory replenishment lists, raw ration tracking, volume weights, and market vendor bills.</p>
             </div>
-            <a href="export_and_backup.php?action=export_excel&tab=kitchen_expenses&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" class="btn-export-trigger btn-excel">Export Sheets</a>
+            <a href="export_and_backup.php?action=export_excel&tab=kitchen_expenses&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" download class="btn-export-trigger btn-excel">Export Sheets</a>
         </div>
 
         <div class="action-row-card">
@@ -252,7 +252,7 @@ include "includes/header.php";
                 <h4 class="action-card-title">🛠️ Property Maintenance &amp; Utilities Logs</h4>
                 <p class="action-card-desc">Generates itemized expense spreadsheets for water tankers, electricity bills, hardware, and physical farm upkeep.</p>
             </div>
-            <a href="export_and_backup.php?action=export_excel&tab=farm_upkeep&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" class="btn-export-trigger btn-excel">Export Sheets</a>
+            <a href="export_and_backup.php?action=export_excel&tab=farm_upkeep&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" download class="btn-export-trigger btn-excel">Export Sheets</a>
         </div>
 
         <div class="action-row-card">
@@ -260,7 +260,7 @@ include "includes/header.php";
                 <h4 class="action-card-title">💼 Payroll &amp; Salaries Registry</h4>
                 <p class="action-card-desc">Compiles all recorded payouts, staff management stipends, and continuous operational field allowances.</p>
             </div>
-            <a href="export_and_backup.php?action=export_excel&tab=salaries&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" class="btn-export-trigger btn-excel">Export Sheets</a>
+            <a href="export_and_backup.php?action=export_excel&tab=salaries&month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" download class="btn-export-trigger btn-excel">Export Sheets</a>
         </div>
 
         <div class="action-row-card" style="border-left-color: #ef4444; margin-top: 15px; background: #fffdfd;">
@@ -268,7 +268,7 @@ include "includes/header.php";
                 <h4 class="action-card-title" style="color:#b91c1c;">🗄️ Full System Snapshot Backup</h4>
                 <p class="action-card-desc">Generates an instant raw sql dump of your entire database structure and entries for full data protection.</p>
             </div>
-            <a href="export_and_backup.php?action=backup_db" class="btn-export-trigger btn-backup">Download Backup (.sql)</a>
+            <a href="export_and_backup.php?action=backup_db" download class="btn-export-trigger btn-backup">Download Backup (.sql)</a>
         </div>
 
     </div>
