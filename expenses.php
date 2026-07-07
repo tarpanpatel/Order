@@ -128,8 +128,8 @@ include "includes/header.php";
                         <?php if ($user_role === 'Admin' || $user_role === 'Super Admin'): ?>
                             <option value="Salaries">Salaries</option>
                         <?php endif; ?>
-                        <option value="Bills" selected>Bills</option>
-                        <option value="Other">Other</option>
+                        <option value="Bills">Bills</option>
+                        <option value="Other" selected>Other</option>
                     </select>
                 </div>
             </div>
