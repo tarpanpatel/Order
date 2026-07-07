@@ -61,12 +61,14 @@ include "includes/header.php";
         <div style="background:#fff; border:1px solid #cbd5e0; border-radius:12px; padding:20px;">
             <h4 style="margin-top:0; border-bottom:1px solid #e2e8f0; padding-bottom:8px; text-transform:uppercase; font-size:11px; color:#475569;">📋 Current Sub-category Entries List</h4>
             <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:10px; max-height:400px; overflow-y:auto; padding-right:5px;">
-                <?php foreach ($predefined_items as $item): ?>
+                <?php if(!empty($predefined_items)): foreach ($predefined_items as $item): ?>
                     <div style="display:flex; justify-content:space-between; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:8px 12px; font-size:13px; align-items:center;">
                         <span style="font-weight:600; color:#1e293b;"><?= htmlspecialchars($item['item_name']) ?></span>
                         <a href="expense_items_management.php?delete_id=<?= $item['id'] ?>" onclick="return confirm('Remove this predefined item?')" style="color:#ef4444; font-weight:bold; text-decoration:none; font-size:12px;">✕</a>
                     </div>
-                <?php endphp endforeach; ?>
+                <?php endforeach; else: ?>
+                    <div style="grid-column: span 2; text-align:center; padding:20px; color:#94a3b8; font-style:italic;">No predefined categories initialized.</div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
