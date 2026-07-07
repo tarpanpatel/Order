@@ -71,7 +71,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_record_expense
             $tg_exp .= "━━━━━━━━━━━━━━━━━━\n";
             $tg_exp .= "📅 <b>Date:</b> " . $expense_date . "\n";
             $tg_exp .= "🗂️ <b>Category:</b> " . htmlspecialchars($category) . "\n";
-            $tg_exp .= "👤 <b>Recipient:</b> " . htmlspecialchars($vendor_name) . "\n";
+            $tg_exp .= "👤 <b>Paid By:</b> " . htmlspecialchars($vendor_name) . "\n";
             $tg_exp .= "📝 <b>Details:</b> " . htmlspecialchars($description) . "\n";
             $tg_exp .= "💳 <b>Method:</b> " . htmlspecialchars($payment_mode) . "\n";
             $tg_exp .= "━━━━━━━━━━━━━━━━━━\n";
@@ -176,8 +176,13 @@ include "includes/header.php";
                     </select>
                 </div>
                 <div id="vendorNameInputWrapper">
-                    <label class="form-label-header">Vendor / Recipient</label>
-                    <input type="text" name="vendor_name" id="expVendorInput" required placeholder="e.g., JVVNL Electricity" class="form-input-container">
+                    <label class="form-label-header">Paid By (User)</label>
+                    <select name="vendor_name" id="expVendorInput" required class="form-input-container">
+                        <option value="">-- Choose Member Who Paid --</option>
+                        <?php if (!empty($db_staff)): foreach ($db_staff as $staff_name): ?>
+                            <option value="<?= htmlspecialchars($staff_name) ?>"><?= htmlspecialchars($staff_name) ?></option>
+                        <?php endforeach; endif; ?>
+                    </select>
                 </div>
             </div>
 
@@ -280,6 +285,7 @@ function selectPredefinedItem(value) {
     setTimeout(() => { document.getElementById("moreInfoOptionalField").focus(); }, 50);
 }
 
+// Inline editing initialization handler
 function openInlineFieldEditor(rowId, type, rawValue) {
     const targetCell = document.getElementById(`cell-${type}-${rowId}`);
     if (targetCell.querySelector('input')) return;
@@ -298,6 +304,7 @@ function openInlineFieldEditor(rowId, type, rawValue) {
     });
 }
 
+// Inline blur sync save
 function saveInlineFieldChange(rowId, type, fallbackValue) {
     const targetCell = document.getElementById(`cell-${type}-${rowId}`);
     const inputEl = document.getElementById(`inline-edit-${type}-${rowId}`);
