@@ -195,24 +195,24 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
             <a href="kitchen.php" class="nav-link <?= ($current_page === 'kitchen.php') ? 'active' : ''; ?>">🍳 Kitchen Orders</a>
             <a href="requisitions.php" class="nav-link <?= ($current_page === 'requisitions.php') ? 'active' : ''; ?>">📦 Material Requests</a>
             
-            <?php if ($is_manager || $is_super): ?>
-                <a href="past_receipts.php" class="nav-link <?= ($current_page === 'past_receipts.php') ? 'active' : ''; ?>">📜 Past Receipts Log</a>
-            <?php endif; ?>
+            <a href="expenses.php" class="nav-link <?= ($current_page === 'expenses.php') ? 'active' : ''; ?>">📈 Expenses Workspace</a>
 
             <?php 
-            // SYSTEM SETTINGS DROPDOWN GATEWAY FOR BOTH CONFIGURATION ACCESS LEVELS
+            // FIXED: Renamed System Settings label wrapper link element container to Admin Control
             if ($is_super || $is_manager): 
             ?>
                 <div class="admin-settings-wrapper" style="margin-top: 10px; border-top: 1px solid #cbd5e0; padding-top: 10px; width: 100%;">
                     <div onclick="toggleAdminSubMenu()" class="nav-link" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 700; color: #475569; padding: 10px 16px;">
-                        <span>🛠️ System Settings</span>
+                        <span>🛠️ Admin Control</span>
                         <span id="adminMenuChevron" style="font-size: 10px; transition: transform 0.2s ease;">▶</span>
                     </div>
 
                     <div id="adminSubMenuContent" style="display: none; flex-direction: column; gap: 4px; padding-left: 20px; margin-top: 5px;">
+                        <a href="past_receipts.php" class="nav-link <?= ($current_page === 'past_receipts.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">📜 Past Receipts Log</a>
                         <a href="menu_admin.php" class="nav-link <?= ($current_page === 'menu_admin.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">🍽️ Menu Configuration</a>
                         <a href="materials_admin.php" class="nav-link <?= ($current_page === 'materials_admin.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">📦 Material Registry</a>
-                        <a href="expenses.php" class="nav-link <?= ($current_page === 'expenses.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">📈 Expense & Ledger Sync</a>
+                        <a href="expense_items_management.php" class="nav-link <?= ($current_page === 'expense_items_management.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">🔧 Add Expense Items</a>
+                        <a href="staff_management.php" class="nav-link <?= ($current_page === 'staff_management.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">👥 Add Staff Members</a>
                         <a href="change_passcode.php" class="nav-link <?= ($current_page === 'change_passcode.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">🔐 Passcode Control</a>
                         <a href="login_logs.php" class="nav-link <?= ($current_page === 'login_logs.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">🖥️ Security Trace Logs</a>
                     </div>
