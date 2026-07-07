@@ -1,11 +1,5 @@
 <?php
 // /home/apartment/artistsfarmjaipur.com/Order/billing.php
-// Report all PHP errors
-error_reporting(E_ALL);
-
-// Display errors directly on the screen
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -24,9 +18,10 @@ $guest = $pdo->query("SELECT * FROM guests WHERE status = 'Active' LIMIT 1")->fe
 if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["adjust_action"])) {
     $id = intval($_POST["order_item_id"]); 
     $qty = intval($_POST["adjust_qty"]);
-    if ($_POST["adjust_type"] === \"Cancel\") { 
+    // FIXED: Removed unescaped backslash typo syntax errors
+    if ($_POST["adjust_type"] === 'Cancel') { 
         $pdo->prepare("UPDATE order_items SET quantity = quantity - ? WHERE id = ?")->execute([$qty, $id]); 
-    } else if ($_POST["adjust_type"] === \"Return\") { 
+    } else if ($_POST["adjust_type"] === 'Return') { 
         $pdo->prepare("UPDATE order_items SET returned_qty = returned_qty + ? WHERE id = ?")->execute([$qty, $id]); 
     }
     header("Location: billing.php"); 
@@ -123,13 +118,11 @@ include "includes/header.php";
 </style>
 
 <div class="app-body" style="max-width:100%; width:100%;">
-    
     <?php if (!$guest): ?>
         <div style="padding:40px; background:#fff; border:1px solid #e2e8f0; text-align:center; border-radius:12px; font-style:italic; color:#94a3b8;">
             📭 There are no active operational guest billing accounts found running on the farm property today.
         </div>
     <?php else: 
-        // CALCULATE INCIDENTALS (FOOD & EXTRAS)
         $ordersQuery = $pdo->prepare("
             SELECT oi.*, mi.name, mi.price 
             FROM order_items oi 
@@ -161,16 +154,15 @@ include "includes/header.php";
 
         $total_incidentals_bill = max(0, $food_subtotal + $adjustments_sum);
         
-        // FIXED CALCULATIONS: Advance accommodation added as credit, Pending highlighted explicitly
         $base_rent = floatval($guest['base_room_rent'] ?? 0);
         $advance_paid = floatval($guest['advance_paid'] ?? 0);
         $accommodation_pending = max(0, $base_rent - $advance_paid);
+        $days_calc = max(1, (strtotime(date('Y-m-d')) - strtotime($guest['checkin_date'])) / 86400);
     ?>
 
     <div class="billing-grid-split">
-        
         <div class="workspace-panel-stack">
-            
+            <!-- ACCOMMODATION PANEL -->
             <div class="billing-card">
                 <div class="billing-section-title">🏡 Accommodation & Stay Invoice</div>
                 <div class="data-display-row">
@@ -181,13 +173,13 @@ include "includes/header.php";
                     <span>Advance Payment Received (Accommodation Credit):</span>
                     <strong style="color: #38a169;">+ ₹<?= number_format($advance_paid, 2) ?></strong>
                 </div>
-                
                 <div class="alert-highlight-pending">
                     <span>⚠️ Remaining Accommodation Pending Payment:</span>
                     <span>₹<?= number_format($accommodation_pending, 2) ?></span>
                 </div>
             </div>
 
+            <!-- FOOD AND INCIDENTALS PANEL -->
             <div class="billing-card">
                 <div class="billing-section-title">🍽️ Food Orders & Combined Incidentals Log</div>
                 
@@ -222,7 +214,7 @@ include "includes/header.php";
                     <div style="margin-top:15px; background:#f8fafc; border-radius:6px; padding:10px; border:1px solid #cbd5e0;">
                         <span style="font-size:11px; font-weight:700; text-transform:uppercase; color:#64748b; display:block; margin-bottom:5px;">Manual Dynamic Adjustments</span>
                         <?php foreach ($adjustments as $adj): ?>
-                            <div style="display:flex; justify-content:between; align-items:center; font-size:12px; padding:4px 0;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:4px 0;">
                                 <div style="flex:1;">↳ <?= htmlspecialchars($adj['reason']) ?> (<?= $adj['type'] === 'charge' ? 'Extra' : 'Discount' ?>)</div>
                                 <div style="font-weight:700; margin-right:15px; color:<?= $adj['type'] === 'charge' ? '#e53e3e' : '#38a169' ?>;">
                                     <?= $adj['type'] === 'charge' ? '+' : '-' ?>₹<?= number_format($adj['amount'], 2) ?>
@@ -243,22 +235,23 @@ include "includes/header.php";
             </div>
         </div>
 
+        <!-- RIGHT CONTROL PANEL SIDEBAR -->
         <div class="sidebar-panel-stack">
-            
+            <!-- ADJUSTMENTS CONTROLLER CARD -->
             <div class="billing-card">
                 <div class="billing-section-title">➕ Add Custom Adjustments</div>
                 <form method="POST" style="margin:0;">
                     <input type="hidden" name="action_add_adjustment" value="1">
                     <div style="margin-bottom:10px;">
                         <label style="font-size:11px; font-weight:700; display:block; margin-bottom:4px;">Adjustment Label Detail</label>
-                        <input type="text" name="adj_reason" placeholder="e.g., Extended checkout fee, extra linen" required style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box;">
+                        <input type="text" name="adj_reason" placeholder="e.g., Decoration, extra bedding" required style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box;">
                     </div>
                     <div style="margin-bottom:10px;">
                         <label style="font-size:11px; font-weight:700; display:block; margin-bottom:4px;">Amount (₹)</label>
                         <input type="number" name="adj_amount" step="0.01" required style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box;">
                     </div>
                     <div style="margin-bottom:15px;">
-                        <label style="font-size:11px; font-weight:700; display:block; margin-bottom:4px;">Adjustment Strategy Strategy</label>
+                        <label style="font-size:11px; font-weight:700; display:block; margin-bottom:4px;">Adjustment Strategy</label>
                         <select name="adj_type" style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px;">
                             <option value="charge">Extra Charge (+)</option>
                             <option value="discount">Discount / Rebate (-)</option>
@@ -268,6 +261,7 @@ include "includes/header.php";
                 </form>
             </div>
 
+            <!-- COMMIT CHECKOUT SETTLEMENT CARD -->
             <div class="billing-card" style="border:2px solid #06b6d4; background:#fafdfd;">
                 <div class="billing-section-title" style="color:#0891b2; border-color:#0891b2;">🏁 Final Checkout Settlement</div>
                 
@@ -283,7 +277,7 @@ include "includes/header.php";
                 </div>
 
                 <div style="display:flex; justify-content:space-between; font-size:16px; font-weight:800; color:#1e293b; margin-bottom:20px;">
-                    <span>Total Outstanding due:</span>
+                    <span>Total Outstanding Due:</span>
                     <span style="color:#059669;">₹<?= number_format(($accommodation_pending + $total_incidentals_bill), 2) ?></span>
                 </div>
 
@@ -312,7 +306,6 @@ include "includes/header.php";
                 </form>
             </div>
         </div>
-
     </div>
     <?php endif; ?>
 </div>
