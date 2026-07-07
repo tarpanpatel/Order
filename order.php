@@ -21,9 +21,36 @@ include "includes/header.php";
 <style>
 .order-layout-split { display: grid; grid-template-columns: 1fr 360px; gap: 20px; width: 100%; align-items: start; }
 .menu-items-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
-.menu-card-item { background: #fff; border: 1px solid #cbd5e0; border-radius: 8px; padding: 12px; text-align: left; cursor: pointer; transition: transform 0.15s; display: flex; flex-direction: column; justify-content: space-between; min-height: 140px; }
+
+/* RESTORED: Card formatting exactly matching your native design style */
+.menu-card-item { 
+    background: var(--card-bg); 
+    border-radius: var(--radius); 
+    border: 1px solid #e2e8f0; 
+    padding: 12px; 
+    text-align: center; 
+    position: relative;
+    cursor: pointer; 
+    transition: transform 0.15s ease, border-color 0.15s ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 150px;
+}
 .menu-card-item:hover { transform: translateY(-2px); border-color: #06b6d4; }
-.menu-card-img { width: 50px; height: 50px; object-fit: cover; border-radius: 50%; background: #f7fafc; padding: 2px; border: 1px solid #e2e8f0; margin-bottom: 8px; }
+
+/* RESTORED: Pure circular profile thumbnail item images styling rules */
+.menu-card-item img { 
+    width: 44px; 
+    height: 44px; 
+    object-fit: cover; 
+    border-radius: 50%; 
+    margin: 0 auto 6px auto; 
+    background: #f7fafc; 
+    padding: 3px; 
+    display: block;
+}
+
 .cart-sticky-panel { background: #f8fafc; border: 1px solid #cbd5e0; border-radius: 12px; padding: 16px; position: sticky; top: 130px; max-height: calc(100vh - 160px); display: flex; flex-direction: column; }
 </style>
 
@@ -59,22 +86,20 @@ include "includes/header.php";
                     <?php foreach ($cat_items as $item): ?>
                         <div class="menu-card-item menu-row-item" data-name="<?= strtolower(htmlspecialchars($item['name'])) ?>" onclick="addItemToCheckoutCart(<?= $item['id'] ?>, '<?= htmlspecialchars(addslashes($item['name'])) ?>', <?= $item['price'] ?>)">
                             
-                            <div class="menu-card-img-wrapper">
+                            <div>
                                 <?php if (!empty($item['image_path']) && file_exists($item['image_path'])): ?>
-                                    <img src="<?= htmlspecialchars($item['image_path']) ?>" class="menu-card-img" alt="<?= htmlspecialchars($item['name']) ?>">
-                                <?php else: ?>
-                                    <div class="menu-card-img-placeholder">🍲 No Image Configured</div>
+                                    <img src="<?= htmlspecialchars($item['image_path']) ?>" alt="<?= htmlspecialchars($item['name']) ?>">
                                 <?php endif; ?>
-                            </div>
-
-                            <div class="menu-card-body-content">
-                                <strong style="font-size:13px; display:block; color:#1e293b; line-height:1.4; text-align:left; margin-bottom:8px;"><?= htmlspecialchars($item['name']) ?></strong>
-                                <div style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-top:auto;">
-                                    <span style="font-size:13px; font-weight:800; color:#059669;">₹<?= number_format($item['price'], 2) ?></span>
-                                    <span style="font-size:10px; color:#22c55e; font-weight:700; background:#f0fdf4; padding:2px 8px; border-radius:4px; border:1px solid #bbf7d0;">➕ Add</span>
+                                
+                                <div class="card-name" style="font-size: 13px; font-weight: 600; margin-bottom: 4px; color: var(--text-main); height: auto;">
+                                    <?= htmlspecialchars($item['name']) ?>
                                 </div>
                             </div>
 
+                            <div style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-top:8px;">
+                                <span style="font-size:13px; font-weight:800; color:#059669;">₹<?= number_format($item['price'], 2) ?></span>
+                                <span style="font-size:10px; color:#22c55e; font-weight:700;">➕ Add</span>
+                            </div>
                         </div>
                     <?php endforeach; ?>
                 </div>
