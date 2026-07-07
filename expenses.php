@@ -3,6 +3,11 @@
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once "config/db.php";
 
+// FIXED SYSTEM PATH: Load the dual-channel configuration engine safely
+if (file_exists(__DIR__ . "/config/telegram.php")) {
+    require_once __DIR__ . "/config/telegram.php";
+}
+
 if (!isset($_SESSION["user_id"])) { 
     header("Location: login.php"); 
     exit; 
@@ -57,6 +62,25 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_record_expense
     if (!empty($expense_date) && $amount > 0 && !empty($category)) {
         $stmt = $pdo->prepare("INSERT INTO farm_utility_expenses (expense_date, category, description, amount, payment_mode, vendor_name) VALUES (?, ?, ?, ?, ?, ?)");
         $stmt->execute([$expense_date, $category, $description, $amount, $payment_mode, $vendor_name]);
+        
+        // ==========================================================================
+        // DUAL-CHANNEL NOTIFICATION ROUTER: FILTER SALARIES EXCLUSIVELY
+        // ==========================================================================
+        if ($category !== 'Salaries' && function_exists('sendAdminTelegramMessage')) {
+            $tg_exp = "💸 <b>NEW OPERATIONAL EXPENSE LOGGED</b>\n";
+            $tg_exp .= "━━━━━━━━━━━━━━━━━━\n";
+            $tg_exp .= "📅 <b>Date:</b> " . $expense_date . "\n";
+            $tg_exp .= "🗂️ <b>Category:</b> " . htmlspecialchars($category) . "\n";
+            $tg_exp .= "👤 <b>Recipient:</b> " . htmlspecialchars($vendor_name) . "\n";
+            $tg_exp .= "📝 <b>Details:</b> " . htmlspecialchars($description) . "\n";
+            $tg_exp .= "💳 <b>Method:</b> " . htmlspecialchars($payment_mode) . "\n";
+            $tg_exp .= "━━━━━━━━━━━━━━━━━━\n";
+            $tg_exp .= "💰 <b>AMOUNT PAID: ₹" . number_format($amount, 2) . "</b>";
+            
+            sendAdminTelegramMessage($tg_exp);
+        }
+        // ==========================================================================
+        
         $_SESSION['expense_toast'] = "Expense recorded successfully!";
     }
     header("Location: expenses.php");
