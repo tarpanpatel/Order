@@ -1,7 +1,10 @@
 <?php
 // /home/apartment/artistsfarmjaipur.com/Order/checkin.php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 require_once "config/db.php";
+include_once __DIR__ . '/config/local_db_bridge.php';
 
 // Allow access if they are logged in as either Admin or Chef
 if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Admin" && $_SESSION["role"] !== "Chef")) {
@@ -136,7 +139,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_booking
 // --- 4. DATA COMPILATION FOR UI RENDERING ---
 $current_active_guest = $pdo->query("SELECT * FROM guests WHERE status = 'Active' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 
-// FIX 1: Filter to get ONLY today's entries for the quick action menu
+// Filter to get ONLY today's entries for the quick action menu
 $todaysStmt = $pdo->prepare("
     SELECT id, CONCAT('📱 (', RIGHT(phone_number, 4), ')') as guest_label 
     FROM guests 
@@ -163,6 +166,9 @@ foreach ($bookings as $b) {
 }
 $disabledDatesJson = json_encode($disabledDatesArray);
 
+// FETCH ALL TEAM PROFILES DYNAMICALLY FROM THE UNIFIED DATABASE USERS TABLE
+$db_staff = $pdo->query("SELECT username FROM users ORDER BY username ASC")->fetchAll(PDO::FETCH_COLUMN);
+
 include "includes/header.php";
 ?>
 
@@ -187,7 +193,6 @@ include "includes/header.php";
 
 <div class="app-body" style="max-width: 100% !important; width: 100% !important; display: block !important;">
     
-    <!-- FIX 2: Dynamic Dropdown displays only today's arrivals -->
     <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
         <div style="text-align: left;">
             <span style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #64748b; letter-spacing: 0.5px;">Active Session Context</span>
@@ -216,7 +221,6 @@ include "includes/header.php";
     <?php endif; ?>
 
     <div class="split-registration-container">
-        <!-- FORM WORKSPACE PANEL -->
         <div class="form-registration-panel">
             <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; color: #111827; text-align: left; padding-bottom: 8px; border-bottom: 1px dashed #e2e8f0; margin-bottom: 15px;">Add Guest Booking</h3>
             <form method="POST" action="checkin.php" style="margin: 0;">
@@ -246,16 +250,13 @@ include "includes/header.php";
                     <div class="input-field-group"><label>Advance Paid (₹)</label><input type="number" id="fieldAdvancePaid" name="advance_paid" value="0" min="0" oninput="autoCalculatePendingBalance('field')"></div>
                     <div class="input-field-group">
                         <label>Advance Received By</label>
-                        <select name="advance_received_by">
-                            <option value="Unnamed">Unnamed</option>
-                            <option value="Kamlesh">Kamlesh</option>
-                            <option value="Abhijit">Abhijit</option>
-                            <option value="Subrata">Subrata</option>
-                            <option value="Tarpan bhaiya">Tarpan bhaiya</option>
-                            <option value="Vikas">Vikas</option>
-                            <option value="Rohit">Rohit</option>
-                            <option value="Raju">Raju</option>
-                            <option value="Kinkar">Kinkar</option>
+                        <select name="advance_received_by" required>
+                            <option value="">-- Choose Collector --</option>
+                            <?php if (!empty($db_staff)): foreach ($db_staff as $staff_name): ?>
+                                <option value="<?= htmlspecialchars($staff_name) ?>"><?= htmlspecialchars($staff_name) ?></option>
+                            <?php endforeach; else: ?>
+                                <option value="Unnamed">Unnamed</option>
+                            <?php endif; ?>
                         </select>
                     </div>
                 </div>
@@ -264,16 +265,13 @@ include "includes/header.php";
                     <div class="input-field-group"><label>Pending Balance (₹)</label><input type="number" id="fieldPendingBalance" name="pending_amount" value="0" min="0"></div>
                     <div class="input-field-group">
                         <label>Pending Received By</label>
-                        <select name="pending_received_by">
-                            <option value="Unnamed">Unnamed</option>
-                            <option value="Kamlesh">Kamlesh</option>
-                            <option value="Abhijit">Abhijit</option>
-                            <option value="Subrata">Subrata</option>
-                            <option value="Tarpan bhaiya">Tarpan bhaiya</option>
-                            <option value="Vikas">Vikas</option>
-                            <option value="Rohit">Rohit</option>
-                            <option value="Raju">Raju</option>
-                            <option value="Kinkar">Kinkar</option>
+                        <select name="pending_received_by" required>
+                            <option value="">-- Choose Collector --</option>
+                            <?php if (!empty($db_staff)): foreach ($db_staff as $staff_name): ?>
+                                <option value="<?= htmlspecialchars($staff_name) ?>"><?= htmlspecialchars($staff_name) ?></option>
+                            <?php endforeach; else: ?>
+                                <option value="Unnamed">Unnamed</option>
+                            <?php endif; ?>
                         </select>
                     </div>
                 </div>
@@ -283,7 +281,6 @@ include "includes/header.php";
             </form>
         </div>
 
-        <!-- VISUAL GRID CONTAINER PANEL -->
         <div class="calendar-display-panel">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h3 style="font-size: 15px; font-weight: 700; text-transform: uppercase; color: #111827; margin: 0;"><?= date('F Y') ?></h3>
@@ -316,13 +313,12 @@ include "includes/header.php";
     </div>
 </div>
 
-<!-- POPUP MODAL ARCHITECTURE COMPONENT -->
 <div id="bookingDetailsModal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
     <div class="modal-content" style="background: white; max-width: 520px; width: 90%; border-radius: 12px; padding: 25px; position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.15); color: #111827;">
         <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="closeDetailsModal()">✕</span>
         
         <div id="modalReadView">
-            <h3 style="font-size: 16px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px;">Residency Tracking Sheet</h3>
+            <h3 style="font-size: 16px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px;">Residency Tracking Sheet <span id="lblStatusBadge"></span></h3>
             <table style="width: 100%; font-size: 14px; text-align: left; border-collapse: collapse; margin-bottom: 20px;">
                 <tr><th style="padding: 4px 0; color: #4b5563;">Contact Phone:</th><td id="lblPhone"></td></tr>
                 <tr><th style="padding: 4px 0; color: #4b5563;">Channel Source:</th><td id="lblSource"></td></tr>
@@ -366,16 +362,13 @@ include "includes/header.php";
                         <div><label>Advance Paid (₹)</label><input type="number" name="edit_advance_paid" id="txtEditAdvance" oninput="autoCalculatePendingBalance('edit')"></div>
                         <div>
                             <label>Advance Received By</label>
-                            <select name="edit_advance_received_by" id="txtEditAdvanceBy">
-                                <option value="Unnamed">Unnamed</option>
-                                <option value="Kamlesh">Kamlesh</option>
-                                <option value="Abhijit">Abhijit</option>
-                                <option value="Subrata">Subrata</option>
-                                <option value="Tarpan bhaiya">Tarpan bhaiya</option>
-                                <option value="Vikas">Vikas</option>
-                                <option value="Rohit">Rohit</option>
-                                <option value="Raju">Raju</option>
-                                <option value="Kinkar">Kinkar</option>
+                            <select name="edit_advance_received_by" id="txtEditAdvanceBy" required>
+                                <option value="">-- Choose Collector --</option>
+                                <?php if (!empty($db_staff)): foreach ($db_staff as $staff_name): ?>
+                                    <option value="<?= htmlspecialchars($staff_name) ?>"><?= htmlspecialchars($staff_name) ?></option>
+                                <?php endforeach; else: ?>
+                                    <option value="Unnamed">Unnamed</option>
+                                <?php endif; ?>
                             </select>
                         </div>
                     </div>
@@ -383,16 +376,13 @@ include "includes/header.php";
                         <div><label>Pending Balance (₹)</label><input type="number" name="edit_pending_amount" id="txtEditPending"></div>
                         <div>
                             <label>Pending Received By</label>
-                            <select name="edit_pending_received_by" id="txtEditPendingBy">
-                                <option value="Unnamed">Unnamed</option>
-                                <option value="Kamlesh">Kamlesh</option>
-                                <option value="Abhijit">Abhijit</option>
-                                <option value="Subrata">Subrata</option>
-                                <option value="Tarpan bhaiya">Tarpan bhaiya</option>
-                                <option value="Vikas">Vikas</option>
-                                <option value="Rohit">Rohit</option>
-                                <option value="Raju">Raju</option>
-                                <option value="Kinkar">Kinkar</option>
+                            <select name="edit_pending_received_by" id="txtEditPendingBy" required>
+                                <option value="">-- Choose Collector --</option>
+                                <?php if (!empty($db_staff)): foreach ($db_staff as $staff_name): ?>
+                                    <option value="<?= htmlspecialchars($staff_name) ?>"><?= htmlspecialchars($staff_name) ?></option>
+                                <?php endforeach; else: ?>
+                                    <option value="Unnamed">Unnamed</option>
+                                <?php endif; ?>
                             </select>
                         </div>
                     </div>
@@ -410,7 +400,6 @@ let currentActiveSelectedBookingObject = null;
 
 function setSystemDefaultFormTimestamps() {
     const checkinInput = document.getElementById("fieldCheckin");
-    // FIX 3: Read values parameters from inputs only if they are not pre-selected to avoid false alerts on refresh
     if (!checkinInput.value) {
         const now = new Date();
         checkinInput.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
