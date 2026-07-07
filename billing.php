@@ -29,11 +29,12 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["adjust_acti
 
 // --- HANDLE POST: ASYNC ADDITION MODIFICATIONS ---
 if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_add_adjustment"])) {
-    $reason = trim($_POST["adj_reason"]);
-    $amount = floatval($_POST["adj_amount"]);
     $type   = $_POST["adj_type"]; 
+    // FIXED: Default to "Discount Given" text string dynamically if the field is left blank by user
+    $reason = !empty(trim($_POST["adj_reason"])) ? trim($_POST["adj_reason"]) : ($type === 'discount' ? 'Discount Given' : 'Extra Charge');
+    $amount = floatval($_POST["adj_amount"]);
 
-    if (!empty($reason) && $amount > 0) {
+    if ($amount > 0) {
         $current_adjustments = [];
         if (!empty($guest['food_remark'])) {
             $current_adjustments = json_decode($guest['food_remark'], true) ?: [];
@@ -71,8 +72,8 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_fina
     $food_bill_total = floatval($_POST["post_food_bill_total"]);
     $accommodation_pending = floatval($_POST["post_accommodation_pending"]);
     
-    // CAPTURE BOTH DISTINCT INDIVIDUAL COLLECTORS FROM POST VALUES
-    $accommodation_collected_by = trim($_POST["accommodation_received_by_staff"]);
+    // PULL AUTOMATICALLY: Retain persistent historical advance registry fields natively
+    $accommodation_collected_by = !empty($guest['advance_received_by']) ? $guest['advance_received_by'] : 'System Ledger';
     $food_collected_by          = trim($_POST["food_received_by_staff"]);
     
     // Update local guest archive logs with distinct collector allocations
@@ -98,9 +99,9 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_fina
         $guest['checkin_date'],
         $guest['per_night_charges'],
         $guest['advance_paid'],
-        $guest['advance_received_by'],
+        $accommodation_collected_by, // Automated
         $accommodation_pending,
-        $accommodation_collected_by,
+        $accommodation_collected_by, // Automated
         $food_bill_total,
         $food_collected_by
     ]);
@@ -108,8 +109,6 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_fina
     header("Location: index.php");
     exit;
 }
-
-$menu_catalog_list = $pdo->query("SELECT id, name, price FROM menu_items WHERE is_hidden = 0 ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
 include "includes/header.php";
 ?>
@@ -163,11 +162,11 @@ include "includes/header.php";
         $base_rent = floatval($guest['base_room_rent'] ?? 0);
         $advance_paid = floatval($guest['advance_paid'] ?? 0);
         $accommodation_pending = max(0, $base_rent - $advance_paid);
+        $auto_accommodation_staff = !empty($guest['advance_received_by']) ? $guest['advance_received_by'] : 'System Ledger';
     ?>
 
     <div class="billing-grid-split">
         <div class="workspace-panel-stack">
-            <!-- ACCOMMODATION SUMMARY PANEL -->
             <div class="billing-card">
                 <div class="billing-section-title">🏡 Accommodation Invoice Breakdown</div>
                 <div class="data-display-row">
@@ -184,7 +183,6 @@ include "includes/header.php";
                 </div>
             </div>
 
-            <!-- FOOD AND INCIDENTALS PANEL -->
             <div class="billing-card">
                 <div class="billing-section-title">🍽️ Food Orders & Combined Incidentals Log</div>
                 <table style="width:100%; border-collapse:collapse; font-size:13px; margin-bottom:15px;">
@@ -239,39 +237,37 @@ include "includes/header.php";
             </div>
         </div>
 
-        <!-- RIGHT CONTROL PANEL SIDEBAR -->
         <div class="sidebar-panel-stack">
-            <!-- ADJUSTMENTS CONTROLLER CARD -->
             <div class="billing-card">
                 <div class="billing-section-title">➕ Add Custom Adjustments</div>
-                <form method="POST" style="margin:0;">
+                <form method="POST" style="margin:0;" id="adjustmentEntryForm">
                     <input type="hidden" name="action_add_adjustment" value="1">
                     <div style="margin-bottom:10px;">
-                        <label style="font-size:11px; font-weight:700; display:block; margin-bottom:4px;">Adjustment Label Detail</label>
-                        <input type="text" name="adj_reason" placeholder="e.g., Decoration, extra bedding" required style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box;">
+                        <label style="font-size:11px; font-weight:700; display:block; margin-bottom:4px;">Adjustment Strategy Type</label>
+                        <select name="adj_type" id="adjTypeSelector" onchange="toggleLabelRequirement()" style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px;">
+                            <option value="charge">Extra Charge (+)</option>
+                            <option value="discount" selected>Discount / Rebate (-)</option>
+                        </select>
                     </div>
                     <div style="margin-bottom:10px;">
-                        <label style="font-size:11px; font-weight:700; display:block; margin-bottom:4px;">Amount (₹)</label>
-                        <input type="number" name="adj_amount" step="0.01" required style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box;">
+                        <label style="font-size:11px; font-weight:700; display:block; margin-bottom:4px;">Adjustment Label Detail</label>
+                        <input type="text" name="adj_reason" id="adjReasonInput" placeholder="Optional for discounts..." style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box;">
                     </div>
                     <div style="margin-bottom:15px;">
-                        <label style="font-size:11px; font-weight:700; display:block; margin-bottom:4px;">Adjustment Strategy</label>
-                        <select name="adj_type" style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px;">
-                            <option value="charge">Extra Charge (+)</option>
-                            <option value="discount">Discount / Rebate (-)</option>
-                        </select>
+                        <label style="font-size:11px; font-weight:700; display:block; margin-bottom:4px;">Amount (₹)</label>
+                        <input type="number" name="adj_amount" step="0.01" required style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box;">
                     </div>
                     <button type="submit" class="btn btn-start" style="width:100%; padding:10px; border-radius:6px; font-weight:700;">Apply Adjustment</button>
                 </form>
             </div>
 
-            <!-- COMMIT CHECKOUT SETTLEMENT CARD -->
             <div class="billing-card" style="border:2px solid #06b6d4; background:#fafdfd;">
                 <div class="billing-section-title" style="color:#0891b2; border-color:#0891b2;">🏁 Final Checkout Settlement</div>
                 
                 <form method="POST" style="margin:0;" onsubmit="return confirm('Archive statement and complete checkout?');">
                     <input type="hidden" name="action_finalize_checkout" value="1">
                     <input type="hidden" name="post_food_bill_total" value="<?= $total_incidentals_bill ?>">
+                    <input type="hidden" name="post_accommodation_pending" value="<?= $accommodation_pending ?>">
                     
                     <div style="padding:10px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:15px; font-size:12px; line-height:1.5;">
                         <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
@@ -288,20 +284,9 @@ include "includes/header.php";
                         </div>
                     </div>
 
-                    <!-- REFACTORED SEPARATION: DUAL COLLECTOR ALLOCATION FIELDS -->
-                    <div style="margin-bottom:12px;">
-                        <label style="font-size:11px; font-weight:700; display:block; color:#475569;">👤 Accommodation Deposit Collected By:</label>
-                        <select name="accommodation_received_by_staff" required class="staff-selector">
-                            <option value="">-- Choose Collector --</option>
-                            <option value="Tarpan bhaiya">Tarpan bhaiya</option>
-                            <option value="Kamlesh">Kamlesh</option>
-                            <option value="Abhijit">Abhijit</option>
-                            <option value="Kinkar">Kinkar</option>
-                            <option value="Subrata">Subrata</option>
-                            <option value="Rohit">Rohit</option>
-                            <option value="Vikas">Vikas</option>
-                            <option value="Raju">Raju</option>
-                        </select>
+                    <div style="margin-bottom:15px; background:#f1f5f9; padding:8px 12px; border-radius:6px; border:1px dashed #cbd5e0; font-size:12px; color:#475569;">
+                        💼 <strong>Accommodation Collector:</strong> <span style="float:right; font-weight:bold; color:#1e293b;"><?= htmlspecialchars($auto_accommodation_staff) ?></span>
+                        <input type="hidden" name="accommodation_received_by_staff" value="<?= htmlspecialchars($auto_accommodation_staff) ?>">
                     </div>
 
                     <div style="margin-bottom:20px;">
@@ -328,5 +313,26 @@ include "includes/header.php";
     </div>
     <?php endif; ?>
 </div>
+
+<script>
+// Toggle function validation mapping to ensure smooth headless form execution arrays
+function toggleLabelRequirement() {
+    const typeSelector = document.getElementById("adjTypeSelector");
+    const reasonInput = document.getElementById("adjReasonInput");
+    
+    if (typeSelector && reasonInput) {
+        if (typeSelector.value === "discount") {
+            reasonInput.removeAttribute("required");
+            reasonInput.placeholder = "Optional description label for discounts...";
+        } else {
+            reasonInput.setAttribute("required", "required");
+            reasonInput.placeholder = "Required description label for extra charges...";
+        }
+    }
+}
+
+// Fire runtime verification sweep automatically on initial document bootstrap
+document.addEventListener("DOMContentLoaded", toggleLabelRequirement);
+</script>
 
 <?php include "includes/footer.php"; ?>
