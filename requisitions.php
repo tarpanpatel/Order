@@ -33,13 +33,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_requisi
     $req_id = intval($_POST["update_req_id"]);
     $quantities = $_POST["req_item_qty"] ?? [];
     $item_statuses = $_POST["req_item_status"] ?? [];
-    $chosen_units = $_POST["req_item_unit_label"] ?? [];
 
     $pdo->beginTransaction();
     try {
         $getOriginalQty = $pdo->prepare("SELECT quantity FROM requisition_items WHERE requisition_id = ? AND catalog_id = ?");
         $logDeficiency  = $pdo->prepare("INSERT INTO deficient_stock_logs (requisition_id, catalog_id, ordered_qty, delivered_qty, deficit_qty) VALUES (?, ?, ?, ?, ?)");
-        $updateItem     = $pdo->prepare("UPDATE requisition_items SET quantity = ?, item_status = ?, chosen_unit_label = ? WHERE requisition_id = ? AND catalog_id = ?");
+        $updateItem     = $pdo->prepare("UPDATE requisition_items SET quantity = ?, item_status = ? WHERE requisition_id = ? AND catalog_id = ?");
         $deleteItem     = $pdo->prepare("DELETE FROM requisition_items WHERE requisition_id = ? AND catalog_id = ?");
 
         $all_fulfilled = true;
@@ -48,7 +47,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_requisi
             $cat_id = intval($cat_id);
             $new_qty = floatval($qty); 
             $allocated_status = isset($item_statuses[$cat_id]) ? trim($item_statuses[$cat_id]) : 'Pending';
-            $unit_label = isset($chosen_units[$cat_id]) ? trim($chosen_units[$cat_id]) : 'Pcs';
 
             if ($new_qty <= 0 || $allocated_status === 'Cancelled') {
                 $deleteItem->execute([$req_id, $cat_id]);
@@ -67,7 +65,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_requisi
                 $logDeficiency->execute([$req_id, $cat_id, $original_qty, $new_qty, $deficit]);
             }
 
-            $updateItem->execute([$new_qty, $allocated_status, $unit_label, $req_id, $cat_id]);
+            // Excluded updates to ri.chosen_unit_label to keep things locked down
+            $updateItem->execute([$new_qty, $allocated_status, $req_id, $cat_id]);
         }
 
         $countRemaining = $pdo->prepare("SELECT COUNT(*) FROM requisition_items WHERE requisition_id = ?");
@@ -182,7 +181,6 @@ include "includes/header.php";
 
 .audit-history-subtitle { font-size: 11px; color: #64748b; font-weight: 600; display: block; margin-top: 2px; font-family: monospace; }
 .global-toast-notification { padding: 12px 24px; background: #10b981; color: white; font-size: 14px; font-weight: 800; text-align: center; border-radius: 8px; box-shadow: 0 4px 12px rgba(16,185,129,0.2); margin-bottom: 15px; border: 1px solid #059669; }
-.unit-selector-dropdown { padding: 4px 6px; font-size: 11px; border: 1px solid #cbd5e0; border-radius: 4px; background: #fff; font-weight: 600; color: #475569; }
 </style>
 
 <div class="app-body" style="max-width: 100% !important; width: 100% !important; display: block !important;">
@@ -506,35 +504,14 @@ window.openEditRequisitionModal = function(reqId, element) {
             if (initialStatus === 'Fulfilled') { rowStateClass = 'row-state-green-highlight'; fDisabled = 'disabled'; }
             if (initialStatus === 'Cancelled') { rowStateClass = 'row-state-greyed-out'; rDisabled = 'disabled'; }
 
-            let unitDropdownMarkup = '';
-            if (unitType === 'Weight') {
-                unitDropdownMarkup = `
-                    <select name="req_item_unit_label[${i.catalog_id}]" class="unit-selector-dropdown">
-                        <option value="kg" ${currentLabel === 'kg' ? 'selected' : ''}>kg</option>
-                        <option value="gms" ${currentLabel === 'gms' ? 'selected' : ''}>gms</option>
-                        <option value="Ltr" ${currentLabel === 'Ltr' ? 'selected' : ''}>Ltr</option>
-                        <option value="ml" ${currentLabel === 'ml' ? 'selected' : ''}>ml</option>
-                    </select>
-                `;
-            } else {
-                unitDropdownMarkup = `
-                    <select name="req_item_unit_label[${i.catalog_id}]" class="unit-selector-dropdown">
-                        <option value="Pcs" ${currentLabel === 'Pcs' ? 'selected' : ''}>Pcs</option>
-                        <option value="Packets" ${currentLabel === 'Packets' ? 'selected' : ''}>Packets</option>
-                        <option value="Boxes" ${currentLabel === 'Boxes' ? 'selected' : ''}>Boxes</option>
-                    </select>
-                `;
-            }
-
             const computationFactor = (unitType === 'Weight') ? 0.25 : 1;
 
-            // FIXED ROW:
-            // Stripped the 150px wide image thumbnail block to optimize space layout performance
+            // FIXED ROW BLOCK: Removed the dropdown column completely from verification view matrix
             return `
                 <div id="itemVerificationRow_${i.catalog_id}" class="verification-item-row-wrapper ${rowStateClass}" style="display:flex; justify-content:space-between; align-items:center; padding:12px 10px; border-bottom:1px solid #e2e8f0; background:#ffffff; margin-bottom:6px; border-radius:8px; gap:12px;">
                     <div style="flex:1; min-width:0; text-align:left;">
                         <span class="item-text-title" style="font-size:12px; font-weight:700; color:#1e293b; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; transition:all 0.15s ease;">${i.name}</span>
-                        <span style="font-size:10px; color:#475569; font-weight:bold; display:block; margin-bottom:2px;">Packing Spec: ${pSize} ${pUnit}</span>
+                        <span style="font-size:10px; color:#475569; font-weight:bold; display:block; margin-bottom:2px;">Packing Spec: ${pSize} ${pUnit} | Target: ${currentLabel}</span>
                         <span id="qtyAuditSubtitle_${i.catalog_id}" class="audit-history-subtitle" data-original="${i.quantity}">Ordered: ${i.quantity}</span>
                     </div>
                    
@@ -544,13 +521,12 @@ window.openEditRequisitionModal = function(reqId, element) {
                             <input type="number" id="mdlQtyInput_${i.catalog_id}" name="req_item_qty[${i.catalog_id}]" value="${i.quantity}" min="0" step="${computationFactor}" class="modal-input-qty" oninput="window.handleQuantityInputChangeDirect(${i.catalog_id})">
                             <button type="button" class="modal-qty-btn" onclick="window.adjustVerificationRowQty(${i.catalog_id}, ${computationFactor})">+</button>
                         </div>
-                        ${unitDropdownMarkup}
                     </div>
 
                     <div class="binary-toggle-container" style="background:transparent; border:none; padding:0;">
                         <input type="hidden" id="mdlStatusHidden_${i.catalog_id}" name="req_item_status[${i.catalog_id}]" value="${initialStatus}">
-                        <button type="button" id="toggleBtn_F_" class="toggle-choice-btn btn-block-fulfilled" onclick="window.triggerMemoryStateUpdate(${i.catalog_id}, 'Fulfilled')">Fulfilled</button>
-                        <button type="button" id="toggleBtn_C_" class="toggle-choice-btn btn-block-remove" onclick="window.triggerMemoryStateUpdate(${i.catalog_id}, 'Cancelled')">Remove</button>
+                        <button type="button" id="toggleBtn_F_${i.catalog_id}" ${fDisabled} class="toggle-choice-btn btn-block-fulfilled" onclick="window.triggerMemoryStateUpdate(${i.catalog_id}, 'Fulfilled')">Fulfilled</button>
+                        <button type="button" id="toggleBtn_C_${i.catalog_id}" ${rDisabled} class="toggle-choice-btn btn-block-remove" onclick="window.triggerMemoryStateUpdate(${i.catalog_id}, 'Cancelled')">Remove</button>
                     </div>
                 </div>
             `;
@@ -597,13 +573,19 @@ window.handleQuantityInputChangeDirect = function(catalogId) {
 window.reactivateActionRowButtons = function(catalogId, activeValue) {
     const hiddenStatus = document.getElementById(`mdlStatusHidden_${catalogId}`);
     const rowWrapper   = document.getElementById(`itemVerificationRow_${catalogId}`);
+    const btnFulfilled = document.getElementById("toggleBtn_F_" + catalogId);
+    const btnCancelled = document.getElementById("toggleBtn_C_" + catalogId);
 
-    if (!hiddenStatus || !rowWrapper) return;
+    if (!hiddenStatus || !rowWrapper || !btnFulfilled || !btnCancelled) return;
 
     rowWrapper.classList.remove('row-state-greyed-out', 'row-state-green-highlight');
+    btnFulfilled.removeAttribute('disabled');
+    btnCancelled.removeAttribute('disabled');
+
     hiddenStatus.value = (activeValue > 0) ? 'Pending' : 'Cancelled';
     if (activeValue === 0) {
         rowWrapper.classList.add('row-state-greyed-out');
+        btnCancelled.setAttribute('disabled', 'disabled');
         window.syncRowAuditText(catalogId);
     }
 };
@@ -661,10 +643,14 @@ window.triggerMemoryStateUpdate = function(catalogId, targetedState) {
     const hiddenStatus = document.getElementById(`mdlStatusHidden_${catalogId}`);
     const rowWrapper   = document.getElementById(`itemVerificationRow_${catalogId}`);
     const qtyInput     = document.getElementById(`mdlQtyInput_${catalogId}`);
+    const btnFulfilled = document.getElementById("toggleBtn_F_" + catalogId);
+    const btnCancelled = document.getElementById("toggleBtn_C_" + catalogId);
 
-    if (!hiddenStatus || !rowWrapper || !qtyInput) return;
+    if (!hiddenStatus || !rowWrapper || !qtyInput || !btnFulfilled || !btnCancelled) return;
 
     rowWrapper.classList.remove('row-state-greyed-out', 'row-state-green-highlight');
+    btnFulfilled.removeAttribute('disabled');
+    btnCancelled.removeAttribute('disabled');
 
     if (hiddenStatus.value === targetedState) {
         hiddenStatus.value = 'Pending';
@@ -673,9 +659,11 @@ window.triggerMemoryStateUpdate = function(catalogId, targetedState) {
         if (targetedState === 'Cancelled') {
             qtyInput.value = 0;
             rowWrapper.classList.add('row-state-greyed-out');
+            btnCancelled.setAttribute('disabled', 'disabled');
             window.syncRowAuditText(catalogId);
         } else if (targetedState === 'Fulfilled') {
             rowWrapper.classList.add('row-state-green-highlight');
+            btnFulfilled.setAttribute('disabled', 'disabled');
         }
     }
 };
