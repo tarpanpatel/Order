@@ -1,10 +1,4 @@
 <?php
-// Report all PHP errors
-error_reporting(E_ALL);
-
-// Display errors directly on the screen
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
 // /home/apartment/artistsfarmjaipur.com/Order/billing.php
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -24,7 +18,6 @@ $guest = $pdo->query("SELECT * FROM guests WHERE status = 'Active' LIMIT 1")->fe
 if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["adjust_action"])) {
     $id = intval($_POST["order_item_id"]); 
     $qty = intval($_POST["adjust_qty"]);
-    // FIXED: Removed unescaped backslash typo syntax errors
     if ($_POST["adjust_type"] === 'Cancel') { 
         $pdo->prepare("UPDATE order_items SET quantity = quantity - ? WHERE id = ?")->execute([$qty, $id]); 
     } else if ($_POST["adjust_type"] === 'Return') { 
@@ -76,22 +69,28 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_remo
 if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_finalize_checkout"])) {
     $guest_id = $guest['id'];
     $food_bill_total = floatval($_POST["post_food_bill_total"]);
-    $received_by = trim($_POST["received_by_staff"]);
+    $accommodation_pending = floatval($_POST["post_accommodation_pending"]);
     
-    // Save state out to historical ledger archives
+    // CAPTURE BOTH DISTINCT INDIVIDUAL COLLECTORS FROM POST VALUES
+    $accommodation_collected_by = trim($_POST["accommodation_received_by_staff"]);
+    $food_collected_by          = trim($_POST["food_received_by_staff"]);
+    
+    // Update local guest archive logs with distinct collector allocations
     $pdo->prepare("
         UPDATE guests 
         SET status = 'CheckedOut', 
             checkout_date = CURRENT_DATE(),
+            pending_amount = ?,
+            pending_received_by = ?,
             total_food = ?,
             food_received_by = ?
         WHERE id = ?
-    ")->execute([$food_bill_total, $received_by, $guest_id]);
+    ")->execute([$accommodation_pending, $accommodation_collected_by, $food_bill_total, $food_collected_by, $guest_id]);
 
-    // Push record out to general farm operational tracking metrics
+    // Push separate fields out cleanly to general farm bookings ledger rows
     $pdo->prepare("
         INSERT INTO farm_bookings (booking_source, contact_no, no_of_guests, check_in_date, check_out_date, per_night_charges, advance_paid, advance_received_by, pending_amount, pending_received_by, total_food_bill, food_received_by, remarks)
-        VALUES (?, ?, ?, ?, CURRENT_DATE(), ?, ?, ?, ?, ?, ?, ?, 'Checked out from POS Terminal')
+        VALUES (?, ?, ?, ?, CURRENT_DATE(), ?, ?, ?, ?, ?, ?, ?, 'Checked out from Dual Collector POS')
     ")->execute([
         $guest['booking_source'],
         $guest['phone_number'],
@@ -100,15 +99,17 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_fina
         $guest['per_night_charges'],
         $guest['advance_paid'],
         $guest['advance_received_by'],
-        $guest['pending_amount'],
-        $guest['pending_received_by'],
+        $accommodation_pending,
+        $accommodation_collected_by,
         $food_bill_total,
-        $received_by
+        $food_collected_by
     ]);
 
     header("Location: index.php");
     exit;
 }
+
+$menu_catalog_list = $pdo->query("SELECT id, name, price FROM menu_items WHERE is_hidden = 0 ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
 include "includes/header.php";
 ?>
@@ -119,8 +120,7 @@ include "includes/header.php";
 .billing-section-title { font-size: 14px; font-weight: 700; text-transform: uppercase; color: #1e293b; border-bottom: 1px dashed #cbd5e0; padding-bottom: 8px; margin-top: 0; margin-bottom: 15px; letter-spacing: 0.5px; }
 .alert-highlight-pending { background: #fff5f5; border: 1px solid #feb2b2; padding: 12px; border-radius: 8px; color: #c53030; font-weight: bold; font-size: 15px; display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
 .data-display-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; padding: 8px 0; border-bottom: 1px solid #f1f5f9; }
-.data-display-row:last-child { border-bottom: none; }
-.staff-selector { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e0; background: #fff; font-size: 13px; font-weight: 600; color: #334155; margin-bottom: 15px; }
+.staff-selector { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e0; background: #fff; font-size: 13px; font-weight: 600; color: #334155; margin-top: 4px; }
 </style>
 
 <div class="app-body" style="max-width:100%; width:100%;">
@@ -163,14 +163,13 @@ include "includes/header.php";
         $base_rent = floatval($guest['base_room_rent'] ?? 0);
         $advance_paid = floatval($guest['advance_paid'] ?? 0);
         $accommodation_pending = max(0, $base_rent - $advance_paid);
-        $days_calc = max(1, (strtotime(date('Y-m-d')) - strtotime($guest['checkin_date'])) / 86400);
     ?>
 
     <div class="billing-grid-split">
         <div class="workspace-panel-stack">
-            <!-- ACCOMMODATION PANEL -->
+            <!-- ACCOMMODATION SUMMARY PANEL -->
             <div class="billing-card">
-                <div class="billing-section-title">🏡 Accommodation & Stay Invoice</div>
+                <div class="billing-section-title">🏡 Accommodation Invoice Breakdown</div>
                 <div class="data-display-row">
                     <span>Base Lodging Charges (Total Stay Contract):</span>
                     <strong style="color: #334155;">₹<?= number_format($base_rent, 2) ?></strong>
@@ -188,7 +187,6 @@ include "includes/header.php";
             <!-- FOOD AND INCIDENTALS PANEL -->
             <div class="billing-card">
                 <div class="billing-section-title">🍽️ Food Orders & Combined Incidentals Log</div>
-                
                 <table style="width:100%; border-collapse:collapse; font-size:13px; margin-bottom:15px;">
                     <thead>
                         <tr style="background:#f8fafc; border-bottom:1px solid #cbd5e0; color:#475569; text-align:left;">
@@ -271,29 +269,29 @@ include "includes/header.php";
             <div class="billing-card" style="border:2px solid #06b6d4; background:#fafdfd;">
                 <div class="billing-section-title" style="color:#0891b2; border-color:#0891b2;">🏁 Final Checkout Settlement</div>
                 
-                <div style="font-size:13px; margin-bottom:15px; border-bottom:1px dashed #cbd5e0; padding-bottom:10px;">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                        <span>Pending Accommodation:</span>
-                        <span>₹<?= number_format($accommodation_pending, 2) ?></span>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; font-weight:bold;">
-                        <span>Food & Incidentals:</span>
-                        <span>₹<?= number_format($total_incidentals_bill, 2) ?></span>
-                    </div>
-                </div>
-
-                <div style="display:flex; justify-content:space-between; font-size:16px; font-weight:800; color:#1e293b; margin-bottom:20px;">
-                    <span>Total Outstanding Due:</span>
-                    <span style="color:#059669;">₹<?= number_format(($accommodation_pending + $total_incidentals_bill), 2) ?></span>
-                </div>
-
-                <form method="POST" style="margin:0;">
+                <form method="POST" style="margin:0;" onsubmit="return confirm('Archive statement and complete checkout?');">
                     <input type="hidden" name="action_finalize_checkout" value="1">
                     <input type="hidden" name="post_food_bill_total" value="<?= $total_incidentals_bill ?>">
                     
-                    <div style="margin-bottom:15px;">
-                        <label style="font-size:11px; font-weight:700; display:block; margin-bottom:6px; color:#475569;">👤 Who is taking the deposit?</label>
-                        <select name="received_by_staff" required class="staff-selector">
+                    <div style="padding:10px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:15px; font-size:12px; line-height:1.5;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                            <span>Accommodation Outstanding:</span>
+                            <span style="font-weight:700; color:#c53030;">₹<?= number_format($accommodation_pending, 2) ?></span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; border-bottom:1px dashed #cbd5e0; padding-bottom:6px; margin-bottom:6px;">
+                            <span>Food & Incidentals Total:</span>
+                            <span style="font-weight:700; color:#0284c7;">₹<?= number_format($total_incidentals_bill, 2) ?></span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:bold;">
+                            <span>Total Due at Checkout:</span>
+                            <span style="color:#059669;">₹<?= number_format(($accommodation_pending + $total_incidentals_bill), 2) ?></span>
+                        </div>
+                    </div>
+
+                    <!-- REFACTORED SEPARATION: DUAL COLLECTOR ALLOCATION FIELDS -->
+                    <div style="margin-bottom:12px;">
+                        <label style="font-size:11px; font-weight:700; display:block; color:#475569;">👤 Accommodation Deposit Collected By:</label>
+                        <select name="accommodation_received_by_staff" required class="staff-selector">
                             <option value="">-- Choose Collector --</option>
                             <option value="Tarpan bhaiya">Tarpan bhaiya</option>
                             <option value="Kamlesh">Kamlesh</option>
@@ -306,7 +304,22 @@ include "includes/header.php";
                         </select>
                     </div>
 
-                    <button type="submit" class="btn btn-bill" style="width:100%; padding:12px; border-radius:8px; font-size:14px; font-weight:800; background:#06b6d4; border-color:#06b6d4;" onclick="return confirm('Confirm processing total collection settlement and ending guest session?');">
+                    <div style="margin-bottom:20px;">
+                        <label style="font-size:11px; font-weight:700; display:block; color:#475569;">👤 Food & Incidentals Collected By:</label>
+                        <select name="food_received_by_staff" required class="staff-selector">
+                            <option value="">-- Choose Collector --</option>
+                            <option value="Tarpan bhaiya">Tarpan bhaiya</option>
+                            <option value="Kamlesh">Kamlesh</option>
+                            <option value="Abhijit">Abhijit</option>
+                            <option value="Kinkar">Kinkar</option>
+                            <option value="Subrata">Subrata</option>
+                            <option value="Rohit">Rohit</option>
+                            <option value="Vikas">Vikas</option>
+                            <option value="Raju">Raju</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn btn-bill" style="width:100%; padding:12px; border-radius:8px; font-size:14px; font-weight:800; background:#06b6d4; border-color:#06b6d4;">
                         Complete Checkout & Archive Bill
                     </button>
                 </form>
