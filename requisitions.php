@@ -94,7 +94,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_requisi
 }
 
 $categories = $pdo->query("SELECT * FROM material_categories ORDER BY sort_order ASC")->fetchAll(PDO::FETCH_ASSOC);
-// UPDATED CORE QUERY: Pulled image_path from database configuration parameters
 $materials  = $pdo->query("SELECT id, item_name as name, category_id, unit_type, unit_label, pack_size, pack_unit, image_path FROM req_catalog WHERE is_verified = 1 ORDER BY item_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
 $past_requisitions = $pdo->query("SELECT r.id, r.requested_at, r.status,
@@ -116,7 +115,7 @@ include "includes/header.php";
 .right-column-stack { display: flex; flex-direction: column; gap: 20px; position: sticky !important; top: 20px !important; }
 .requisition-right-sidebar { background: #ffffff !important; border: 1px solid #cbd5e0 !important; border-radius: 12px !important; padding: 20px !important; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05) !important; display: flex; flex-direction: column; text-align: left; }
 
-.catalog-tab-header { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; border-bottom: 1px solid #edf2f7; padding-bottom: 12px; }
+.catalog-tab-header { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; border-bottom: 1px solid #edf2f7; padding-bottom: 12px; align-items: center; }
 .catalog-tab-btn { padding: 6px 12px; font-size: 12px; font-weight: 600; background: #f7fafc; border: 1px solid #cbd5e0; border-radius: 6px; cursor: pointer; color: #475569; transition: all 0.15s ease; }
 .catalog-tab-btn:hover { background: #e2e8f0; }
 .catalog-tab-btn.active { background: #06b6d4; color: white; border-color: #06b6d4; }
@@ -125,7 +124,12 @@ include "includes/header.php";
 .material-item-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; background: #fff; text-align: center; display: flex; flex-direction: column; justify-content: space-between; align-items: center; min-height: 175px; box-sizing: border-box; }
 .material-item-image-box { width: 100%; height: 50px; overflow: hidden; border-radius: 6px; border: 1px solid #edf2f7; background: #f8fafc; margin-bottom: 8px; }
 .material-item-image-box img { width: 100%; height: 100%; object-fit: cover; }
-.material-item-name { font-size: 12px; font-weight: 600; color: #111827; margin-bottom: 8px; line-height: 1.3; text-align: center; width: 100%; word-wrap: break-word; }
+.material-item-name { font-size: 12px; font-weight: 600; color: #111827; margin-bottom: 8px; line-height: 1.3; text-align: center; width: 100%; word-break: break-word; }
+
+.btn-quick-search-box { width: 100%; padding: 10px 14px 10px 35px; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 13px; font-weight: 600; color: #1e293b; background: #fff; outline: none; box-sizing: border-box; transition: all 0.2s; }
+.btn-quick-search-box:focus { border-color: #06b6d4; box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.15); }
+.search-input-wrapper { position: relative; margin-bottom: 15px; width: 100%; }
+.search-icon-inside { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 14px; pointer-events: none; }
 
 .btn-tab-styled-add { 
     display: inline-block !important; padding: 5px 14px !important; font-size: 12px !important; font-weight: 600 !important; 
@@ -196,12 +200,18 @@ include "includes/header.php";
     <div class="split-requisition-layout">
         <div class="materials-main-panel">
             <div class="catalog-cards-box">
+                
+                <div class="search-input-wrapper">
+                    <span class="search-icon-inside">🔍</span>
+                    <input type="text" id="catalogQuickSearchInput" class="btn-quick-search-box" placeholder="Quick search materials registry on the fly... (e.g., Oil, Rice)" onkeyup="window.quickSearchCatalogRegistry()">
+                </div>
+
                 <div class="catalog-tab-header">
-                    <button type="button" class="catalog-tab-btn active" onclick="window.filterMaterialCatalog('all', this)">All Items</button>
+                    <button type="button" id="globalAllTabBtn" class="catalog-tab-btn active" onclick="window.filterMaterialCatalog('all', this)">All Items</button>
                     <?php foreach ($categories as $cat): ?>
                         <button type="button" class="catalog-tab-btn" onclick="window.filterMaterialCatalog('cat_<?= $cat['id'] ?>', this)"><?= htmlspecialchars($cat['name']) ?></button>
                     <?php endforeach; ?>
-                    <button type="button" class="catalog-tab-btn" style="background:#fffbeb; color:#d97706; border: 1px dashed #f59e0b;" onclick="window.openChefNewProductModal()">➕ New Product</button>
+                    <button type="button" class="catalog-tab-btn" style="background:#fffbeb; color:#d97706; border: 1px dashed #f59e0b; margin-left: auto;" onclick="window.openChefNewProductModal()">➕ New Product</button>
                 </div>
 
                 <div id="materialCatalogContainer">
@@ -212,12 +222,12 @@ include "includes/header.php";
                         if (empty($catItems)) continue;
                     ?>
                         <div class="category-block" id="cat_<?= $cat['id'] ?>" style="margin-bottom: 25px;">
-                            <h4 style="font-size: 13px; text-transform: uppercase; color: #4b5563; text-align: left; margin-bottom: 10px; font-weight: 700;"><?= $cat['name'] ?></h4>
+                            <h4 class="category-block-title" style="font-size: 13px; text-transform: uppercase; color: #4b5563; text-align: left; margin-bottom: 10px; font-weight: 700;"><?= $cat['name'] ?></h4>
                             <div class="material-item-grid">
                                 <?php foreach ($catItems as $item): 
                                     $item_img = !empty($item['image_path']) ? $item['image_path'] : 'assets/images/catalog/placeholder.png';
                                 ?>
-                                    <div class="material-item-card">
+                                    <div class="material-item-card" data-search-name="<?= strtolower(htmlspecialchars($item['name'])) ?>">
                                         <div class="material-item-image-box">
                                             <img src="<?= $item_img ?>" alt="">
                                         </div>
@@ -353,14 +363,65 @@ include "includes/header.php";
 
             <div style="display: flex; gap: 10px; justify-content: flex-end;">
                 <button type="button" class="btn btn-log" style="padding: 8px 16px;" onclick="window.closeChefNewProductModal()">Cancel</button>
-                <button type="submit" class="btn btn-bill" style="padding: 8px 20px; font-weight: 800; background:#d97706; border-color:#d97706;">Add to List</button>
+                <button type="submit" class="btn btn-bill" style="padding: 8px 20px; font-weight: 800; background:#d97706; border-color:#d97706;">Add To Catalog</button>
             </div>
         </form>
     </div>
 </div>
 
 <script>
-window.reqCart = [];
+let activeCartStateMap = {};
+let activeFilteredTabId = 'all';
+
+// --- ASYNCHRONOUS ENGINE: LIVE SEARCH FILTERS ---
+window.quickSearchCatalogRegistry = function() {
+    const inputVal = document.getElementById("catalogQuickSearchInput").value.toLowerCase().trim();
+    const blocks = document.querySelectorAll(".category-block");
+    
+    // Automatically reset category tab back to 'All Items' when filtering text string to maximize results matching visibility
+    if (inputVal !== "" && activeFilteredTabId !== 'all') {
+        activeFilteredTabId = 'all';
+        document.querySelectorAll(".catalog-tab-btn").forEach(b => b.classList.remove("active"));
+        document.getElementById("globalAllTabBtn").classList.add("active");
+    }
+
+    blocks.forEach(block => {
+        let parentHasVisibleItem = false;
+        const cards = block.querySelectorAll(".material-item-card");
+        
+        cards.forEach(card => {
+            const searchName = card.getAttribute("data-search-name") || "";
+            const isTabMatch = (activeFilteredTabId === 'all' || block.id === activeFilteredTabId);
+            const isSearchMatch = searchName.includes(inputVal);
+
+            if (isTabMatch && isSearchMatch) {
+                card.style.display = "flex";
+                parentHasVisibleItem = true;
+            } else {
+                card.style.display = "none";
+            }
+        });
+
+        block.style.display = parentHasVisibleItem ? "block" : "none";
+    });
+};
+
+window.filterMaterialCatalog = function(catId, btn) {
+    activeFilteredTabId = catId;
+    document.getElementById("catalogQuickSearchInput").value = ""; // Flush query line on explicit tab selection
+
+    document.querySelectorAll(".catalog-tab-btn").forEach(b => b.classList.remove("active"));
+    if (btn) btn.classList.add("active");
+    
+    document.querySelectorAll(".category-block").forEach(block => {
+        if (catId === 'all' || block.id === catId) {
+            block.style.display = "block";
+            block.querySelectorAll(".material-item-card").forEach(c => c.style.display = "flex");
+        } else {
+            block.style.display = "none";
+        }
+    });
+};
 
 window.addMaterialToSidebar = function(id, name) {
     let existing = window.reqCart.find(x => x.id === id);
@@ -398,14 +459,6 @@ window.renderSidebarCart = function() {
             </div>
         </div>
     `).join('');
-};
-
-window.filterMaterialCatalog = function(catId, btn) {
-    document.querySelectorAll(".catalog-tab-btn").forEach(b => b.classList.remove("active"));
-    if (btn) btn.classList.add("active");
-    document.querySelectorAll(".category-block").forEach(block => {
-        block.style.display = (catId === 'all' || block.id === catId) ? "block" : "none";
-    });
 };
 
 window.submitSidebarRequisition = function() {
@@ -562,22 +615,42 @@ window.reactivateActionRowButtons = function(catalogId, activeValue) {
     if (activeValue === 0) {
         rowWrapper.classList.add('row-state-greyed-out');
         btnCancelled.setAttribute('disabled', 'disabled');
+        window.syncRowAuditText(catalogId);
     }
-};
+}
 
-window.syncRowAuditText = function(catalogId) {
-    const input = document.getElementById(`mdlQtyInput_${catalogId}`);
-    const subtitle = document.getElementById(`qtyAuditSubtitle_${catalogId}`);
-    if (!input || !subtitle) return;
+window.saveInlineFieldChange = function(rowId, type, fallbackValue) {
+    const targetCell = document.getElementById(`cell-${type}-${rowId}`);
+    const inputEl = document.getElementById(`inline-edit-${type}-${rowId}`);
+    if (!inputEl) return;
 
-    const originalCount = parseFloat(subtitle.getAttribute("data-original")) || 0;
-    const currentCount  = parseFloat(input.value) || 0;
-
-    if (currentCount === originalCount) {
-        subtitle.innerHTML = `Ordered: ${originalCount}`;
-    } else {
-        subtitle.innerHTML = `Ordered: <del>${originalCount}</del> <strong style="color:#0284c7;">${currentCount}</strong>`;
+    const finalValue = inputEl.value.trim();
+    if (finalValue === "" || finalValue === fallbackValue) {
+        targetCell.innerText = type === 'amount' ? parseFloat(fallbackValue).toFixed(2) : fallbackValue;
+        return;
     }
+
+    const targetDate = (type === 'date') ? finalValue : document.getElementById(`cell-date-${rowId}`).innerText;
+    const targetAmount = (type === 'amount') ? finalValue : document.getElementById(`cell-amount-${rowId}`).innerText;
+
+    const payload = new FormData();
+    payload.append('action_ajax_update_expense', '1');
+    payload.append('expense_id', rowId);
+    payload.append('new_amount', targetAmount);
+    payload.append('new_date', targetDate);
+
+    fetch('expenses.php', { method: 'POST', body: payload })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            document.getElementById(`cell-date-${rowId}`).innerText = targetDate;
+            document.getElementById(`cell-amount-${rowId}`).innerText = parseFloat(targetAmount).toFixed(2);
+        } else {
+            alert("❌ Update failure: " + data.message);
+        }
+    }).catch(() => {
+        alert("❌ Server connectivity error.");
+    });
 };
 
 window.triggerMemoryStateUpdate = function(catalogId, targetedState) {
