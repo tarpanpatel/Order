@@ -8,15 +8,6 @@ if (!isset($_SESSION["user_id"])) {
     exit; 
 }
 
-// --- CORE ANALYTICS: EVALUATE MATERIAL STOCK THRESHOLDS ---
-$stock_alerts = $pdo->query("
-    SELECT m.item_name, m.min_threshold_qty, COALESCE(SUM(k.qty), 0) as current_available_stock
-    FROM materials_registry m
-    LEFT JOIN kitchen_expenses k ON LOWER(m.item_name) = LOWER(k.item_detail)
-    GROUP BY m.item_name, m.min_threshold_qty
-    HAVING current_available_stock <= m.min_threshold_qty
-")->fetchAll(PDO::FETCH_ASSOC);
-
 // Fetching menu categories and configurations directly from the verified database mapping
 $categories = $pdo->query("SELECT * FROM menu_categories ORDER BY sort_order ASC")->fetchAll(PDO::FETCH_ASSOC);
 $menu_items = $pdo->query("SELECT * FROM menu_items WHERE is_hidden = 0 ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
@@ -47,7 +38,7 @@ include "includes/header.php";
 }
 .menu-card-item:hover { transform: translateY(-3px); border-color: #06b6d4; box-shadow: 0 4px 12px rgba(6,182,212,0.08); }
 
-/* MAXIMUM VIEW IMAGE LAYER ENGINE */
+/* MAXIMUM VISIBILITY IMAGE CANVAS HEADER */
 .menu-card-img-wrapper {
     width: 100%;
     height: 110px;
@@ -82,23 +73,9 @@ include "includes/header.php";
 }
 
 .cart-sticky-panel { background: #f8fafc; border: 1px solid #cbd5e0; border-radius: 12px; padding: 16px; position: sticky; top: 130px; max-height: calc(100vh - 160px); display: flex; flex-direction: column; }
-.alert-pill-box { padding: 8px 12px; background: #fef2f2; border: 1px dashed #ef4444; border-radius: 6px; color: #b91c1c; font-size: 11px; font-weight: bold; margin-bottom: 15px; }
 </style>
 
 <div class="app-body" style="padding: 15px; font-family: sans-serif; text-align: left;">
-    
-    <?php if (!empty($stock_alerts)): ?>
-        <div class="alert-pill-box">
-            <span style="font-size:13px;">⚠️ INVENTORY STOCK ALERT BOUNDARY THRESHOLDS:</span>
-            <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px;">
-                <?php foreach ($stock_alerts as $alert): ?>
-                    <span style="background: #fee2e2; border: 1px solid #fca5a5; padding: 2px 6px; border-radius: 4px; font-size: 11px;">
-                        <strong><?= htmlspecialchars($alert['item_name']) ?></strong> (Low: <?= $alert['current_available_stock'] ?> units left)
-                    </span>
-                <?php endforeach; ?>
-            </div>
-        </div>
-    <?php endif; ?>
 
     <div style="background: #fff; border: 1px solid #cbd5e0; border-radius: 10px; padding: 12px 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; width:100%;">
         <div style="display:flex; width:100%; justify-content:space-between; align-items:center;">
