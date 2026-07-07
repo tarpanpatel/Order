@@ -1,8 +1,11 @@
 <?php
 // /home/apartment/artistsfarmjaipur.com/Order/kitchen_purchases.php
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
-require_once "config/db.php";
-require_once "config/telegram.php";
+require_once __DIR__ . "/config/db.php";
+
+if (file_exists(__DIR__ . "/config/telegram.php")) {
+    require_once __DIR__ . "/config/telegram.php";
+}
 
 if (!isset($_SESSION["user_id"])) { 
     header("Location: login.php"); 
@@ -15,7 +18,7 @@ $message = "";
 $columnCheck = $pdo->query("DESCRIBE kitchen_expenses")->fetchAll(PDO::FETCH_COLUMN);
 
 // 1. Verify item descriptor column name
-$target_item_column = "item_detail"; 
+$target_item_column = "item_detail";
 if (!in_array("item_detail", $columnCheck)) {
     if (in_array("item_name", $columnCheck)) {
         $target_item_column = "item_name";
@@ -73,16 +76,16 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_add_kitchen_ex
                     // Automatically mark the main request envelope complete
                     $inClause = implode(',', array_map('intval', $checkMasters));
                     $pdo->query("UPDATE requisitions SET status = 'Fulfilled' WHERE id IN ($inClause) AND status = 'Pending'");
-                    
-                    // --- SUCCESS NOTIFICATION: TELEGRAM BROADCAST ON DEMO MATCH FULFILLMENT ---
-                    if (function_exists('sendTelegramMessage')) {
-                        $telegramMessage = "✅ *Stock Request Auto-Fulfilled!*\n\n";
-                        $telegramMessage .= "🛒 *Item:* " . $item_detail . "\n";
-                        $telegramMessage .= "📦 *Quantity:* " . $qty . "\n";
-                        $telegramMessage .= "🏪 *Vendor:* " . (!empty($vendor) ? $vendor : 'Market Sourcing') . "\n\n";
-                        $telegramMessage .= "📊 *Status:* Requisition order matching successfully closed.";
-                        sendTelegramMessage($telegramMessage);
-                    }
+                }
+
+                // Send Telegram update if the notification mechanism exists
+                if (function_exists('sendTelegramMessage')) {
+                    $telegramMessage = "✅ *Stock Request Auto-Fulfilled!*\n\n";
+                    $telegramMessage .= "🛒 *Item:* " . $item_detail . "\n";
+                    $telegramMessage .= "📦 *Quantity:* " . $qty . "\n";
+                    $telegramMessage .= "🏪 *Vendor:* " . (!empty($vendor) ? $vendor : 'Market Sourcing') . "\n\n";
+                    $telegramMessage .= "📊 *Status:* Requisition order item marked complete.";
+                    sendTelegramMessage($telegramMessage);
                 }
             }
 
