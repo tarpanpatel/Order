@@ -12,45 +12,41 @@
     </div>
     
     <nav style="display: flex; flex-direction: column; gap: 4px;">
-        <?php 
-        $is_manager = isset($_SESSION["role"]) && $_SESSION["role"] === 'Admin';
-        $is_super   = isset($_SESSION["role"]) && $_SESSION["role"] === 'Super Admin';
-        
-        if ($is_manager || $is_super): 
-        ?>
-            <a href="index.php" class="nav-link <?= ($current_page === 'index.php') ? 'active' : ''; ?>">📊 Dashboard</a>
+        <a href="index.php" class="nav-link <?= ($current_page === 'index.php') ? 'active' : ''; ?>">📊 Dashboard</a>
 
-            <?php if (!empty($current_active_guest)): ?>
-                <div style="margin: 6px 0; background: #fdfaf7; border: 1px solid #cbd5e0; border-radius: 8px; padding: 8px;">
-                    <div style="font-size:11px; font-weight:bold; color:#0891b2; margin-bottom:5px; text-align:center; text-transform:uppercase;">● Active: 📱 (<?= substr($current_active_guest['phone_number'], -4) ?>)</div>
-                    <a href="billing.php" class="sidebar-action-card sb-btn-active">⏸ Checkout Billing</a>
-                </div>
-            <?php else: ?>
-                <div style="margin: 6px 0; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px;">
-                    <form method="POST" action="checkin.php" style="margin: 0;">
-                        <input type="hidden" name="action_sidebar_activate" value="1">
-                        <select name="sidebar_guest_select" required style="width: 100%; padding: 6px; margin-bottom: 6px; border-radius: 6px; border: 1px solid #cbd5e0; font-size: 11px; background: #fff; color: #1e293b;">
-                            <option value="">-- Choose Guest --</option>
-                            <?php foreach ($all_booked_guests as $g): ?>
-                                <option value="<?= $g['id'] ?>"><?= htmlspecialchars($g['guest_name']) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                        <button type="submit" class="sidebar-action-card sb-btn-inactive">▶ Activate Ledger</button>
-                    </form>
-                </div>
-            <?php endif; ?>
-
-            <a href="checkin.php" class="nav-link <?= ($current_page === 'checkin.php') ? 'active' : ''; ?>">👤 Guest Registration</a>
-            <a href="billing.php" class="nav-link <?= ($current_page === 'billing.php') ? 'active' : ''; ?>">🧾 Settlements & Billing</a>
+        <?php if (!empty($current_active_guest)): ?>
+            <div style="margin: 6px 0; background: #fdfaf7; border: 1px solid #cbd5e0; border-radius: 8px; padding: 8px;">
+                <div style="font-size:11px; font-weight:bold; color:#0891b2; margin-bottom:5px; text-align:center; text-transform:uppercase;">● Active: 📱 (<?= substr($current_active_guest['phone_number'], -4) ?>)</div>
+                <a href="billing.php" class="sidebar-action-card sb-btn-active">⏸ Checkout Billing</a>
+            </div>
+        <?php else: ?>
+            <div style="margin: 6px 0; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px;">
+                <form method="POST" action="checkin.php" style="margin: 0;">
+                    <input type="hidden" name="action_sidebar_activate" value="1">
+                    <select name="sidebar_guest_select" required style="width: 100%; padding: 6px; margin-bottom: 6px; border-radius: 6px; border: 1px solid #cbd5e0; font-size: 11px; background: #fff; color: #1e293b;">
+                        <option value="">-- Choose Guest --</option>
+                        <?php foreach ($all_booked_guests as $g): ?>
+                            <option value="<?= $g['id'] ?>"><?= htmlspecialchars($g['guest_name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <button type="submit" class="sidebar-action-card sb-btn-inactive">▶ Activate Ledger</button>
+                </form>
+            </div>
         <?php endif; ?>
 
+        <a href="checkin.php" class="nav-link <?= ($current_page === 'checkin.php') ? 'active' : ''; ?>">👤 Guest Registration</a>
+        <a href="billing.php" class="nav-link <?= ($current_page === 'billing.php') ? 'active' : ''; ?>">🧾 Settlements & Billing</a>
         <a href="order.php" class="nav-link <?= ($current_page === 'order.php') ? 'active' : ''; ?>">🍽️ Take Food Order</a>
         <a href="kitchen.php" class="nav-link <?= ($current_page === 'kitchen.php') ? 'active' : ''; ?>">🍳 Kitchen Orders</a>
         <a href="requisitions.php" class="nav-link <?= ($current_page === 'requisitions.php') ? 'active' : ''; ?>">📦 Material Requests</a>
         <a href="kitchen_purchases.php" class="nav-link <?= ($current_page === 'kitchen_purchases.php') ? 'active' : ''; ?>">🛒 Kitchen Purchases</a>
         <a href="expenses.php" class="nav-link <?= ($current_page === 'expenses.php') ? 'active' : ''; ?>">📈 Expenses</a>
 
-        <?php if ($is_super || $is_manager): ?>
+        <?php 
+        $is_manager = isset($_SESSION["role"]) && $_SESSION["role"] === 'Admin';
+        $is_super   = isset($_SESSION["role"]) && $_SESSION["role"] === 'Super Admin';
+        if ($is_super || $is_manager): 
+        ?>
             <div class="admin-settings-wrapper" style="margin-top: 10px; border-top: 1px solid #cbd5e0; padding-top: 10px; width: 100%;">
                 <div onclick="toggleAdminSubMenu()" class="nav-link" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 700; color: #475569; padding: 10px 16px;">
                     <span>🛠️ Admin Control</span>
