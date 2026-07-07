@@ -8,17 +8,36 @@ if (!isset($_SESSION["user_id"])) {
     exit; 
 }
 
-// Ensure role safety variables are initialized cleanly
 $user_role = $_SESSION["role"] ?? 'Staff';
 
-// --- BACKEND LOGIC: POST INTERCEPTOR FOR COMMITTING FIXED COSTS ---
+// --- BACKEND LOGIC: AJAX INLINE ROW UPDATE INTERCEPTOR ---
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_ajax_update_expense"])) {
+    header('Content-Type: application/json');
+    $expense_id = intval($_POST["expense_id"]);
+    $new_amount = floatval($_POST["new_amount"]);
+    $new_date   = trim($_POST["new_date"]);
+
+    if ($expense_id > 0 && $new_amount > 0 && !empty($new_date)) {
+        try {
+            $stmt = $pdo->prepare("UPDATE farm_utility_expenses SET amount = ?, expense_date = ? WHERE id = ?");
+            $stmt->execute([$new_amount, $new_date, $expense_id]);
+            echo json_encode(["status" => "success", "message" => "Expense entry log row updated successfully."]);
+        } catch (PDOException $e) {
+            echo json_encode(["status" => "error", "message" => "Database synchronization rejection fault."]);
+        }
+    } else {
+        echo json_encode(["status" => "error", "message" => "Invalid criteria parameters payload supplied."]);
+    }
+    exit;
+}
+
+// --- STANDARD SUBMISSION FORM HANDLER ---
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_record_expense"])) {
     $expense_date = $_POST["expense_date"];
     $category     = $_POST["cost_category"];
     $amount       = floatval($_POST["amount"]);
     $payment_mode = $_POST["payment_mode"];
     
-    // SECURITY BLOCK: Enforce Admin/Super Admin access control for Staff Salaries category entries
     if ($category === "Salaries" && ($user_role !== "Admin" && $user_role !== "Super Admin")) {
         die("Security Exception: Access Denied to unauthorized financial categories.");
     }
@@ -27,7 +46,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_record_expense
         $vendor_name = trim($_POST["selected_staff_name"]);
         $description = "Salary payment for " . $vendor_name;
     } else if ($category === "Other") {
-        $vendor_name = trim($_POST["predefined_item_selection"]); // Selected dynamic list item
+        $vendor_name = trim($_POST["predefined_item_selection"]);
         $more_info = trim($_POST["more_info_notes"] ?? '');
         $description = !empty($more_info) ? $vendor_name . " - " . $more_info : $vendor_name;
     } else {
@@ -36,10 +55,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_record_expense
     }
 
     if (!empty($expense_date) && $amount > 0 && !empty($category)) {
-        $stmt = $pdo->prepare("
-            INSERT INTO farm_utility_expenses (expense_date, category, description, amount, payment_mode, vendor_name)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ");
+        $stmt = $pdo->prepare("INSERT INTO farm_utility_expenses (expense_date, category, description, amount, payment_mode, vendor_name) VALUES (?, ?, ?, ?, ?, ?)");
         $stmt->execute([$expense_date, $category, $description, $amount, $payment_mode, $vendor_name]);
         $_SESSION['expense_toast'] = "Expense recorded successfully!";
     }
@@ -47,34 +63,32 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_record_expense
     exit;
 }
 
-// Fetch staff from the table excluding Super Admin
 $db_staff = $pdo->query("SELECT username FROM users WHERE role != 'Super Admin' ORDER BY username ASC")->fetchAll(PDO::FETCH_COLUMN);
-
-// Fetch customized autocomplete description checklist arrays natively from the database
 $predefined_items = $pdo->query("SELECT item_name FROM expense_predefined_items ORDER BY item_name ASC")->fetchAll(PDO::FETCH_COLUMN);
-
-// Fetch recent operational cost logs
-$recent_expenses = $pdo->query("SELECT * FROM farm_utility_expenses ORDER BY id DESC LIMIT 10")->fetchAll(PDO::FETCH_ASSOC);
+$recent_expenses = $pdo->query("SELECT * FROM farm_utility_expenses ORDER BY id DESC LIMIT 15")->fetchAll(PDO::FETCH_ASSOC);
 
 include "includes/header.php";
 ?>
 
 <style>
 .form-input-container { width:100%; padding:10px; border:1px solid #cbd5e0; border-radius:8px; box-sizing:border-box; font-size:14px; font-weight:600; color:#1e293b; background:#fff; }
-.form-label-header { font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.3px; }
+.form-label-header { font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:5px; text-transform:uppercase; }
 .autocomplete-search-popup { position:absolute; background:white; border:1px solid #cbd5e0; border-radius:8px; width:100%; max-height:180px; overflow-y:auto; box-shadow:0 4px 6px rgba(0,0,0,0.05); z-index:999; margin-top:2px; display:none; }
-.autocomplete-suggestion-item { padding:10px; cursor:pointer; font-size:13px; font-weight:600; border-bottom:1px solid #f1f5f9; text-align:left; }
+.autocomplete-suggestion-item { padding:10px; cursor:pointer; font-size:13px; font-weight:600; border-bottom:1px solid #f1f5f9; }
 .autocomplete-suggestion-item:hover { background:#f0fdfa; color:#06b6d4; }
+.editable-click-cell { cursor: pointer; border-bottom: 1px dashed #06b6d4; padding: 2px 4px; border-radius: 4px; }
+.editable-click-cell:hover { background: #ecfeff; color: #0891b2; }
+.inline-cell-editor { width: 90px; padding: 4px; font-size: 13px; font-weight: bold; border: 2px solid #06b6d4; border-radius: 4px; }
 </style>
 
 <div class="app-body" style="padding: 20px; font-family: sans-serif; text-align: left;">
     
     <?php if (isset($_SESSION['expense_toast'])): ?>
-        <div style="max-width:760px; margin:0 auto 15px auto; padding:10px; background:#10b981; color:white; border-radius:6px; font-weight:bold;">📢 <?= htmlspecialchars($_SESSION['expense_toast']); unset($_SESSION['expense_toast']); ?></div>
+        <div style="max-width:820px; margin:0 auto 15px auto; padding:12px; background:#10b981; color:white; border-radius:6px; font-weight:bold;">📢 <?= htmlspecialchars($_SESSION['expense_toast']); unset($_SESSION['expense_toast']); ?></div>
     <?php endif; ?>
 
-    <div style="max-width: 760px; margin: 0 auto; background: #ffffff; border: 1px solid #cbd5e0; border-radius: 12px; padding: 25px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
-        <h3 style="margin-top:0; color:#1e293b; border-bottom:1px solid #e2e8f0; padding-bottom:10px; text-transform:uppercase; font-size:16px; letter-spacing:0.5px;">📝 Expenses Workspace</h3>
+    <div style="max-width: 820px; margin: 0 auto; background: #ffffff; border: 1px solid #cbd5e0; border-radius: 12px; padding: 25px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+        <h3 style="margin-top:0; color:#1e293b; border-bottom:1px solid #e2e8f0; padding-bottom:10px; text-transform:uppercase; font-size:15px; letter-spacing:0.5px;">📝 Expenses Workspace</h3>
         
         <form method="POST" action="expenses.php" id="expenseRegistryForm" autocomplete="off">
             <input type="hidden" name="action_record_expense" value="1">
@@ -99,7 +113,7 @@ include "includes/header.php";
             <div id="staffSalaryDropdownContainer" style="display:none; margin-bottom:15px; background:#f8fafc; padding:15px; border-radius:8px; border:1px dashed #06b6d4;">
                 <label class="form-label-header" style="color:#0891b2;">👤 Select Salary Recipient Member</label>
                 <select name="selected_staff_name" id="selectedStaffField" class="form-input-container">
-                    <option value="">-- Choose Teammate getting Paid --</option>
+                    <option value="">-- Choose Staff Member getting Paid --</option>
                     <?php if (!empty($db_staff)): foreach ($db_staff as $name): ?>
                         <option value="<?= htmlspecialchars($name) ?>"><?= htmlspecialchars($name) ?></option>
                     <?php endforeach; endif; ?>
@@ -109,7 +123,6 @@ include "includes/header.php";
             <div id="otherPredefinedAutocompleteContainer" style="display:none; margin-bottom:15px; background:#f8fafc; padding:15px; border-radius:8px; border:1px dashed #64748b; position:relative;">
                 <label class="form-label-header">🔍 Details Descriptions</label>
                 <input type="text" id="detailsDescriptionAutocompleteInput" name="predefined_item_selection" placeholder="Type to search items... (e.g., MCB, Petrol)" class="form-input-container" onkeyup="filterPredefinedSuggestions()" onfocus="filterPredefinedSuggestions()">
-                
                 <div id="autocompleteSuggestionsMenu" class="autocomplete-search-popup"></div>
 
                 <div id="moreInformationOptionalFieldWrapper" style="display:none; margin-top:15px;">
@@ -148,8 +161,8 @@ include "includes/header.php";
         </form>
     </div>
 
-    <div style="max-width:760px; margin:25px auto 0 auto; background:#fff; border:1px solid #cbd5e0; border-radius:12px; padding:20px;">
-        <h4 style="margin-top:0; border-bottom:1px solid #e2e8f0; padding-bottom:8px; text-transform:uppercase; font-size:11px; color:#475569;">Recent Operational Cost Logs</h4>
+    <div style="max-width:820px; margin:25px auto 0 auto; background:#fff; border:1px solid #cbd5e0; border-radius:12px; padding:20px;">
+        <h4 style="margin-top:0; border-bottom:1px solid #e2e8f0; padding-bottom:8px; text-transform:uppercase; font-size:11px; color:#475569;">Recent Operational Cost Logs (Click Date or Amount to edit inline)</h4>
         <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
             <thead>
                 <tr style="background:#f8fafc; border-bottom:2px solid #cbd5e0;">
@@ -162,11 +175,15 @@ include "includes/header.php";
             </thead>
             <tbody>
                 <?php if(!empty($recent_expenses)): foreach ($recent_expenses as $row): ?>
-                    <tr style="border-bottom:1px solid #edf2f7;">
-                        <td style="padding:10px; color:#64748b;"><?= $row['expense_date'] ?></td>
+                    <tr style="border-bottom:1px solid #edf2f7;" id="expense-row-id-<?= $row['id'] ?>">
+                        <td style="padding:10px;">
+                            <span class="editable-click-cell" id="cell-date-<?= $row['id'] ?>" onclick="openInlineFieldEditor(<?= $row['id'] ?>, 'date', '<?= $row['expense_date'] ?>')"><?= $row['expense_date'] ?></span>
+                        </td>
                         <td style="padding:10px;"><span style="font-weight:700; color:#0284c7;"><?= htmlspecialchars($row['category']) ?></span></td>
                         <td style="padding:10px;"><strong><?= htmlspecialchars($row['vendor_name'] ?? 'Other') ?></strong> - <span style="color:#475569; font-size:12px;"><?= htmlspecialchars($row['description']) ?></span></td>
-                        <td style="padding:10px; text-align:right; font-weight:800; color:#1e293b;">₹<?= number_format($row['amount'], 2) ?></td>
+                        <td style="padding:10px; text-align:right; font-weight:800; color:#1e293b;">
+                            ₹<span class="editable-click-cell" id="cell-amount-<?= $row['id'] ?>" onclick="openInlineFieldEditor(<?= $row['id'] ?>, 'amount', '<?= $row['amount'] ?>')"><?= number_format($row['amount'], 2, '.', '') ?></span>
+                        </td>
                         <td style="padding:10px; text-align:center;"><span style="font-size:11px; font-weight:bold; color:#64748b;"><?= htmlspecialchars($row['payment_mode']) ?></span></td>
                     </tr>
                 <?php endforeach; endif; ?>
@@ -176,12 +193,10 @@ include "includes/header.php";
 </div>
 
 <script>
-// JSON string map of items initialized via backend query array matrices safely
 const datasetPredefinedOptions = <?php echo json_encode($predefined_items); ?>;
 
 function toggleExpenseCategoryView() {
     const activeSelection = document.getElementById("costCategoryGroup").value;
-    
     const blockSalaries    = document.getElementById("staffSalaryDropdownContainer");
     const blockOther       = document.getElementById("otherPredefinedAutocompleteContainer");
     const blockStandard    = document.getElementById("standardExpenseInputsContainer");
@@ -191,9 +206,7 @@ function toggleExpenseCategoryView() {
     const fieldAutocomplete= document.getElementById("detailsDescriptionAutocompleteInput");
     const fieldDesc        = document.getElementById("expDescInput");
     const fieldVendor      = document.getElementById("expVendorInput");
-    const fieldMoreInfoBlock = document.getElementById("moreInformationOptionalFieldWrapper");
 
-    // Reset fields visibility and requirements natively
     blockSalaries.style.display = "none";
     blockOther.style.display    = "none";
     blockStandard.style.display = "none";
@@ -214,11 +227,8 @@ function toggleExpenseCategoryView() {
         fieldVendorBlock.style.display = "none";
         fieldAutocomplete.setAttribute("required", "required");
         fieldVendor.removeAttribute("required");
-        
-        // FOCUS REDIRECT: Snap cursor focus straight to Details Descriptions
         setTimeout(() => { fieldAutocomplete.focus(); }, 50);
     } else {
-        // Fallback baseline for "Bills"
         blockStandard.style.display = "block";
         fieldDesc.setAttribute("required", "required");
     }
@@ -228,16 +238,12 @@ function filterPredefinedSuggestions() {
     const inputField = document.getElementById("detailsDescriptionAutocompleteInput");
     const filterText = inputField.value.toLowerCase().trim();
     const popupMenu  = document.getElementById("autocompleteSuggestionsMenu");
-    
-    // Filter suggestion dataset matching search parameter substring patterns
     const matches = datasetPredefinedOptions.filter(item => item.toLowerCase().includes(filterText));
     
     if (matches.length === 0) {
         popupMenu.innerHTML = '<div style="padding:10px; color:#94a3b8; font-size:12px; font-style:italic;">No matches found.</div>';
     } else {
-        popupMenu.innerHTML = matches.map(item => `
-            <div class="autocomplete-suggestion-item" onclick="selectPredefinedItem('${item.replace(/'/g, "\\'")}')">${item}</div>
-        `).join('');
+        popupMenu.innerHTML = matches.map(item => `<div class="autocomplete-suggestion-item" onclick="selectPredefinedItem('${item.replace(/'/g, "\\'")}')">${item}</div>`).join('');
     }
     popupMenu.style.display = "block";
 }
@@ -245,20 +251,71 @@ function filterPredefinedSuggestions() {
 function selectPredefinedItem(value) {
     const inputField = document.getElementById("detailsDescriptionAutocompleteInput");
     inputField.value = value;
-    
-    // Hide suggester list instantly
     document.getElementById("autocompleteSuggestionsMenu").style.display = "none";
-    
-    // DYNAMIC HOOK: Reveal the optional More Info text field upon asset select commitment
     document.getElementById("moreInformationOptionalFieldWrapper").style.display = "block";
     setTimeout(() => { document.getElementById("moreInfoOptionalField").focus(); }, 50);
 }
 
-// Close suggester drop-down instantly if clicked anywhere outside boundary focus bounds
+function openInlineFieldEditor(rowId, type, rawValue) {
+    const targetCell = document.getElementById(`cell-${type}-${rowId}`);
+    if (targetCell.querySelector('input')) return;
+
+    const inputType = (type === 'date') ? 'date' : 'number';
+    const extraAttributes = (type === 'amount') ? 'step="0.01" min="0.01"' : '';
+    
+    targetCell.innerHTML = `<input type="${inputType}" ${extraAttributes} class="inline-cell-editor" id="inline-edit-${type}-${rowId}" value="${rawValue}">`;
+    const inputEl = document.getElementById(`inline-edit-${type}-${rowId}`);
+    inputEl.focus();
+
+    inputEl.addEventListener('blur', () => saveInlineFieldChange(rowId, type, rawValue));
+    inputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') inputEl.blur();
+        if (e.key === 'Escape') targetCell.innerText = rawValue;
+    });
+}
+
+function saveInlineFieldChange(rowId, type, fallbackValue) {
+    const targetCell = document.getElementById(`cell-${type}-${rowId}`);
+    const inputEl = document.getElementById(`inline-edit-${type}-${rowId}`);
+    if (!inputEl) return;
+
+    const finalValue = inputEl.value.trim();
+    if (finalValue === "" || finalValue === fallbackValue) {
+        targetCell.innerText = type === 'amount' ? parseFloat(fallbackValue).toFixed(2) : fallbackValue;
+        return;
+    }
+
+    const targetDate = (type === 'date') ? finalValue : document.getElementById(`cell-date-${rowId}`).innerText;
+    const targetAmount = (type === 'amount') ? finalValue : document.getElementById(`cell-amount-${rowId}`).innerText;
+
+    const payload = new FormData();
+    payload.append('action_ajax_update_expense', '1');
+    payload.append('expense_id', rowId);
+    payload.append('new_amount', targetAmount);
+    payload.append('new_date', targetDate);
+
+    fetch('expenses.php', { method: 'POST', body: payload })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            document.getElementById(`cell-date-${rowId}`).innerText = targetDate;
+            document.getElementById(`cell-amount-${rowId}`).innerText = parseFloat(targetAmount).toFixed(2);
+            document.getElementById(`cell-date-${rowId}`).onclick = () => openInlineFieldEditor(rowId, 'date', targetDate);
+            document.getElementById(`cell-amount-${rowId}`).onclick = () => openInlineFieldEditor(rowId, 'amount', targetAmount);
+        } else {
+            alert("❌ Update failure: " + data.message);
+            location.reload();
+        }
+    }).catch(() => {
+        alert("❌ Loss of connection link network tunnel connectivity.");
+        location.reload();
+    });
+}
+
 document.addEventListener("click", function(e) {
     const inputField = document.getElementById("detailsDescriptionAutocompleteInput");
     const popupMenu  = document.getElementById("autocompleteSuggestionsMenu");
-    if (e.target !== inputField && !popupMenu.contains(e.target)) {
+    if (inputField && popupMenu && e.target !== inputField && !popupMenu.contains(e.target)) {
         popupMenu.style.display = "none";
     }
 });
