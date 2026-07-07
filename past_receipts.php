@@ -14,7 +14,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_invoice
     
     $pdo->beginTransaction();
     try {
-        $subtotal = 0;
         foreach ($item_qtys as $item_id => $qty) {
             $item_id = intval($item_id);
             $qty = intval($qty);
@@ -22,20 +21,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_invoice
             if ($qty <= 0) {
                 $pdo->prepare("DELETE FROM order_items WHERE id = ? AND order_id = ?")->execute([$item_id, $order_id]);
             } else {
-                $priceStmt = $pdo->prepare("SELECT price FROM order_items WHERE id = ?");
-                $priceStmt->execute([$item_id]);
-                $unit_price = floatval($priceStmt->fetchColumn() ?: 0);
-                
-                $item_total = $unit_price * $qty;
-                $subtotal += $item_total;
-                
-                // Update quantity; we do not rely on a total_price column
+                // Update quantity inside order_items table lines
                 $pdo->prepare("UPDATE order_items SET quantity = ? WHERE id = ? AND order_id = ?")->execute([$qty, $item_id, $order_id]);
             }
         }
-        
-        // Update order total using dynamic calculation (grand_total set to subtotal)
-        $pdo->prepare("UPDATE orders SET grand_total = ? WHERE id = ?")->execute([$subtotal, $order_id]);
         
         $pdo->commit();
         $_SESSION['invoice_success_toast'] = "Invoice #$order_id updated successfully!";
@@ -47,10 +36,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_invoice
     }
 }
 
-// FIXED SQL: Calculating 'subtotal' by multiplying quantity * price dynamically to avoid missing column errors
+// FIXED SQL: Joined order_items with menu_items to multiply quantity * mi.price accurately
 $orders = $pdo->query("
     SELECT o.id, 
-           (SELECT SUM(oi.quantity * oi.price) FROM order_items oi WHERE oi.order_id = o.id) as subtotal,
+           (SELECT SUM(oi.quantity * mi.price) 
+            FROM order_items oi 
+            JOIN menu_items mi ON oi.menu_item_id = mi.id 
+            WHERE oi.order_id = o.id) as grand_total,
            g.phone_number
     FROM orders o 
     LEFT JOIN guests g ON o.guest_id = g.id 
@@ -96,16 +88,17 @@ include "includes/header.php";
             </thead>
             <tbody>
                 <?php if (!empty($orders)): foreach ($orders as $order): 
-                    $subtotal = floatval($order['subtotal'] ?? 0);
+                    $total_amount = floatval($order['grand_total'] ?? 0);
 
-                    $itemsStmt = $pdo->prepare("SELECT oi.*, mi.name FROM order_items oi JOIN menu_items mi ON oi.menu_item_id = mi.id WHERE oi.order_id = ?");
+                    // Pull menu line prices properly from mi.price relation 
+                    $itemsStmt = $pdo->prepare("SELECT oi.id, oi.quantity, mi.name, mi.price FROM order_items oi JOIN menu_items mi ON oi.menu_item_id = mi.id WHERE oi.order_id = ?");
                     $itemsStmt->execute([$order['id']]);
                     $serializedItems = json_encode($itemsStmt->fetchAll(PDO::FETCH_ASSOC));
                 ?>
-                    <tr class="invoice-data-row">
+                    <tr class="invoice-data-row" data-search-string="<?= strtolower($order['id'] . ' ' . ($order['phone_number'] ?? '')) ?>">
                         <td style="font-weight: bold; color: #0284c7;">#<?= $order['id'] ?></td>
                         <td style="font-family:monospace; font-weight:bold; color:#475569;"><?= htmlspecialchars($order['phone_number'] ?? 'Walk-In Guest') ?></td>
-                        <td style="font-weight: 800; color: #059669;">₹<?= number_format($subtotal, 2) ?></td>
+                        <td style="font-weight: 800; color: #059669;">₹<?= number_format($total_amount, 2) ?></td>
                         <td style="text-align: center;">
                             <button type="button" class="btn btn-start" style="padding: 6px 14px; font-size:12px; border-radius:6px;" data-items='<?= htmlspecialchars($serializedItems, ENT_QUOTES, 'UTF-8') ?>' onclick="openEditInvoiceModal(<?= $order['id'] ?>, this)">✏ Edit Bill</button>
                         </td>
@@ -128,7 +121,7 @@ include "includes/header.php";
             <input type="hidden" name="update_order_id" id="mdlInvoiceOrderId">
             
             <label style="font-size: 11px; font-weight: 700; color: #475569; display: block; margin-bottom: 6px; text-transform: uppercase;">Line Items Assembly</label>
-            <div id="mdlInvoiceItemsContainer" style="max-height: 220px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px; margin-bottom: 15px; background: #fafafa;"></div>
+            <div id="mdlInvoiceItemsContainer" style="max-height: 220px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px; margin-bottom: 20px; background: #fafafa;"></div>
             
             <div style="display: flex; gap: 10px; justify-content: flex-end; align-items: center;">
                 <button type="button" class="btn btn-log" style="padding: 10px 18px;" onclick="closeEditInvoiceModal()">Cancel</button>
@@ -175,7 +168,10 @@ function openEditInvoiceModal(orderId, element) {
     
     document.getElementById("editInvoiceModalPopup").style.display = "flex";
 }
-function closeEditInvoiceModal() { document.getElementById("editInvoiceModalPopup").style.display = "none"; }
+
+function closeEditInvoiceModal() { 
+    document.getElementById("editInvoiceModalPopup").style.display = "none"; 
+}
 </script>
 
 <?php include "includes/footer.php"; ?>
