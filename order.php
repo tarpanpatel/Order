@@ -30,9 +30,57 @@ include "includes/header.php";
 <style>
 .order-layout-split { display: grid; grid-template-columns: 1fr 360px; gap: 20px; width: 100%; align-items: start; }
 .menu-items-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
-.menu-card-item { background: #fff; border: 1px solid #cbd5e0; border-radius: 8px; padding: 12px; text-align: left; cursor: pointer; transition: transform 0.15s; display: flex; flex-direction: column; justify-content: space-between; min-height: 140px; }
-.menu-card-item:hover { transform: translateY(-2px); border-color: #06b6d4; }
-.menu-card-img { width: 50px; height: 50px; object-fit: cover; border-radius: 50%; background: #f7fafc; padding: 2px; border: 1px solid #e2e8f0; margin-bottom: 8px; }
+
+/* RE-ENGINEERED COMPACT IMAGE CONTAINER CARD */
+.menu-card-item { 
+    background: #fff; 
+    border: 1px solid #e2e8f0; 
+    border-radius: 10px; 
+    overflow: hidden; 
+    cursor: pointer; 
+    transition: transform 0.15s ease, border-color 0.15s ease; 
+    display: flex; 
+    flex-direction: column; 
+    justify-content: space-between; 
+    min-height: 210px; 
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+.menu-card-item:hover { transform: translateY(-3px); border-color: #06b6d4; box-shadow: 0 4px 12px rgba(6,182,212,0.08); }
+
+/* MAXIMUM VIEW IMAGE LAYER ENGINE */
+.menu-card-img-wrapper {
+    width: 100%;
+    height: 110px;
+    background: #f8fafc;
+    position: relative;
+    border-bottom: 1px solid #edf2f7;
+}
+.menu-card-img { 
+    width: 100%; 
+    height: 100%; 
+    object-fit: cover; 
+    display: block;
+}
+.menu-card-img-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: #94a3b8;
+    font-weight: 600;
+    background: #f1f5f9;
+}
+
+.menu-card-body-content {
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    justify-content: space-between;
+}
+
 .cart-sticky-panel { background: #f8fafc; border: 1px solid #cbd5e0; border-radius: 12px; padding: 16px; position: sticky; top: 130px; max-height: calc(100vh - 160px); display: flex; flex-direction: column; }
 .alert-pill-box { padding: 8px 12px; background: #fef2f2; border: 1px dashed #ef4444; border-radius: 6px; color: #b91c1c; font-size: 11px; font-weight: bold; margin-bottom: 15px; }
 </style>
@@ -81,16 +129,23 @@ include "includes/header.php";
                 <div class="menu-items-grid">
                     <?php foreach ($cat_items as $item): ?>
                         <div class="menu-card-item menu-row-item" data-name="<?= strtolower(htmlspecialchars($item['name'])) ?>" onclick="addItemToCheckoutCart(<?= $item['id'] ?>, '<?= htmlspecialchars(addslashes($item['name'])) ?>', <?= $item['price'] ?>)">
-                            <div>
+                            
+                            <div class="menu-card-img-wrapper">
                                 <?php if (!empty($item['image_path']) && file_exists($item['image_path'])): ?>
                                     <img src="<?= htmlspecialchars($item['image_path']) ?>" class="menu-card-img" alt="<?= htmlspecialchars($item['name']) ?>">
+                                <?php else: ?>
+                                    <div class="menu-card-img-placeholder">🍲 No Image Configured</div>
                                 <?php endif; ?>
-                                <strong style="font-size:13px; display:block; color:#1e293b; line-height:1.3;"><?= htmlspecialchars($item['name']) ?></strong>
                             </div>
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; width:100%;">
-                                <span style="font-size:13px; font-weight:800; color:#059669;">₹<?= number_format($item['price'], 2) ?></span>
-                                <span style="font-size:10px; color:#22c55e; font-weight:700;">➕ Add</span>
+
+                            <div class="menu-card-body-content">
+                                <strong style="font-size:13px; display:block; color:#1e293b; line-height:1.4; text-align:left; margin-bottom:8px;"><?= htmlspecialchars($item['name']) ?></strong>
+                                <div style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-top:auto;">
+                                    <span style="font-size:13px; font-weight:800; color:#059669;">₹<?= number_format($item['price'], 2) ?></span>
+                                    <span style="font-size:10px; color:#22c55e; font-weight:700; background:#f0fdf4; padding:2px 8px; border-radius:4px; border:1px solid #bbf7d0;">➕ Add</span>
+                                </div>
                             </div>
+
                         </div>
                     <?php endforeach; ?>
                 </div>
