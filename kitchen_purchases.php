@@ -2,6 +2,7 @@
 // /home/apartment/artistsfarmjaipur.com/Order/kitchen_purchases.php
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once "config/db.php";
+require_once "config/telegram.php";
 
 if (!isset($_SESSION["user_id"])) { 
     header("Location: login.php"); 
@@ -51,7 +52,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_add_kitchen_ex
             $stmt->execute([$date, $category, $item_detail, $vendor, $qty, $price_per_unit]);
             
             // --- AUTOMATED REQUISITION WORKFLOW HANDSHAKE HOOK ---
-            // Find the item catalog ID matching the typed input name safely
             $catalogStmt = $pdo->prepare("SELECT id FROM req_catalog WHERE LOWER(item_name) = LOWER(?) LIMIT 1");
             $catalogStmt->execute([$item_detail]);
             $catalog_id = $catalogStmt->fetchColumn();
@@ -73,6 +73,16 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_add_kitchen_ex
                     // Automatically mark the main request envelope complete
                     $inClause = implode(',', array_map('intval', $checkMasters));
                     $pdo->query("UPDATE requisitions SET status = 'Fulfilled' WHERE id IN ($inClause) AND status = 'Pending'");
+                    
+                    // --- SUCCESS NOTIFICATION: TELEGRAM BROADCAST ON DEMO MATCH FULFILLMENT ---
+                    if (function_exists('sendTelegramMessage')) {
+                        $telegramMessage = "✅ *Stock Request Auto-Fulfilled!*\n\n";
+                        $telegramMessage .= "🛒 *Item:* " . $item_detail . "\n";
+                        $telegramMessage .= "📦 *Quantity:* " . $qty . "\n";
+                        $telegramMessage .= "🏪 *Vendor:* " . (!empty($vendor) ? $vendor : 'Market Sourcing') . "\n\n";
+                        $telegramMessage .= "📊 *Status:* Requisition order matching successfully closed.";
+                        sendTelegramMessage($telegramMessage);
+                    }
                 }
             }
 
@@ -87,8 +97,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_add_kitchen_ex
     }
 }
 
-// --- CORE FIX: CENTRALIZED UNIFIED CATALOG SEED LOOP VIA UNION QUERY ---
-// Pulls standard shortlists from materials_registry AND the massive 116 item req_catalog table
+// Centralized catalog dropdown build
 $materials_list = [];
 try {
     $materials_list = $pdo->query("
@@ -104,7 +113,6 @@ try {
     $materials_list = [];
 }
 
-// Fetch recent entries to show log feed
 $recent_logs = [];
 try {
     $recent_logs = $pdo->query("SELECT * FROM kitchen_expenses ORDER BY id DESC LIMIT 10")->fetchAll(PDO::FETCH_ASSOC);
@@ -143,11 +151,11 @@ include "includes/header.php";
             </div>
 
             <div style="margin-bottom:15px;">
-                <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">INVENTORY ITEM DETAIL (unified catalog map search)</label>
-                <input type="text" name="item_detail" id="itemDetailInput" list="registryMaterialsList" required placeholder="Type to filter... (e.g., Aachar, Mustard Oil, Basmati)" style="width:100%; padding:10px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box; font-weight:600;">
+                <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">INVENTORY ITEM DETAIL</label>
+                <input type="text" name="item_detail" id="itemDetailInput" list="registryMaterialsList" required placeholder="Type to filter... (e.g., Mustard Oil)" style="width:100%; padding:10px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box; font-weight:600;">
                 <datalist id="registryMaterialsList">
                     <?php foreach ($materials_list as $mat): ?>
-                        <option value="<?= htmlspecialchars($mat['item_name']) ?>"><?= htmlspecialchars($mat['category'] ?? 'General Sourcing') ?></option>
+                        <option value="<?= htmlspecialchars($mat['item_name']) ?>"><?= htmlspecialchars($mat['category'] ?? 'General') ?></option>
                     <?php endforeach; ?>
                 </datalist>
             </div>
