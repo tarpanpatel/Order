@@ -73,3 +73,34 @@
         <a href="logout.php" class="nav-link" style="margin-top: 30px; color: #e53e3e; text-align: center;">🔒 Sign Out</a>
     </nav>
 </div>
+
+<!-- FIXED: Injected the required runtime sub-menu toggle behavior mechanism directly here -->
+<script>
+function toggleAdminSubMenu() {
+    const content = document.getElementById("adminSubMenuContent");
+    const chevron = document.getElementById("adminMenuChevron");
+    
+    if (!content || !chevron) return;
+    
+    if (content.style.display === "none" || content.style.display === "") {
+        content.style.display = "flex";
+        chevron.style.transform = "rotate(90deg)";
+        localStorage.setItem("adminPanelExpanded", "true");
+    } else {
+        content.style.display = "none";
+        chevron.style.transform = "rotate(0deg)";
+        localStorage.setItem("adminPanelExpanded", "false");
+    }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    if (localStorage.getItem("adminPanelExpanded") === "true") {
+        const content = document.getElementById("adminSubMenuContent");
+        const chevron = document.getElementById("adminMenuChevron");
+        if (content && chevron) {
+            content.style.display = "flex";
+            chevron.style.transform = "rotate(90deg)";
+        }
+    }
+});
+</script>
