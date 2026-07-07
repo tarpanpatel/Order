@@ -161,8 +161,6 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
             
             if ($is_manager || $is_super): 
             ?>
-                <a href="index.php" class="nav-link <?= ($current_page === 'index.php') ? 'active' : ''; ?>">📊 Dashboard</a>
-                
                 <?php if (!empty($current_active_guest)): ?>
                     <div style="margin: 6px 0; background: #fdfaf7; border: 1px solid #cbd5e0; border-radius: 8px; padding: 8px;">
                         <div style="font-size:11px; font-weight:bold; color:#0891b2; margin-bottom:5px; text-align:center; text-transform:uppercase;">● Active: 📱 (<?= substr($current_active_guest['phone_number'], -4) ?>)</div>
@@ -194,11 +192,9 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
             <a href="order.php" class="nav-link <?= ($current_page === 'order.php') ? 'active' : ''; ?>">🍽️ Take Food Order</a>
             <a href="kitchen.php" class="nav-link <?= ($current_page === 'kitchen.php') ? 'active' : ''; ?>">🍳 Kitchen Orders</a>
             <a href="requisitions.php" class="nav-link <?= ($current_page === 'requisitions.php') ? 'active' : ''; ?>">📦 Material Requests</a>
-            
             <a href="expenses.php" class="nav-link <?= ($current_page === 'expenses.php') ? 'active' : ''; ?>">📈 Expenses Workspace</a>
 
             <?php 
-            // FIXED: Renamed System Settings label wrapper link element container to Admin Control
             if ($is_super || $is_manager): 
             ?>
                 <div class="admin-settings-wrapper" style="margin-top: 10px; border-top: 1px solid #cbd5e0; padding-top: 10px; width: 100%;">
@@ -208,6 +204,7 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
 
                     <div id="adminSubMenuContent" style="display: none; flex-direction: column; gap: 4px; padding-left: 20px; margin-top: 5px;">
+                        <a href="index.php" class="nav-link <?= ($current_page === 'index.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">📊 Dashboard Analytics</a>
                         <a href="past_receipts.php" class="nav-link <?= ($current_page === 'past_receipts.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">📜 Past Receipts Log</a>
                         <a href="menu_admin.php" class="nav-link <?= ($current_page === 'menu_admin.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">🍽️ Menu Configuration</a>
                         <a href="materials_admin.php" class="nav-link <?= ($current_page === 'materials_admin.php') ? 'active' : ''; ?>" style="font-size: 12px; padding: 8px 12px;">📦 Material Registry</a>
