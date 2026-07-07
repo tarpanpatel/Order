@@ -35,7 +35,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_record_expense
     exit;
 }
 
-// FIXED: Swapped 'role_name' out for the correct column name 'role' to resolve the PDO Exception
+// FIXED: Swapped out the old 'role_name' for the correct column 'role' to eliminate the PDO Exception
 $db_staff = $pdo->query("SELECT username FROM users WHERE role != 'Super Admin' ORDER BY username ASC")->fetchAll(PDO::FETCH_COLUMN);
 
 // Fetch recent entries to show in logs feed
@@ -68,6 +68,7 @@ include "includes/header.php";
                 </div>
             </div>
 
+            <!-- INTERACTIVE CONTAINER: Toggled via JavaScript when "Staff Salaries" is selected -->
             <div id="staffSalaryDropdownContainer" style="display:none; margin-bottom:15px; background:#f8fafc; padding:15px; border-radius:8px; border:1px dashed #06b6d4;">
                 <label style="font-size:11px; font-weight:700; color:#0891b2; display:block; margin-bottom:4px;">👤 SELECT SALARY RECIPIENT MEMBER</label>
                 <select name="selected_staff_name" style="width:100%; padding:10px; border:1px solid #cbd5e0; border-radius:6px; background:white; font-weight:bold; color:#1e293b;">
@@ -108,6 +109,7 @@ include "includes/header.php";
         </form>
     </div>
 
+    <!-- LOG FEED TIMELINE -->
     <div style="max-width:760px; margin:25px auto 0 auto; background:#fff; border:1px solid #cbd5e0; border-radius:12px; padding:20px;">
         <h4 style="margin-top:0; border-bottom:1px solid #e2e8f0; padding-bottom:8px; text-transform:uppercase; font-size:11px; color:#475569;">Recent Operational Cost Logs</h4>
         <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
@@ -121,15 +123,15 @@ include "includes/header.php";
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($recent_expenses as $row): ?>
+                <?php if(!empty($recent_expenses)): foreach ($recent_expenses as $row): ?>
                     <tr style="border-bottom:1px solid #edf2f7;">
                         <td style="padding:10px; color:#64748b;"><?= $row['expense_date'] ?></td>
                         <td style="padding:10px;"><span style="font-weight:700; color:#0284c7;"><?= htmlspecialchars($row['category']) ?></span></td>
-                        <td style="padding:10px;"><strong><?= htmlspecialchars($row['vendor_name']) ?></strong> - <span style="color:#475569; font-size:12px;"><?= htmlspecialchars($row['description']) ?></span></td>
+                        <td style="padding:10px;"><strong><?= htmlspecialchars($row['vendor_name'] ?? 'Other') ?></strong> - <span style="color:#475569; font-size:12px;"><?= htmlspecialchars($row['description']) ?></span></td>
                         <td style="padding:10px; text-align:right; font-weight:800; color:#1e293b;">₹<?= number_format($row['amount'], 2) ?></td>
-                        <td style="padding:10px; text-align:center;"><span style="font-size:11px; font-weight:bold; color:#64748b;"><?= $row['payment_mode'] ?></span></td>
+                        <td style="padding:10px; text-align:center;"><span style="font-size:11px; font-weight:bold; color:#64748b;"><?= htmlspecialchars($row['payment_mode']) ?></span></td>
                     </tr>
-                <?php endforeach; ?>
+                <?php endforeach; endif; ?>
             </tbody>
         </table>
     </div>
