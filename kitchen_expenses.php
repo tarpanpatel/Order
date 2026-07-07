@@ -30,7 +30,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_add_kitchen_ex
             $stmt->execute([$date, $category, $item_detail, $vendor, $qty, $price_per_unit]);
             
             // 2. AUTOMATED REQUISITION WORKFLOW HOOK:
-            // Try updating if the material_requests table exists
+            // Scan for pending material requests matching the exact name substring or item name
             $updateReq = $pdo->prepare("
                 UPDATE material_requests 
                 SET status = 'Fulfilled', fulfillment_date = ? 
@@ -50,27 +50,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_add_kitchen_ex
     }
 }
 
-// SAFE FALLBACK: Try pulling from materials_registry, catch error if it doesn't exist yet
-$materials_list = [];
-try {
-    $materials_list = $pdo->query("SELECT item_name, category FROM materials_registry ORDER BY item_name ASC")->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    // If the table doesn't exist yet, we collect unique items previously typed in kitchen expenses to keep your drop-down working!
-    try {
-        $materials_list = $pdo->query("SELECT DISTINCT item_detail as item_name, category FROM kitchen_expenses ORDER BY item_detail ASC")->fetchAll(PDO::FETCH_ASSOC);
-    } catch (PDOException $ex) {
-        $materials_list = [];
-    }
-}
+// Fetch material list dropdown options directly from the newly created SQL table structure
+$materials_list = $pdo->query("SELECT item_name, category FROM materials_registry ORDER BY item_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch recent entries to show logs stream feed
-$recent_logs = [];
-try {
-    $recent_logs = $pdo->query("SELECT * FROM kitchen_expenses ORDER BY id DESC LIMIT 10")->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    // Fallback if kitchen_expenses table itself needs to be initialized by a form hit
-    $recent_logs = [];
-}
+$recent_logs = $pdo->query("SELECT * FROM kitchen_expenses ORDER BY id DESC LIMIT 10")->fetchAll(PDO::FETCH_ASSOC);
 
 include "includes/header.php";
 ?>
@@ -103,18 +87,18 @@ include "includes/header.php";
             </div>
 
             <div style="margin-bottom:15px;">
-                <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">INVENTORY ITEM DETAIL</label>
+                <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">INVENTORY ITEM DETAIL (standard name link match)</label>
                 <input type="text" name="item_detail" id="itemDetailInput" list="registryMaterialsList" required placeholder="e.g., Mustard Oil, Basmati Rice" style="width:100%; padding:10px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box; font-weight:600;">
                 <datalist id="registryMaterialsList">
-                    <?php if(!empty($materials_list)): foreach ($materials_list as $mat): ?>
-                        <option value="<?= htmlspecialchars($mat['item_name']) ?>"><?= htmlspecialchars($mat['category'] ?? 'General') ?></option>
-                    <?php endforeach; endif; ?>
+                    <?php foreach ($materials_list as $mat): ?>
+                        <option value="<?= htmlspecialchars($mat['item_name']) ?>"><?= htmlspecialchars($mat['category']) ?></option>
+                    <?php endforeach; ?>
                 </datalist>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom:20px;">
                 <div>
-                    <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">QUANTITY PURCHASED</label>
+                    <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">QUANTITY purchased</label>
                     <input type="number" step="0.01" name="quantity" required placeholder="0" style="width:100%; padding:10px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box;">
                 </div>
                 <div>
@@ -127,7 +111,7 @@ include "includes/header.php";
                 </div>
             </div>
 
-            <button type="submit" style="width:100%; padding:12px; font-size:14px; font-weight:bold; background:#0284c7; border:none; color:white; border-radius:8px; cursor:pointer;">Save Stock Entry</button>
+            <button type="submit" style="width:100%; padding:12px; font-size:14px; font-weight:bold; background:#0284c7; border:none; color:white; border-radius:8px; cursor:pointer;">Save Stock Entry & Check Requisitions</button>
         </form>
     </div>
 
@@ -144,7 +128,7 @@ include "includes/header.php";
                 </tr>
             </thead>
             <tbody>
-                <?php if(!empty($recent_logs)): foreach ($recent_logs as $row): ?>
+                <?php foreach ($recent_logs as $row): ?>
                     <tr style="border-bottom:1px solid #edf2f7;">
                         <td style="padding:10px; color:#64748b;"><?= $row['date'] ?></td>
                         <td style="padding:10px;"><span style="font-weight:700; color:#ea580c;"><?= htmlspecialchars($row['category']) ?></span></td>
@@ -152,9 +136,7 @@ include "includes/header.php";
                         <td style="padding:10px; text-align:right; font-weight:600;"><?= $row['qty'] ?></td>
                         <td style="padding:10px; text-align:right; font-weight:800; color:#1e293b;">₹<?= number_format($row['qty'] * $row['price_per_unit'], 2) ?></td>
                     </tr>
-                <?php endforeach; else: ?>
-                    <tr><td colspan="5" style="text-align:center; padding:15px; color:#94a3b8; font-style:italic;">No procurement entries logged yet.</td></tr>
-                <?php endif; ?>
+                <?php endforeach; ?>
             </tbody>
         </table>
     </div>
