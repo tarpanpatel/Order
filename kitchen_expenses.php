@@ -50,11 +50,21 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_add_kitchen_ex
     }
 }
 
-// Fetch material list dropdown options directly from the newly created SQL table structure
-$materials_list = $pdo->query("SELECT item_name, category FROM materials_registry ORDER BY item_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+// Fetch material list dropdown options directly from the SQL table structure
+$materials_list = [];
+try {
+    $materials_list = $pdo->query("SELECT item_name, category FROM materials_registry ORDER BY item_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $materials_list = [];
+}
 
 // Fetch recent entries to show logs stream feed
-$recent_logs = $pdo->query("SELECT * FROM kitchen_expenses ORDER BY id DESC LIMIT 10")->fetchAll(PDO::FETCH_ASSOC);
+$recent_logs = [];
+try {
+    $recent_logs = $pdo->query("SELECT * FROM kitchen_expenses ORDER BY id DESC LIMIT 10")->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $recent_logs = [];
+}
 
 include "includes/header.php";
 ?>
@@ -128,15 +138,20 @@ include "includes/header.php";
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($recent_logs as $row): ?>
+                <?php if (!empty($recent_logs)): foreach ($recent_logs as $row): 
+                    // FIXED: Fallback arrays safely catch variance between item_detail, item_name, and description keys
+                    $display_name = $row['item_detail'] ?? $row['item_name'] ?? $row['description'] ?? 'Unnamed Asset';
+                ?>
                     <tr style="border-bottom:1px solid #edf2f7;">
                         <td style="padding:10px; color:#64748b;"><?= $row['date'] ?></td>
                         <td style="padding:10px;"><span style="font-weight:700; color:#ea580c;"><?= htmlspecialchars($row['category']) ?></span></td>
-                        <td style="padding:10px;"><strong><?= htmlspecialchars($row['item_detail']) ?></strong> <span style="font-size:11px; color:#64748b;">(via <?= htmlspecialchars($row['vendor'] ?: 'Market') ?>)</span></td>
+                        <td style="padding:10px;"><strong><?= htmlspecialchars($display_name) ?></strong> <span style="font-size:11px; color:#64748b;">(via <?= htmlspecialchars($row['vendor'] ?? 'Market') ?>)</span></td>
                         <td style="padding:10px; text-align:right; font-weight:600;"><?= $row['qty'] ?></td>
                         <td style="padding:10px; text-align:right; font-weight:800; color:#1e293b;">₹<?= number_format($row['qty'] * $row['price_per_unit'], 2) ?></td>
                     </tr>
-                <?php endforeach; ?>
+                <?php endforeach; else: ?>
+                    <tr><td colspan="5" style="text-align:center; color:#94a3b8; padding:20px; font-style:italic;">No records found.</td></tr>
+                <?php endif; ?>
             </tbody>
         </table>
     </div>
