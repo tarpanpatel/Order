@@ -21,7 +21,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_invoice
             if ($qty <= 0) {
                 $pdo->prepare("DELETE FROM order_items WHERE id = ?")->execute([$item_id]);
             } else {
-                // Adjust food quantities directly for the selected checkout transaction line
                 $pdo->prepare("UPDATE order_items SET quantity = ? WHERE id = ?")->execute([$qty, $item_id]);
             }
         }
@@ -36,7 +35,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_invoice
     }
 }
 
-// FIXED SQL: Selects checked out invoice profiles generated via billing.php
+// Select checked out invoice profiles generated via billing.php
 $invoices = $pdo->query("
     SELECT g.id, g.guest_name, g.phone_number, g.checkin_date, g.checkout_date, g.total_charge as room_charge,
            COALESCE((SELECT SUM((oi.quantity - oi.returned_qty) * mi.price) 
@@ -95,7 +94,6 @@ include "includes/header.php";
                     
                     $display_date = !empty($inv['checkout_date']) ? date('d M Y', strtotime($inv['checkout_date'])) : date('d M Y', strtotime($inv['checkin_date']));
 
-                    // Fetch associated kitchen details to modify seamlessly from model layer templates
                     $itemsStmt = $pdo->prepare("
                         SELECT oi.id, oi.quantity, mi.name, mi.price 
                         FROM order_items oi 
@@ -106,7 +104,7 @@ include "includes/header.php";
                     $itemsStmt->execute([$inv['id']]);
                     $serializedItems = json_encode($itemsStmt->fetchAll(PDO::FETCH_ASSOC));
                 ?>
-                    <tr class="invoice-data-row" data-search-string="<?= strtolower($inv['guest_name'] . ' ' . $inv['phone_number']) ?>">
+                    <tr class="invoice-data-row" data-search-string="<?= strtolower(htmlspecialchars($inv['guest_name']) . ' ' . htmlspecialchars($inv['phone_number'])) ?>">
                         <td style="font-weight: bold; color: #475569;"><?= $display_date ?></td>
                         <td style="font-weight: 600; color:#334155;">
                             <?= htmlspecialchars($inv['guest_name']) ?> 
@@ -114,7 +112,7 @@ include "includes/header.php";
                         </td>
                         <td style="font-weight: 800; color: #059669;">₹<?= number_format($grand_total, 2) ?></td>
                         <td style="text-align: center;">
-                            <button type="button" class="btn btn-start" style="padding: 6px 14px; font-size:12px; border-radius:6px;" data-items='<?= htmlspecialchars($serializedItems, ENT_QUOTES, 'UTF-8') ?>' onclick="openEditInvoiceModal(<?= $inv['id'] ?>, '${{ $inv['guest_name'] }}', this)">✏ Edit Bill</button>
+                            <button type="button" class="btn btn-start" style="padding: 6px 14px; font-size:12px; border-radius:6px;" data-items='<?= htmlspecialchars($serializedItems, ENT_QUOTES, 'UTF-8') ?>' onclick="openEditInvoiceModal(<?= $inv['id'] ?>, '<?= htmlspecialchars(addslashes($inv['guest_name']), ENT_QUOTES, 'UTF-8') ?>', this)">✏ Edit Bill</button>
                         </td>
                     </tr>
                 <?php endforeach; else: ?>
@@ -162,7 +160,7 @@ function searchInvoiceTable() {
 
 function openEditInvoiceModal(guestId, guestName, element) {
     document.getElementById("mdlInvoiceGuestId").value = guestId;
-    document.getElementById("modalInvoiceTitle").innerText = "Modify Invoice Summary";
+    document.getElementById("modalInvoiceTitle").innerText = "Modify Invoice: " + guestName;
     
     const container = document.getElementById("mdlInvoiceItemsContainer");
     const items = JSON.parse(element.getAttribute("data-items"));
