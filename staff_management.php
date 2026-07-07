@@ -39,7 +39,7 @@ if (isset($_GET["delete_id"])) {
     exit;
 }
 
-// FETCH ALL USERS FROM THE MASTER USERS TABLE
+// FETCH ALL USERS FROM THE MASTER USERS TABLE NATIVELY
 $staff_list = $pdo->query("SELECT id, username, role FROM users ORDER BY username ASC")->fetchAll(PDO::FETCH_ASSOC);
 
 include "includes/header.php";
