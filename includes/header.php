@@ -29,17 +29,76 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
     <link rel="stylesheet" href="assets/css/style.css?v=<?= time(); ?>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        .mobile-header-strip { display: none; background: #ffffff; padding: 8px 16px; border-bottom: 1px solid #e2e8f0; align-items: center; width: 100%; min-height: 56px; }
+        /* ==========================================================================
+           🔒 GLOBAL VIEWPORT LOCKS (PREVENTS HORIZONTAL OVERFLOW ON ALL PAGES)
+           ========================================================================== */
+        html, body {
+            max-width: 100vw !important;
+            width: 100% !important;
+            overflow-x: hidden !important;
+            box-sizing: border-box !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        .mobile-header-strip { display: none; background: #ffffff; padding: 8px 16px; border-bottom: 1px solid #e2e8f0; align-items: center; width: 100%; min-height: 56px; box-sizing: border-box; }
         .hamburger-btn { background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 1.2rem; padding: 6px 14px; cursor: pointer; margin-right: 12px; font-weight: bold; color: #2d3748; }
         .desktop-sidebar-title { font-size: 11px; font-weight: 700; color: #718096; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px dashed #e2e8f0; }
         .sidebar-action-card { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; font-size: 12px; font-weight: 700; border-radius: 8px; text-decoration: none; width: 100%; box-sizing: border-box; border: none; cursor: pointer; }
         .sb-btn-active { background: #e53e3e; color: white; border: 1px solid #c53030; }
         .sb-btn-inactive { background: #38a169; color: white; }
-        @media (min-width: 1024px) { .nav-bar { top: 0 !important; } .close-drawer-btn { display: none !important; } }
+        
+        @media (min-width: 1024px) { 
+            .nav-bar { top: 0 !important; } 
+            .close-drawer-btn { display: none !important; } 
+        }
+
+        /* ==========================================================================
+           ⚡ UNIFORM MOBILE RESPONSIVE LAYOUT OVERRIDES (TARGETS MAIN WRAPPERS)
+           ========================================================================== */
         @media (max-width: 1023px) {
-            .mobile-header-strip { display: flex; }
-            .sidebar { position: fixed !important; top: 0; left: 0; height: 100vh; width: 260px; z-index: 9999; transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: 4px 0 25px rgba(0,0,0,0.08); }
+            .mobile-header-strip { 
+                display: flex !important; 
+                width: 100% !important;
+                box-sizing: border-box !important;
+            }
+            
+            /* Forces structural parent grid layouts to drop desktop column counts */
+            .app-container { 
+                display: block !important; 
+                width: 100% !important;
+                max-width: 100vw !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                box-sizing: border-box !important;
+            }
+            
+            /* Tightens the background viewport width for all nested page code contents */
+            .main-content { 
+                width: 100% !important; 
+                max-width: 100vw !important; 
+                padding: 4px !important; 
+                box-sizing: border-box !important;
+                display: block !important;
+                float: none !important;
+            }
+
+            .sidebar { 
+                position: fixed !important; 
+                top: 0; 
+                left: 0; 
+                height: 100vh; 
+                width: 260px; 
+                z-index: 9999; 
+                transform: translateX(-100%); 
+                transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); 
+                box-shadow: 4px 0 25px rgba(0,0,0,0.08); 
+            }
             .sidebar.is-drawer-open { transform: translateX(0) !important; }
+
+            /* Universal Header/Text scaling down rules */
+            .category-section { margin-bottom: 8px !important; padding: 0 4px !important; }
+            .category-section h2, .category-title { font-size: 14px !important; font-weight: 700 !important; color: #374151 !important; }
         }
     </style>
 </head>
