@@ -7,7 +7,8 @@ require_once "config/db.php";
 require_once "config/telegram.php"; 
 include_once __DIR__ . '/config/local_db_bridge.php';
 
-if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Chef" && $_SESSION["role"] !== "Admin")) {
+// FIXED ROLE ACCESS: Added "Super Admin" to the allowed authentication conditions alongside Admin and Chef
+if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Chef" && $_SESSION["role"] !== "Admin" && $_SESSION["role"] !== "Super Admin")) {
     header("Location: login.php");
     exit;
 }
@@ -222,7 +223,6 @@ include "includes/header.php";
         bottom: 0 !important;
         left: 0 !important;
         width: 100% !important;
-        /* FIXED: isolated height limits container footprint boundary on mobile so top hamburger icon menu can breathe */
         height: auto !important; 
         top: auto !important; 
         z-index: 9999 !important;
@@ -529,8 +529,6 @@ window.addMaterialToSidebar = function(id, name) {
     if (existing) { existing.qty += 1; }
     else { window.reqCart.push({ id: id, name: name, qty: 1 }); }
     window.renderSidebarCart();
-    
-    // FIXED: Removed the dynamic 'drawer-open-state' class injection rule here so drawer remains completely closed when new items load
 };
 
 window.updateSidebarQty = function(id, delta) {
@@ -734,10 +732,10 @@ window.triggerMemoryStateUpdate = function(catalogId, targetedState) {
 };
 
 window.openChefNewProductModal = function() {
-    document.getElementById("chefNewProductModal").style.display = "none";
-};
-window.openChefNewProductModal = function() {
     document.getElementById("chefNewProductModal").style.display = "flex";
+};
+window.closeChefNewProductModal = function() {
+    document.getElementById("chefNewProductModal").style.display = "none";
 };
 </script>
 
