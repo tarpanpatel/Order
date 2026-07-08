@@ -128,7 +128,19 @@ include "includes/header.php";
 .right-column-stack { display: flex; flex-direction: column; gap: 20px; position: sticky !important; top: 20px !important; }
 .requisition-right-sidebar { background: #ffffff !important; border: 1px solid #cbd5e0 !important; border-radius: 12px !important; padding: 20px !important; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05) !important; display: flex; flex-direction: column; text-align: left; }
 
-.catalog-tab-header { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; border-bottom: 1px solid #edf2f7; padding-bottom: 12px; }
+.catalog-tab-header { 
+    display: flex; 
+    gap: 8px; 
+    flex-wrap: nowrap; 
+    margin-bottom: 20px; 
+    border-bottom: 1px solid #edf2f7; 
+    padding-bottom: 12px;
+    overflow-x: auto; 
+    white-space: nowrap; 
+    -webkit-overflow-scrolling: touch; 
+}
+.catalog-tab-header::-webkit-scrollbar { display: none; }
+
 .catalog-tab-btn { padding: 6px 12px; font-size: 12px; font-weight: 600; background: #f7fafc; border: 1px solid #cbd5e0; border-radius: 6px; cursor: pointer; color: #475569; transition: all 0.15s ease; }
 .catalog-tab-btn:hover { background: #e2e8f0; }
 .catalog-tab-btn.active { background: #06b6d4; color: white; border-color: #06b6d4; }
@@ -197,12 +209,12 @@ include "includes/header.php";
 .global-toast-notification { padding: 12px 24px; background: #10b981; color: white; font-size: 14px; font-weight: 800; text-align: center; border-radius: 8px; box-shadow: 0 4px 12px rgba(16,185,129,0.2); margin-bottom: 15px; border: 1px solid #059669; }
 
 /* ==========================================================================
-   ADVANCED MOBILE OVERLAY FLOATING SHEET LAYOUT ENGINE
+   MOBILE INTERACTION & CLICK PASS-THROUGH STYLING ENGINE
    ========================================================================== */
 @media (max-width: 1023px) {
     .split-requisition-layout {
         grid-template-columns: 1fr !important;
-        padding-bottom: 75px !important; /* Space so sticky bar does not cover elements */
+        padding-bottom: 180px !important; 
     }
     
     .right-column-stack {
@@ -212,76 +224,7 @@ include "includes/header.php";
         width: 100% !important;
         z-index: 9999 !important;
         gap: 0 !important;
-    }
-
-    .past-log-section {
-        display: none !important; /* Hide logs on mobile workspace to prevent visual clutter */
-    }
-
-    .requisition-right-sidebar {
-        border-radius: 20px 20px 0 0 !important;
-        border: none !important;
-        border-top: 2px solid #cbd5e0 !important;
-        box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.12) !important;
-        padding: 12px 18px !important;
-        background: #ffffff !important;
-    }
-
-    .sidebar-summary-title {
-        margin-bottom: 8px !important;
-        padding-bottom: 4px !important;
-        font-size: 13px !important;
-        display: flex !important;
-        justify-content: space-between !important;
-        align-items: center !important;
-        cursor: pointer !important;
-    }
-    
-    /* Dynamic arrow indicator showing drawer expandable status */
-    .sidebar-summary-title::after {
-        content: "▲ Expand Chosen Box";
-        font-size: 11px;
-        color: #06b6d4;
-        font-weight: bold;
-    }
-    
-    /* Toggle action swaps content when drawer gets clicked */
-    .requisition-right-sidebar.drawer-open-state .sidebar-summary-title::after {
-        content: "▼ Collapse Content";
-    }
-
-    .sidebar-cart-list {
-        max-height: 0px !important;
-        overflow-y: auto !important;
-        margin-bottom: 0px !important;
-        transition: max-height 0.25s ease-out, margin 0.25s ease-out !important;
-    }
-
-    .requisition-right-sidebar.drawer-open-state .sidebar-cart-list {
-        max-height: 200px !important;
-        margin-bottom: 12px !important;
-    }
-
-    .requisition-right-sidebar div style {
-        border-top: none !important;
-        padding-top: 0px !important;
-    }
-}
-/* Find this section inside your @media (max-width: 1023px) block and update it: */
-@media (max-width: 1023px) {
-    .split-requisition-layout {
-        grid-template-columns: 1fr !important;
-        padding-bottom: 180px !important; /* Increased space so catalog items aren't blocked */
-    }
-    
-    .right-column-stack {
-        position: fixed !important;
-        bottom: 0 !important;
-        left: 0 !important;
-        width: 100% !important;
-        z-index: 9999 !important;
-        gap: 0 !important;
-        pointer-events: none; /* 🔑 CRITICAL: Allows clicks to pass through the invisible container wrapper */
+        pointer-events: none; /* 🔑 Clicks pass completely through the overlay wrapper container */
     }
 
     .past-log-section {
@@ -295,7 +238,7 @@ include "includes/header.php";
         box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.15) !important;
         padding: 12px 18px !important;
         background: #ffffff !important;
-        pointer-events: auto; /* 🔑 CRITICAL: Restores clickability to the actual visible drawer card and buttons */
+        pointer-events: auto; /* 🔑 Explicitly restores clicks to actual visible card buttons */
     }
 
     .sidebar-summary-title {
@@ -521,12 +464,10 @@ include "includes/header.php";
 window.reqCart = [];
 let activeFilteredTabId = 'all';
 
-// DYNAMIC HANDLER TO EXPAND/COLLAPSE CHOSEN PRODUCTS DRAWER ON MOBILE CONTEXTS
 window.handleMobileDrawerCollapseToggle = function(event) {
-    if (window.innerWidth >= 1024) return; // Ignore on desktop viewports
+    if (window.innerWidth >= 1024) return; 
     
     const sidebar = document.getElementById("mobileSummaryStickyWrapper");
-    // Only toggle if they click the heading layer directly
     if (event.target.closest('.sidebar-summary-title')) {
         sidebar.classList.toggle("drawer-open-state");
     }
@@ -586,7 +527,6 @@ window.addMaterialToSidebar = function(id, name) {
     else { window.reqCart.push({ id: id, name: name, qty: 1 }); }
     window.renderSidebarCart();
     
-    // Auto expand mobile drawer briefly so staff see visual confirmation of choice load
     if (window.innerWidth < 1024) {
         document.getElementById("mobileSummaryStickyWrapper").classList.add("drawer-open-state");
     }
@@ -624,7 +564,7 @@ window.renderSidebarCart = function() {
 };
 
 window.submitSidebarRequisition = function(event) {
-    if(event) event.stopPropagation(); // Avoid triggering mobile collapse actions
+    if(event) event.stopPropagation(); 
     if (window.reqCart.length === 0) return alert("Please select material choices first.");
     if (!confirm("Dispatch this material request list to inventory history logs?")) return;
 
@@ -797,9 +737,6 @@ window.closeChefNewProductModal = function() {
 };
 window.openChefNewProductModal = function() {
     document.getElementById("chefNewProductModal").style.display = "flex";
-};
-window.closeChefNewProductModal = function() {
-    document.getElementById("chefNewProductModal").style.display = "none";
 };
 </script>
 
