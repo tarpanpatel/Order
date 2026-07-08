@@ -13,9 +13,9 @@ if ($_SESSION["role"] !== "Admin" && $_SESSION["role"] !== "Super Admin") {
     die("Security Exception: Access Denied.");
 }
 
-// Fetch all tracked backend modifications joined with the users table to get real names
+// Fetch tracked actions joined with users
 $query_string = "
-    SELECT al.id, al.action, al.timestamp, u.username, u.role 
+    SELECT al.id, al.action, al.timestamp, u.username 
     FROM audit_logs al 
     LEFT JOIN users u ON al.user_id = u.id 
     ORDER BY al.timestamp DESC 
@@ -24,6 +24,44 @@ $query_string = "
 $activities = $pdo->query($query_string)->fetchAll(PDO::FETCH_ASSOC);
 
 include "includes/header.php";
+
+// Helper function to turn technical log strings into human-friendly language
+function turnActionIntoHumanLanguage($action_text) {
+    // 1. Convert Material Requisition submissions
+    // Format expected: User [X] submitted a new Housekeeping/Kitchen Material Requisition Request (Sheet ID #Y containing Z item unique line allocations).
+    if (preg_match('/submitted a new Housekeeping\/Kitchen Material Requisition Request/i', $action_text)) {
+        return "Submitted a new material requisition request sheet.";
+    }
+
+    // 2. Convert Expense recordings
+    // Format expected: User [X] registered an operational expense under category [Y] totaling ₹Z
+    if (preg_match('/registered an operational expense under category \[(.*?)\] totaling ₹(.*)/i', $action_text, $matches)) {
+        return "Added an expense of ₹" . number_format(floatval($matches[2]), 2) . " under the '" . htmlspecialchars($matches[1]) . "' category.";
+    }
+
+    // 3. Convert Kitchen purchases / Stock arrivals
+    // Format expected: User [X] registered a kitchen purchase for Y unit(s) of [Z] total price ₹W
+    if (preg_match('/registered a kitchen purchase for (.*?) unit\(s\) of \[(.*?)\]/i', $action_text, $matches)) {
+        $quantity = floatval($matches[1]);
+        $item_name = htmlspecialchars($matches[2]);
+        return "Purchased and logged stock of " . $quantity . " units of " . $item_name . ".";
+    }
+
+    // 4. Convert Ticket Serve completions
+    // Format expected: User [X] marked Kitchen Ticket #Y as Completed/Ready to Serve.
+    if (preg_match('/marked Kitchen Ticket #(.*?) as/i', $action_text, $matches)) {
+        return "Marked food order ticket #" . htmlspecialchars($matches[1]) . " as ready and served from the kitchen.";
+    }
+
+    // 5. Convert Final Checkouts
+    // Format expected: User [X] executed final room checkout settlement for Guest [Y]...
+    if (preg_match('/executed final room checkout settlement for Guest \[(.*?)\]/i', $action_text, $matches)) {
+        return "Completed final settlement and room checkout for guest: " . htmlspecialchars($matches[1]) . ".";
+    }
+
+    // Return original text if it doesn't match any specific patterns
+    return htmlspecialchars($action_text);
+}
 ?>
 
 <style>
@@ -50,34 +88,29 @@ include "includes/header.php";
             <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
                 <thead>
                     <tr style="background:#f8fafc; border-bottom:2px solid #cbd5e0; color:#475569; text-transform:uppercase; font-size:11px;">
-                        <th style="padding:12px 10px; width: 160px;">Timestamp</th>
-                        <th style="padding:12px 10px; width: 150px;">Performed By</th>
-                        <th style="padding:12px 10px; width: 120px;">Staff Role</th>
+                        <th style="padding:12px 10px; width: 180px;">Timestamp</th>
+                        <th style="padding:12px 10px; width: 200px;">Performed By (user name)</th>
                         <th style="padding:12px 10px;">Action Description Summary</th>
                     </tr>
                 </thead>
                 <tbody id="activityLogTableBody">
                     <?php if (!empty($activities)): foreach ($activities as $row): 
-                        $search_hash = strtolower(($row['username'] ?? 'system') . ' ' . ($row['role'] ?? 'automated') . ' ' . $row['action']);
+                        $human_friendly_action = turnActionIntoHumanLanguage($row['action']);
+                        $search_hash = strtolower(($row['username'] ?? 'system') . ' ' . $human_friendly_action);
                     ?>
                         <tr style="border-bottom:1px solid #edf2f7;" class="log-row-node" data-search-hash="<?= htmlspecialchars($search_hash) ?>">
                             <td style="padding:12px 10px; color:#64748b; font-family: monospace; font-weight: 600;">
-                                <?= date('d M Y - H:i:s', strtotime($row['timestamp'])) ?>
+                                <?= date('d M Y - h:i A', strtotime($row['timestamp'])) ?>
                             </td>
                             <td style="padding:12px 10px; font-weight: 700; color: #0f172a;">
                                 👤 <?= htmlspecialchars($row['username'] ?? 'System / Automated') ?>
                             </td>
-                            <td style="padding:12px 10px;">
-                                <span style="font-size:11px; font-weight:bold; padding:2px 6px; border-radius:4px; background:#e0f2fe; color:#0369a1;">
-                                    <?= htmlspecialchars($row['role'] ?? 'System') ?>
-                                </span>
-                            </td>
                             <td style="padding:12px 10px; color: #334155; font-weight: 500; line-height: 1.4;">
-                                <?= htmlspecialchars($row['action']) ?>
+                                <?= $human_friendly_action ?>
                             </td>
                         </tr>
                     <?php endforeach; else: ?>
-                        <tr id="emptyLogsPlaceholder"><td colspan="4" style="padding:30px; text-align:center; color:#94a3b8; font-style:italic;">No logged operational background actions found.</td></tr>
+                        <tr id="emptyLogsPlaceholder"><td colspan="3" style="padding:30px; text-align:center; color:#94a3b8; font-style:italic;">No logged operational actions found.</td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
