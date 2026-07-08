@@ -1,71 +1,58 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+// /home/apartment/artistsfarmjaipur.com/Order/login_logs.php
+if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once "config/db.php";
 
-// Restrict access exclusively to privileged Admin or Super Admin roles
-if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Admin" && $_SESSION["role"] !== "Super Admin")) {
-    header("Location: login.php");
-    exit;
+if (!isset($_SESSION["user_id"])) { 
+    header("Location: login.php"); 
+    exit; 
 }
 
-// Fetch the last 50 authentication log records ordered chronologically
+// Restrict access to administrative staff layers
+if ($_SESSION["role"] !== "Admin" && $_SESSION["role"] !== "Super Admin") {
+    die("Security Exception: Access Denied to unauthorized monitoring parameters.");
+}
+
+// Pull authorization history logs mapped to entries
 $logs = $pdo->query("SELECT * FROM security_login_logs ORDER BY id DESC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
 
 include "includes/header.php";
 ?>
 
-<style>
-.audit-log-panel { background: #ffffff !important; border: 1px solid #cbd5e0 !important; border-radius: 12px !important; padding: 20px !important; text-align: left; }
-.audit-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.audit-table th { background: #f8fafc; padding: 10px; font-weight: 700; color: #4b5563; border-bottom: 2px solid #cbd5e0; }
-.audit-table td { padding: 10px; border-bottom: 1px solid #edf2f7; color: #111827; vertical-align: top; }
-.badge-status { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; display: inline-block; }
-.status-ok { background: #d1fae5; color: #059669; }
-.status-fail { background: #fee2e2; color: #b91c1c; }
-.agent-string-text { max-width: 250px; word-break: break-all; font-size: 11px; color: #6b7280; display: block; line-height: 1.3; }
-</style>
-
-<div class="app-body" style="max-width:100% !important; width:100% !important;">
-    <div class="category-section">
-        <h2 class="category-title" style="text-transform: none;">🖥️ Security Device Auditing Footprints</h2>
-    </div>
-
-    <div class="audit-log-panel">
-        <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; margin-top: 0; margin-bottom: 15px; border-bottom: 1px dashed #cbd5e0; padding-bottom: 8px;">Active Session Access Trail Log</h3>
+<div class="app-body" style="padding: 20px; font-family: sans-serif; text-align: left;">
+    <div style="background: #fff; border: 1px solid #cbd5e0; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+        <h3 style="margin-top:0; color:#1e293b; border-bottom:1px solid #e2e8f0; padding-bottom:10px; text-transform:uppercase; font-size:14px; letter-spacing:0.5px;">🖥️ Security Access Trace Logs</h3>
         
-        <div style="overflow-x: auto;">
-            <table class="audit-table">
+        <div style="overflow-x: auto; margin-top: 15px;">
+            <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
                 <thead>
-                    <tr>
-                        <th style="width: 130px;">Timestamp Logged</th>
-                        <th style="width: 110px;">Username Typed</th>
-                        <th style="width: 100px;">Role Assigned</th>
-                        <th style="width: 110px;">Client IP Footprint</th>
-                        <th>Device/Hardware Metadata</th>
-                        <th style="width: 250px;">Browser Agent Signature</th>
-                        <th style="width: 80px; text-align: center;">Status</th>
+                    <tr style="background:#f8fafc; border-bottom:2px solid #cbd5e0; color:#475569; text-transform:uppercase; font-size:11px;">
+                        <th style="padding:12px 10px;">Timestamp</th>
+                        <th style="padding:12px 10px;">Username Profile</th>
+                        <th style="padding:12px 10px;">Security Code Used</th>
+                        <th style="padding:12px 10px;">Role Checked</th>
+                        <th style="padding:12px 10px;">IP Address</th>
+                        <th style="padding:12px 10px;">Device Endpoint</th>
+                        <th style="padding:12px 10px; text-align:center;">Status</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if (!empty($logs)): foreach ($logs as $row): 
-                        $is_success = ($row['login_status'] === 'Success');
-                        $badge_class = $is_success ? 'status-ok' : 'status-fail';
-                    ?>
-                        <tr style="<?= !$is_success ? 'background: #fff5f5;' : '' ?>">
-                            <td style="color: #4b5563; font-weight: 600;"><?= date('d M Y - H:i:s', strtotime($row['logged_at'])) ?></td>
-                            <td><strong><?= htmlspecialchars($row['username_entered']) ?></strong></td>
-                            <td><span style="color: #4a5568; font-weight:600;"><?= htmlspecialchars($row['role_assigned']) ?></span></td>
-                            <td style="font-family: monospace; font-weight: 600; color: #2563eb;"><?= htmlspecialchars($row['ip_address']) ?></td>
-                            <td style="font-weight: 600; color: #475569;"><?= htmlspecialchars($row['device_type']) ?></td>
-                            <td><span class="agent-string-text"><?= htmlspecialchars($row['browser_agent']) ?></span></td>
-                            <td style="text-align: center;">
-                                <span class="badge-status <?= $badge_class ?>"><?= $row['login_status'] ?></span>
+                    <?php if(!empty($logs)): foreach ($logs as $row): ?>
+                        <tr style="border-bottom:1px solid #edf2f7; background: <?= $row['login_status'] === 'Failed' ? '#fff5f5' : 'transparent'; ?>">
+                            <td style="padding:12px 10px; color:#64748b; font-weight:600;"><?= $row['logged_at'] ?></td>
+                            <td style="padding:12px 10px; font-weight:700; color:#1e293b;"><?= htmlspecialchars($row['username_entered']) ?></td>
+                            <td style="padding:12px 10px; font-family:monospace; font-size:14px; color:#475569;">••••</td>
+                            <td style="padding:12px 10px;"><span style="font-weight:700; color:#0284c7;"><?= htmlspecialchars($row['role_assigned']) ?></span></td>
+                            <td style="padding:12px 10px; color:#4a5568; font-family:monospace;"><?= htmlspecialchars($row['ip_address']) ?></td>
+                            <td style="padding:12px 10px; color:#718096; font-size:12px;"><?= htmlspecialchars($row['device_type']) ?></td>
+                            <td style="padding:12px 10px; text-align:center;">
+                                <span style="font-size:10px; font-weight:bold; padding:3px 8px; border-radius:12px; <?= $row['login_status'] === 'Success' ? 'background:#d1fae5; color:#065f46;' : 'background:#fee2e2; color:#991b1b;'; ?>">
+                                    <?= $row['login_status'] ?>
+                                </span>
                             </td>
                         </tr>
                     <?php endforeach; else: ?>
-                        <tr><td colspan="7" style="text-align: center; color: #a0aec0; padding: 30px; font-style: italic;">No system logging entries compiled.</td></tr>
+                        <tr><td colspan="7" style="padding:20px; text-align:center; color:#94a3b8; font-style:italic;">No authorization records trace logs found.</td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
