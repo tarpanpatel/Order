@@ -57,6 +57,15 @@ if (isset($_POST["complete_order_id"])) {
 
 $pending = $pdo->query("SELECT o.id, g.guest_name FROM orders o JOIN guests g ON o.guest_id = g.id WHERE o.status = 'Pending' ORDER BY o.id ASC")->fetchAll();
 include "includes/header.php";
+if (isset($_POST["complete_order_id"])) { 
+    $order_id = intval($_POST["complete_order_id"]);
+    
+    $stmt = $pdo->prepare("UPDATE orders SET status = 'Completed' WHERE id = ?");
+    $stmt->execute([$order_id]);
+
+    // ADD THIS AUDIT LOG TRIGGER:
+    logUserAction($pdo, "User [" . $_SESSION['username'] . "] marked Kitchen Ticket #" . $order_id . " as Served/Ready.");
+}
 ?>
 
 <div id="kitchenPromptModal" class="prompt-modal">
