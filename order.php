@@ -212,6 +212,13 @@ function searchMenu() {
         row.style.setProperty("display", row.getAttribute("data-name").includes(q) ? "flex" : "none", "important");
     });
 }
+// Inside the script handling order submission (e.g., process_food_order.php or your POST handler)
+$stmt = $pdo->prepare("INSERT INTO orders (guest_id, order_time, status) VALUES (?, NOW(), 'Pending')");
+$stmt->execute([$guest_id]);
+$order_id = $pdo->lastInsertId();
+
+// ADD THIS AUDIT LOG TRIGGER:
+logUserAction($pdo, "Staff member (" . $_SESSION['username'] . ") recorded Food Order Ticket #" . $order_id);
 </script>
 
 <?php include "includes/footer.php"; ?>
