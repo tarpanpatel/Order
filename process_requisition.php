@@ -28,19 +28,19 @@ if (empty($inputData['items']) || !is_array($inputData['items'])) {
 try {
     $pdo->beginTransaction();
 
-    // FIXED: Removed requested_by column to match the database table schema configuration
+    // Insert new parent requisition ticket row
     $insertParent = $pdo->prepare("INSERT INTO requisitions (status, requested_at) VALUES ('Pending', NOW())");
     $insertParent->execute();
     $requisition_id = $pdo->lastInsertId();
 
     $items_summary_list = [];
+    $human_action_phrases = [];
 
-    // 2. Loop through and save individual rows into requisition_items
+    // Setup statements for loop
     $insertItem = $pdo->prepare("
         INSERT INTO requisition_items (requisition_id, catalog_id, quantity, chosen_unit_label, item_status) 
         VALUES (?, ?, ?, ?, 'Pending')
     ");
-
     $fetchCatalogSpec = $pdo->prepare("SELECT item_name, pack_size, pack_unit, unit_label FROM req_catalog WHERE id = ?");
 
     foreach ($inputData['items'] as $cartItem) {
@@ -49,7 +49,7 @@ try {
 
         if ($quantity <= 0) continue;
 
-        // Fetch specs to preserve item data details
+        // Fetch specs to transform technical data into natural human phrases
         $fetchCatalogSpec->execute([$catalog_id]);
         $spec = $fetchCatalogSpec->fetch(PDO::FETCH_ASSOC);
 
@@ -61,15 +61,23 @@ try {
         // Record line item link
         $insertItem->execute([$requisition_id, $catalog_id, $quantity, $unit_label]);
 
+        // Construct short human phrase for this specific element
+        // Looks like: "2 liters of Mustard Oil" or "5 packets of Amul Butter"
+        $human_action_phrases[] = $quantity . " " . $pack_unit . " of " . $item_name;
+
         // Add to list for the Telegram broadcast text block
         $items_summary_list[] = "• " . $item_name . " (" . $pack_size . " " . $pack_unit . ") x" . $quantity . " " . $unit_label;
     }
 
-    // FIXED: Appended user tracing metrics right into your active audit table engine prior to finalizing commits
+    // Build unified human-friendly summary sentence for the activity logs table
+    // Looks like: "Requested stock of 2 liters of Mustard Oil, 1 kg of Basmati Rice."
+    $final_log_summary = "Requested stock of " . implode(", ", $human_action_phrases) . ".";
+
+    // Insert right into your active audit table engine prior to finalizing commits
     $audit_stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
     $audit_stmt->execute([
         $_SESSION['user_id'], 
-        "User [" . $_SESSION['username'] . "] submitted a new Housekeeping/Kitchen Material Requisition Request (Sheet ID #" . $requisition_id . " containing " . count($items_summary_list) . " item unique line allocations)."
+        $final_log_summary
     ]);
 
     $pdo->commit();
