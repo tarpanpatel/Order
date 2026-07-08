@@ -13,7 +13,7 @@ if ($_SESSION["role"] !== "Admin" && $_SESSION["role"] !== "Super Admin") {
     die("Security Exception: Access Denied.");
 }
 
-// Fetch tracked actions joined with users
+// Fetch up to 150 entries to keep historical data accessible via 'Load More'
 $query_string = "
     SELECT al.id, al.action, al.timestamp, u.username 
     FROM audit_logs al 
@@ -27,39 +27,28 @@ include "includes/header.php";
 
 // Helper function to turn technical log strings into human-friendly language
 function turnActionIntoHumanLanguage($action_text) {
-    // 1. Convert Material Requisition submissions
-    // Format expected: User [X] submitted a new Housekeeping/Kitchen Material Requisition Request (Sheet ID #Y containing Z item unique line allocations).
     if (preg_match('/submitted a new Housekeeping\/Kitchen Material Requisition Request/i', $action_text)) {
         return "Submitted a new material requisition request sheet.";
     }
 
-    // 2. Convert Expense recordings
-    // Format expected: User [X] registered an operational expense under category [Y] totaling ₹Z
     if (preg_match('/registered an operational expense under category \[(.*?)\] totaling ₹(.*)/i', $action_text, $matches)) {
         return "Added an expense of ₹" . number_format(floatval($matches[2]), 2) . " under the '" . htmlspecialchars($matches[1]) . "' category.";
     }
 
-    // 3. Convert Kitchen purchases / Stock arrivals
-    // Format expected: User [X] registered a kitchen purchase for Y unit(s) of [Z] total price ₹W
     if (preg_match('/registered a kitchen purchase for (.*?) unit\(s\) of \[(.*?)\]/i', $action_text, $matches)) {
         $quantity = floatval($matches[1]);
         $item_name = htmlspecialchars($matches[2]);
         return "Purchased and logged stock of " . $quantity . " units of " . $item_name . ".";
     }
 
-    // 4. Convert Ticket Serve completions
-    // Format expected: User [X] marked Kitchen Ticket #Y as Completed/Ready to Serve.
     if (preg_match('/marked Kitchen Ticket #(.*?) as/i', $action_text, $matches)) {
         return "Marked food order ticket #" . htmlspecialchars($matches[1]) . " as ready and served from the kitchen.";
     }
 
-    // 5. Convert Final Checkouts
-    // Format expected: User [X] executed final room checkout settlement for Guest [Y]...
     if (preg_match('/executed final room checkout settlement for Guest \[(.*?)\]/i', $action_text, $matches)) {
         return "Completed final settlement and room checkout for guest: " . htmlspecialchars($matches[1]) . ".";
     }
 
-    // Return original text if it doesn't match any specific patterns
     return htmlspecialchars($action_text);
 }
 ?>
@@ -69,6 +58,8 @@ function turnActionIntoHumanLanguage($action_text) {
 .form-label-header { font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:5px; text-transform:uppercase; }
 .log-row-node { transition: background 0.1s ease; }
 .log-row-node:hover { background: #f8fafc; }
+.btn-load-more { display: block; width: 200px; margin: 20px auto 10px auto; padding: 10px 16px; font-size: 13px; font-weight: bold; color: #fff; background: #06b6d4; border: none; border-radius: 8px; cursor: pointer; text-align: center; box-shadow: 0 2px 4px rgba(6,182,212,0.15); transition: background 0.2s; }
+.btn-load-more:hover { background: #0891b2; }
 </style>
 
 <div class="app-body" style="padding: 20px; font-family: sans-serif; text-align: left;">
@@ -98,7 +89,7 @@ function turnActionIntoHumanLanguage($action_text) {
                         $human_friendly_action = turnActionIntoHumanLanguage($row['action']);
                         $search_hash = strtolower(($row['username'] ?? 'system') . ' ' . $human_friendly_action);
                     ?>
-                        <tr style="border-bottom:1px solid #edf2f7;" class="log-row-node" data-search-hash="<?= htmlspecialchars($search_hash) ?>">
+                        <tr style="border-bottom:1px solid #edf2f7; display: none;" class="log-row-node" data-search-hash="<?= htmlspecialchars($search_hash) ?>">
                             <td style="padding:12px 10px; color:#64748b; font-family: monospace; font-weight: 600;">
                                 <?= date('d M Y - h:i A', strtotime($row['timestamp'])) ?>
                             </td>
@@ -110,28 +101,90 @@ function turnActionIntoHumanLanguage($action_text) {
                             </td>
                         </tr>
                     <?php endforeach; else: ?>
-                        <tr id="emptyLogsPlaceholder"><td colspan="3" style="padding:30px; text-align:center; color:#94a3b8; font-style:italic;">No logged operational actions found.</td></tr>
+                        <tr id="emptyLogsPlaceholder" style="display: table-row !important;"><td colspan="3" style="padding:30px; text-align:center; color:#94a3b8; font-style:italic;">No logged operational actions found.</td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
         </div>
+
+        <?php if (count($activities) > 10): ?>
+            <button type="button" id="loadMoreActionBtn" class="btn-load-more" onclick="window.revealNextActivityBatch()">Load More</button>
+        <?php endif; ?>
+
     </div>
 </div>
 
 <script>
+let currentRenderedCount = 0;
+const entriesPerPageChunk = 10;
+let filteredNodesCache = [];
+
+function initializeActivityLogsPagination() {
+    // Collect all data row elements
+    const rows = Array.from(document.querySelectorAll(".log-row-node"));
+    filteredNodesCache = rows;
+    currentRenderedCount = 0;
+    
+    // Reset views
+    rows.forEach(r => r.style.setProperty("display", "none", "important"));
+    
+    window.revealNextActivityBatch();
+}
+
+window.revealNextActivityBatch = function() {
+    const nextBatchBound = currentRenderedCount + entriesPerPageChunk;
+    const loadMoreBtn = document.getElementById("loadMoreActionBtn");
+    
+    for (let i = currentRenderedCount; i < nextBatchBound && i < filteredNodesCache.length; i++) {
+        filteredNodesCache[i].style.setProperty("display", "table-row", "important");
+        currentRenderedCount++;
+    }
+    
+    if (loadMoreBtn) {
+        if (currentRenderedCount >= filteredNodesCache.length) {
+            loadMoreBtn.style.setProperty("display", "none", "important");
+        } else {
+            loadMoreBtn.style.setProperty("display", "block", "important");
+        }
+    }
+};
+
 function runLiveActivityFilter() {
     let query = document.getElementById("activitySearchField").value.toLowerCase().trim();
-    let rows = document.querySelectorAll(".log-row-node");
+    let rows = Array.from(document.querySelectorAll(".log-row-node"));
+    const placeholder = document.getElementById("emptyLogsPlaceholder");
+    const loadMoreBtn = document.getElementById("loadMoreActionBtn");
     
-    rows.forEach(row => {
+    // Clear display matching loops
+    rows.forEach(r => r.style.setProperty("display", "none", "important"));
+    
+    if (query === "") {
+        filteredNodesCache = rows;
+        currentRenderedCount = 0;
+        if (placeholder) placeholder.style.setProperty("display", "none", "important");
+        window.revealNextActivityBatch();
+        return;
+    }
+    
+    // Filter rows based on search parameters hash matching
+    filteredNodesCache = rows.filter(row => {
         let hash = row.getAttribute("data-search-hash") || "";
-        if (hash.includes(query)) {
-            row.style.display = "";
-        } else {
-            row.style.display = "none";
-        }
+        return hash.includes(query);
     });
+    
+    currentRenderedCount = 0;
+    
+    if (filteredNodesCache.length === 0) {
+        if (placeholder) placeholder.style.setProperty("display", "table-row", "important");
+        if (loadMoreBtn) loadMoreBtn.style.setProperty("display", "none", "important");
+    } else {
+        if (placeholder) placeholder.style.setProperty("display", "none", "important");
+        window.revealNextActivityBatch();
+    }
 }
+
+// Fire table pagination on structural layout readiness
+document.addEventListener("DOMContentLoaded", initializeActivityLogsPagination);
 </script>
 
 <?php include "includes/footer.php"; ?>
