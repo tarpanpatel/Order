@@ -222,9 +222,12 @@ include "includes/header.php";
         bottom: 0 !important;
         left: 0 !important;
         width: 100% !important;
+        /* FIXED: isolated height limits container footprint boundary on mobile so top hamburger icon menu can breathe */
+        height: auto !important; 
+        top: auto !important; 
         z-index: 9999 !important;
         gap: 0 !important;
-        pointer-events: none; /* 🔑 Clicks pass completely through the overlay wrapper container */
+        pointer-events: none; 
     }
 
     .past-log-section {
@@ -238,7 +241,7 @@ include "includes/header.php";
         box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.15) !important;
         padding: 12px 18px !important;
         background: #ffffff !important;
-        pointer-events: auto; /* 🔑 Explicitly restores clicks to actual visible card buttons */
+        pointer-events: auto; 
     }
 
     .sidebar-summary-title {
@@ -527,9 +530,7 @@ window.addMaterialToSidebar = function(id, name) {
     else { window.reqCart.push({ id: id, name: name, qty: 1 }); }
     window.renderSidebarCart();
     
-    if (window.innerWidth < 1024) {
-        document.getElementById("mobileSummaryStickyWrapper").classList.add("drawer-open-state");
-    }
+    // FIXED: Removed the dynamic 'drawer-open-state' class injection rule here so drawer remains completely closed when new items load
 };
 
 window.updateSidebarQty = function(id, delta) {
@@ -732,7 +733,7 @@ window.triggerMemoryStateUpdate = function(catalogId, targetedState) {
     }
 };
 
-window.closeChefNewProductModal = function() {
+window.openChefNewProductModal = function() {
     document.getElementById("chefNewProductModal").style.display = "none";
 };
 window.openChefNewProductModal = function() {
