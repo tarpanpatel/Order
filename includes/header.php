@@ -29,13 +29,14 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
     <link rel="stylesheet" href="assets/css/style.css?v=<?= time(); ?>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* --- CLEAN DESKTOP CORE STYLING (LEAVE INTACT) --- */
         html, body {
+            max-width: 100vw !important;
+            width: 100% !important;
+            overflow-x: hidden !important;
+            box-sizing: border-box !important;
             margin: 0 !important;
             padding: 0 !important;
-            box-sizing: border-box !important;
         }
-
         .mobile-header-strip { display: none; background: #ffffff; padding: 8px 16px; border-bottom: 1px solid #e2e8f0; align-items: center; width: 100%; min-height: 56px; box-sizing: border-box; }
         .hamburger-btn { background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 1.2rem; padding: 6px 14px; cursor: pointer; margin-right: 12px; font-weight: bold; color: #2d3748; }
         .desktop-sidebar-title { font-size: 11px; font-weight: 700; color: #718096; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px dashed #e2e8f0; }
@@ -47,72 +48,10 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
             .nav-bar { top: 0 !important; } 
             .close-drawer-btn { display: none !important; } 
         }
-
-        /* ==========================================================================
-           ⚡ STRICT MOBILE RESPONSIVE OVERRIDES (COMPLETELY INSULATED FOR PHONES)
-           ========================================================================== */
         @media (max-width: 1023px) {
-            html, body {
-                max-width: 100vw !important;
-                width: 100% !important;
-                overflow-x: hidden !important;
-            }
-
-            .mobile-header-strip { 
-                display: flex !important; 
-                width: 100% !important;
-                box-sizing: border-box !important;
-            }
-            
-            .app-container { 
-                display: block !important; 
-                width: 100% !important;
-                max-width: 100vw !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                box-sizing: border-box !important;
-            }
-            
-            .main-content { 
-                width: 100% !important; 
-                max-width: 100vw !important; 
-                padding: 4px !important; 
-                box-sizing: border-box !important;
-                display: block !important;
-                float: none !important;
-            }
-
-            /* Flatten desktop layouts into single block containers ONLY on phone dimensions */
-            .split-requisition-layout {
-                display: block !important;
-                width: 100% !important;
-                max-width: 100vw !important;
-                box-sizing: border-box !important;
-            }
-
-            .materials-main-panel,
-            .catalog-cards-box {
-                display: block !important;
-                width: 100% !important;
-                max-width: 100% !important;
-                box-sizing: border-box !important;
-            }
-
-            .sidebar { 
-                position: fixed !important; 
-                top: 0; 
-                left: 0; 
-                height: 100vh; 
-                width: 260px; 
-                z-index: 9999; 
-                transform: translateX(-100%); 
-                transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); 
-                box-shadow: 4px 0 25px rgba(0,0,0,0.08); 
-            }
+            .mobile-header-strip { display: flex !important; width: 100% !important; box-sizing: border-box !important; }
+            .sidebar { position: fixed !important; top: 0; left: 0; height: 100vh; width: 260px; z-index: 9999; transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: 4px 0 25px rgba(0,0,0,0.08); }
             .sidebar.is-drawer-open { transform: translateX(0) !important; }
-
-            .category-section { margin-bottom: 8px !important; padding: 0 4px !important; }
-            .category-section h2, .category-title { font-size: 14px !important; font-weight: 700 !important; color: #374151 !important; }
         }
     </style>
 </head>
@@ -126,7 +65,6 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
 <div class="app-container" <?php echo ($is_staff_role && $current_page === 'kitchen.php') ? 'style="grid-template-columns: 1fr;"' : 'style=""'; ?>>
     
     <?php 
-    // If the view requires a navigation menu sidebar, inject the isolated menu file here
     if (!($is_staff_role && $current_page === 'kitchen.php')) {
         include __DIR__ . "/left_menu.php";
     } 
