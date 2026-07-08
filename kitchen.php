@@ -1,4 +1,5 @@
 <?php
+// /home/apartment/artistsfarmjaipur.com/Order/kitchen.php
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -6,7 +7,7 @@ require_once "config/db.php";
 require_once "config/telegram.php";
 
 // Restrict access exclusively to the Chef and Admin roles
-if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Chef" && $_SESSION["role"] !== "Admin")) {
+if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Chef" && $_SESSION["role"] !== "Admin" && $_SESSION["role"] !== "Staff")) {
     header("Location: login.php");
     exit;
 }
@@ -51,21 +52,17 @@ if (isset($_POST["complete_order_id"])) {
 
     // 3. Finalize core application database status values update cleanly
     $pdo->prepare("UPDATE orders SET status = 'Completed' WHERE id = ?")->execute([$order_id]); 
+
+    // --- AUDIT TRAIL LOGGING ---
+    $audit_stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
+    $audit_stmt->execute([$_SESSION['user_id'], "User [" . $_SESSION['username'] . "] marked Kitchen Ticket #" . $order_id . " as Completed/Ready to Serve."]);
+
     header("Location: kitchen.php"); 
     exit;
 }
 
 $pending = $pdo->query("SELECT o.id, g.guest_name FROM orders o JOIN guests g ON o.guest_id = g.id WHERE o.status = 'Pending' ORDER BY o.id ASC")->fetchAll();
 include "includes/header.php";
-if (isset($_POST["complete_order_id"])) { 
-    $order_id = intval($_POST["complete_order_id"]);
-    
-    $stmt = $pdo->prepare("UPDATE orders SET status = 'Completed' WHERE id = ?");
-    $stmt->execute([$order_id]);
-
-    // ADD THIS AUDIT LOG TRIGGER:
-    logUserAction($pdo, "User [" . $_SESSION['username'] . "] marked Kitchen Ticket #" . $order_id . " as Served/Ready.");
-}
 ?>
 
 <div id="kitchenPromptModal" class="prompt-modal">
