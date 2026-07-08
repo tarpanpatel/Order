@@ -195,6 +195,78 @@ include "includes/header.php";
 
 .audit-history-subtitle { font-size: 11px; color: #64748b; font-weight: 600; display: block; margin-top: 2px; font-family: monospace; }
 .global-toast-notification { padding: 12px 24px; background: #10b981; color: white; font-size: 14px; font-weight: 800; text-align: center; border-radius: 8px; box-shadow: 0 4px 12px rgba(16,185,129,0.2); margin-bottom: 15px; border: 1px solid #059669; }
+
+/* ==========================================================================
+   ADVANCED MOBILE OVERLAY FLOATING SHEET LAYOUT ENGINE
+   ========================================================================== */
+@media (max-width: 1023px) {
+    .split-requisition-layout {
+        grid-template-columns: 1fr !important;
+        padding-bottom: 75px !important; /* Space so sticky bar does not cover elements */
+    }
+    
+    .right-column-stack {
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        z-index: 9999 !important;
+        gap: 0 !important;
+    }
+
+    .past-log-section {
+        display: none !important; /* Hide logs on mobile workspace to prevent visual clutter */
+    }
+
+    .requisition-right-sidebar {
+        border-radius: 20px 20px 0 0 !important;
+        border: none !important;
+        border-top: 2px solid #cbd5e0 !important;
+        box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.12) !important;
+        padding: 12px 18px !important;
+        background: #ffffff !important;
+    }
+
+    .sidebar-summary-title {
+        margin-bottom: 8px !important;
+        padding-bottom: 4px !important;
+        font-size: 13px !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        cursor: pointer !important;
+    }
+    
+    /* Dynamic arrow indicator showing drawer expandable status */
+    .sidebar-summary-title::after {
+        content: "▲ Expand Chosen Box";
+        font-size: 11px;
+        color: #06b6d4;
+        font-weight: bold;
+    }
+    
+    /* Toggle action swaps content when drawer gets clicked */
+    .requisition-right-sidebar.drawer-open-state .sidebar-summary-title::after {
+        content: "▼ Collapse Content";
+    }
+
+    .sidebar-cart-list {
+        max-height: 0px !important;
+        overflow-y: auto !important;
+        margin-bottom: 0px !important;
+        transition: max-height 0.25s ease-out, margin 0.25s ease-out !important;
+    }
+
+    .requisition-right-sidebar.drawer-open-state .sidebar-cart-list {
+        max-height: 200px !important;
+        margin-bottom: 12px !important;
+    }
+
+    .requisition-right-sidebar div style {
+        border-top: none !important;
+        padding-top: 0px !important;
+    }
+}
 </style>
 
 <div class="app-body" style="max-width: 100% !important; width: 100% !important; display: block !important;">
@@ -257,17 +329,17 @@ include "includes/header.php";
         </div>
 
         <div class="right-column-stack">
-            <div class="requisition-right-sidebar">
+            <div class="requisition-right-sidebar" id="mobileSummaryStickyWrapper" onclick="window.handleMobileDrawerCollapseToggle(event)">
                 <h3 class="sidebar-summary-title">📝 Requisition Summary</h3>
                 <div class="sidebar-cart-list" id="sidebarCartRowsContainer">
                     <p style="color: #a0aec0; text-align: center; font-size: 13px; margin-top: 40px; font-style: italic;">No items added to this request list yet.</p>
                 </div>
-                <div style="border-top: 1px dashed #e2e8f0; padding-top: 15px;">
-                    <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 14px; margin-bottom: 15px; color: #111827;">
+                <div>
+                    <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 14px; margin-bottom: 12px; color: #111827;">
                         <span>Total Item Types:</span>
                         <span id="sidebarTotalCount">0</span>
                     </div>
-                    <button type="button" class="btn btn-bill" style="width: 100%; padding: 12px; font-size: 13px; font-weight: bold; border-radius: 8px;" onclick="window.submitSidebarRequisition()">Submit Requisition</button>
+                    <button type="button" class="btn btn-bill" style="width: 100%; padding: 12px; font-size: 13px; font-weight: bold; border-radius: 8px;" onclick="window.submitSidebarRequisition(event)">Submit Requisition</button>
                 </div>
             </div>
 
@@ -384,6 +456,17 @@ include "includes/header.php";
 window.reqCart = [];
 let activeFilteredTabId = 'all';
 
+// DYNAMIC HANDLER TO EXPAND/COLLAPSE CHOSEN PRODUCTS DRAWER ON MOBILE CONTEXTS
+window.handleMobileDrawerCollapseToggle = function(event) {
+    if (window.innerWidth >= 1024) return; // Ignore on desktop viewports
+    
+    const sidebar = document.getElementById("mobileSummaryStickyWrapper");
+    // Only toggle if they click the heading layer directly
+    if (event.target.closest('.sidebar-summary-title')) {
+        sidebar.classList.toggle("drawer-open-state");
+    }
+};
+
 window.quickSearchCatalogRegistry = function() {
     const inputVal = document.getElementById("catalogQuickSearchInput").value.toLowerCase().trim();
     const blocks = document.querySelectorAll(".category-block");
@@ -437,6 +520,11 @@ window.addMaterialToSidebar = function(id, name) {
     if (existing) { existing.qty += 1; }
     else { window.reqCart.push({ id: id, name: name, qty: 1 }); }
     window.renderSidebarCart();
+    
+    // Auto expand mobile drawer briefly so staff see visual confirmation of choice load
+    if (window.innerWidth < 1024) {
+        document.getElementById("mobileSummaryStickyWrapper").classList.add("drawer-open-state");
+    }
 };
 
 window.updateSidebarQty = function(id, delta) {
@@ -470,7 +558,8 @@ window.renderSidebarCart = function() {
     `).join('');
 };
 
-window.submitSidebarRequisition = function() {
+window.submitSidebarRequisition = function(event) {
+    if(event) event.stopPropagation(); // Avoid triggering mobile collapse actions
     if (window.reqCart.length === 0) return alert("Please select material choices first.");
     if (!confirm("Dispatch this material request list to inventory history logs?")) return;
 
@@ -638,8 +727,14 @@ window.triggerMemoryStateUpdate = function(catalogId, targetedState) {
     }
 };
 
-window.closeEditReqModal = function() {
-    document.getElementById("editReqModalPopup").style.display = "none";
+window.closeChefNewProductModal = function() {
+    document.getElementById("chefNewProductModal").style.display = "none";
+};
+window.openChefNewProductModal = function() {
+    document.getElementById("chefNewProductModal").style.display = "flex";
+};
+window.closeChefNewProductModal = function() {
+    document.getElementById("chefNewProductModal").style.display = "none";
 };
 </script>
 
