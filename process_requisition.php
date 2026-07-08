@@ -65,6 +65,13 @@ try {
         $items_summary_list[] = "• " . $item_name . " (" . $pack_size . " " . $pack_unit . ") x" . $quantity . " " . $unit_label;
     }
 
+    // FIXED: Appended user tracing metrics right into your active audit table engine prior to finalizing commits
+    $audit_stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
+    $audit_stmt->execute([
+        $_SESSION['user_id'], 
+        "User [" . $_SESSION['username'] . "] submitted a new Housekeeping/Kitchen Material Requisition Request (Sheet ID #" . $requisition_id . " containing " . count($items_summary_list) . " item unique line allocations)."
+    ]);
+
     $pdo->commit();
 
     // ==========================================================================
