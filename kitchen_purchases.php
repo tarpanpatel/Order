@@ -40,7 +40,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_add_kitchen_ex
     $date           = $_POST["expense_date"];
     $category       = $_POST["item_category"];
     $item_detail    = trim($_POST["item_detail"]);
-    $vendor         = trim($_POST["vendor_name"]);
+    
+    // FORCED OVERRIDE: Active user records transaction responsibility inside vendor_name mapping column
+    $vendor         = $_SESSION["username"]; 
     $qty            = floatval($_POST["quantity"]);
     $price_per_unit = floatval($_POST["price_per_unit"]);
 
@@ -83,11 +85,15 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_add_kitchen_ex
                     $telegramMessage = "✅ *Stock Request Auto-Fulfilled!*\n\n";
                     $telegramMessage .= "🛒 *Item:* " . $item_detail . "\n";
                     $telegramMessage .= "📦 *Quantity:* " . $qty . "\n";
-                    $telegramMessage .= "🏪 *Vendor:* " . (!empty($vendor) ? $vendor : 'Market Sourcing') . "\n\n";
+                    $telegramMessage .= "🏪 *Logged By:* " . $vendor . "\n\n";
                     $telegramMessage .= "📊 *Status:* Requisition order item marked complete.";
                     sendTelegramMessage($telegramMessage);
                 }
             }
+
+            // --- AUDIT TRAIL LOGGING ---
+            $audit_stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
+            $audit_stmt->execute([$_SESSION['user_id'], "User [" . $_SESSION['username'] . "] registered a kitchen purchase for " . $qty . " unit(s) of [" . $item_detail . "] total price ₹" . ($qty * $price_per_unit)]);
 
             $pdo->commit();
             $message = "✔ Stock purchase entry recorded and native kitchen requisitions updated successfully!";
@@ -163,7 +169,7 @@ include "includes/header.php";
                 </datalist>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom:20px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom:20px;">
                 <div>
                     <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">QUANTITY PURCHASED</label>
                     <input type="number" step="0.01" name="quantity" required placeholder="0" style="width:100%; padding:10px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box;">
@@ -173,8 +179,8 @@ include "includes/header.php";
                     <input type="number" step="0.01" name="price_per_unit" required placeholder="0.00" style="width:100%; padding:10px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box;">
                 </div>
                 <div>
-                    <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">VENDOR NAME</label>
-                    <input type="text" name="vendor_name" placeholder="Wholesale Supplier Mart" style="width:100%; padding:10px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box;">
+                    <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">RECORDED BY</label>
+                    <input type="text" readonly value="<?= htmlspecialchars($_SESSION['username']) ?>" style="width:100%; padding:10px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box; background:#f1f5f9; color:#64748b; font-weight:bold;">
                 </div>
             </div>
 
