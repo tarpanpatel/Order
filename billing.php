@@ -20,11 +20,18 @@ $guest = $pdo->query("SELECT * FROM guests WHERE status = 'Active' LIMIT 1")->fe
 if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["adjust_action"])) {
     $id = intval($_POST["order_item_id"]); 
     $qty = intval($_POST["adjust_qty"]);
-    if ($_POST["adjust_type"] === 'Cancel') { 
+    $type = $_POST["adjust_type"];
+
+    if ($type === 'Cancel') { 
         $pdo->prepare("UPDATE order_items SET quantity = quantity - ? WHERE id = ?")->execute([$qty, $id]); 
-    } else if ($_POST["adjust_type"] === 'Return') { 
+    } else if ($type === 'Return') { 
         $pdo->prepare("UPDATE order_items SET returned_qty = returned_qty + ? WHERE id = ?")->execute([$qty, $id]); 
     }
+
+    // --- AUDIT TRAIL LOGGING ---
+    $audit_stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
+    $audit_stmt->execute([$_SESSION['user_id'], "User [" . $_SESSION['username'] . "] triggered " . $type . " operation on Order Item ID #" . $id . " with quantity context: " . $qty]);
+
     header("Location: billing.php"); 
     exit;
 }
@@ -47,6 +54,10 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_add_
         ];
         $updated_json = json_encode($current_adjustments);
         $pdo->prepare("UPDATE guests SET food_remark = ? WHERE id = ?")->execute([$updated_json, $guest['id']]);
+
+        // --- AUDIT TRAIL LOGGING ---
+        $audit_stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
+        $audit_stmt->execute([$_SESSION['user_id'], "User [" . $_SESSION['username'] . "] appended custom incidental adjustment [" . $reason . "] totaling ₹" . $amount . " on Guest ID #" . $guest['id']]);
     }
     header("Location: billing.php");
     exit;
@@ -60,6 +71,10 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_remo
             return $item['id'] !== $adj_id;
         });
         $pdo->prepare("UPDATE guests SET food_remark = ? WHERE id = ?")->execute([json_encode(array_values($filtered)), $guest['id']]);
+
+        // --- AUDIT TRAIL LOGGING ---
+        $audit_stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
+        $audit_stmt->execute([$_SESSION['user_id'], "User [" . $_SESSION['username'] . "] revoked an incidental adjustment from active Profile ID #" . $guest['id']]);
     }
     header("Location: billing.php");
     exit;
@@ -108,9 +123,11 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_fina
         $accommodation_pending, $accommodation_collected_by, $food_bill_total, $food_collected_by
     ]);
 
-    // ==========================================================================
-    // FIXED ROUTING: REDIRECTED SETTLEMENT BREAKDOWN TO sendAdminTelegramMessage
-    // ==========================================================================
+    // --- AUDIT TRAIL LOGGING ---
+    $audit_stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
+    $audit_stmt->execute([$_SESSION['user_id'], "User [" . $_SESSION['username'] . "] executed final room checkout settlement for Guest [" . $guest['guest_name'] . "] (Total Room Rent Pending Collected: ₹" . $accommodation_pending . " | Total Kitchen Incidentals Settle Collected: ₹" . $food_bill_total . ")"]);
+
+    // Telegram Summary Dispatch Logic Hook
     $tg_msg  = "🔔 <b>FARM CHECKOUT SETTLEMENT REPORT</b>\n";
     $tg_msg .= "━━━━━━━━━━━━━━━━━━\n";
     $tg_msg .= "👤 <b>Guest:</b> " . htmlspecialchars($guest['guest_name'] ?: 'Walk-In') . "\n";
@@ -149,7 +166,6 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_fina
     if (function_exists('sendAdminTelegramMessage')) {
         sendAdminTelegramMessage($tg_msg); 
     }
-    // ==========================================================================
 
     header("Location: index.php");
     exit;
