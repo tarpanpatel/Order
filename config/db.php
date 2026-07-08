@@ -49,4 +49,12 @@ function requireSuperAdmin() {
         exit;
     }
 }
+function logUserAction($pdo, $action_description) {
+    if (session_status() === PHP_SESSION_NONE) { session_start(); }
+    $user_id = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : null;
+    
+    // Injects an entry tracking the staff member's exact action path
+    $stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
+    $stmt->execute([$user_id, $action_description]);
+}
 ?>
