@@ -120,9 +120,6 @@ include "includes/header.php";
 ?>
 
 <style>
-/* Master Viewport Lock Engine */
-html, body { max-width: 100vw !important; overflow-x: hidden !important; width: 100% !important; }
-
 /* --- BASE & DESKTOP WORKSPACE LAYOUT ENGINE --- */
 .split-requisition-layout { display: grid !important; grid-template-columns: 1fr 380px !important; gap: 20px !important; width: 100% !important; align-items: start !important; margin-top: 15px; box-sizing: border-box; }
 .materials-main-panel { display: flex; flex-direction: column; gap: 24px; width: 100%; box-sizing: border-box; }
@@ -175,23 +172,49 @@ html, body { max-width: 100vw !important; overflow-x: hidden !important; width: 
 .past-table th { background: #f8fafc; padding: 6px 4px; font-weight: 700; color: #4b5563; border-bottom: 2px solid #e2e8f0; text-align: left; }
 .past-table td { padding: 8px 4px; border-bottom: 1px solid #edf2f7; color: #111827; vertical-align: middle; }
 
-.btn-action-trigger { display: block !important; width: 100% !important; padding: 6px 4px !important; font-size: 10px !important; font-weight: 700 !important; text-transform: uppercase; border-radius: 6px !important; cursor: pointer; text-align: center; border: 1px solid transparent !important; }
-.btn-action-trigger span { display: block !important; font-size: 9px !important; font-weight: 800 !important; text-transform: lowercase; }
+.btn-action-trigger { display: block !important; width: 100% !important; padding: 6px 4px !important; font-size: 10px !important; font-weight: 700 !important; text-transform: uppercase; border-radius: 6px !important; cursor: pointer; text-align: center !important; line-height: 1.3 !important; border: 1px solid transparent !important; }
+
 .btn-status-pending { background: #fef3c7 !important; color: #d97706 !important; border-color: #f59e0b !important; }
+.btn-status-pending:hover { background: #fde68a !important; }
 .btn-status-fulfilled { background: #d1fae5 !important; color: #059669 !important; border-color: #10b981 !important; }
+.btn-status-fulfilled:hover { background: #a7f3d0 !important; }
+
+.btn-sidebar-past-link { display: block !important; text-align: center !important; width: 100% !important; padding: 8px !important; background: #f1f5f9 !important; color: #475569 !important; border: 1px solid #cbd5e0 !important; border-radius: 6px !important; font-size: 12px !important; font-weight: 600 !important; text-decoration: none !important; margin-top: 12px !important; }
+
+.binary-toggle-container { display: flex; gap: 4px; background: #f1f5f9; padding: 3px; border-radius: 6px; border: 1px solid #cbd5e0; }
+.toggle-choice-btn { padding: 6px 12px !important; font-size: 11px !important; font-weight: 700 !important; border: none !important; border-radius: 6px !important; color: #ffffff !important; cursor: pointer !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; }
+
+.btn-block-fulfilled { background: #10b981 !important; border: 1px solid #059669 !important; opacity: 1; }
+.btn-block-fulfilled:hover { background: #059669 !important; }
+.btn-block-fulfilled:disabled { background: #cbd5e0 !important; border-color: #cbd5e0 !important; color: #94a3b8 !important; cursor: not-allowed !important; opacity: 0.7; }
+
+.btn-block-remove { background: #ef4444 !important; border: 1px solid #dc2626 !important; opacity: 1; }
+.btn-block-remove:hover { background: #dc2626 !important; }
+.btn-block-remove:disabled { background: #cbd5e0 !important; border-color: #cbd5e0 !important; color: #94a3b8 !important; cursor: not-allowed !important; opacity: 0.7; }
+
+.row-state-greyed-out .item-text-title { color: #94a3b8 !important; text-decoration: line-through; }
+.row-state-green-highlight .item-text-title { color: #10b981 !important; font-weight: 800; }
 
 .modal-input-qty { width: 55px; padding: 6px 4px; border: 1px solid #cbd5e0; text-align: center; font-size: 13px; font-weight: 700; color: #1e293b; background: #fff !important; }
 .modal-qty-container { display: flex; align-items: center; border-radius: 6px; overflow: hidden; border: 1px solid #cbd5e0; background: #fff; }
 .modal-qty-btn { width: 28px; height: 31px; background: #f8fafc; border: none; color: #475569; font-weight: bold; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.modal-qty-btn:hover { background: #e2e8f0; color: #0f172a; }
 
-.global-toast-notification { padding: 10px 20px; background: #10b981; color: white; font-size: 13px; font-weight: 800; text-align: center; border-radius: 8px; box-shadow: 0 4px 12px rgba(16,185,129,0.2); margin-bottom: 12px; border: 1px solid #059669; }
+.audit-history-subtitle { font-size: 11px; color: #64748b; font-weight: 600; display: block; margin-top: 2px; font-family: monospace; }
+.global-toast-notification { padding: 12px 24px; background: #10b981; color: white; font-size: 14px; font-weight: 800; text-align: center; border-radius: 8px; box-shadow: 0 4px 12px rgba(16,185,129,0.2); margin-bottom: 15px; border: 1px solid #059669; }
 
 /* ==========================================================================
-   ⚡ MOBILE-SPECIFIC SLEEK ROWS FORMAT & COMPACT PADDING OPTIMIZATIONS
+   🚨 CRITICAL RESPONSIVE RECONCILIATION FOR OVERFLOW BREAKS
    ========================================================================== */
 @media (max-width: 1023px) {
-    .app-body { padding: 8px !important; width: 100% !important; max-width: 100vw !important; overflow-x: hidden !important; }
-    
+    /* Hard override targets global grid system container classes breaking screen size bounds */
+    html, body, .app-container, .main-content, .app-body { 
+        max-width: 100vw !important; 
+        width: 100% !important; 
+        overflow-x: hidden !important; 
+        box-sizing: border-box !important;
+    }
+
     .split-requisition-layout {
         grid-template-columns: 1fr !important;
         padding-bottom: 140px !important; 
@@ -203,12 +226,11 @@ html, body { max-width: 100vw !important; overflow-x: hidden !important; width: 
         padding: 10px !important;
         border-radius: 8px !important;
         width: 100% !important;
+        box-sizing: border-box !important;
     }
     
-    /* SHRINK TITLE HEADER AND ICON TEXT */
     .category-section { margin-bottom: 8px !important; padding: 0 2px !important; }
     .category-section h2 { font-size: 14px !important; font-weight: 700 !important; color: #374151 !important; }
-
     .category-block h4 { font-size: 11px !important; margin-bottom: 6px !important; }
 
     .material-item-grid {
@@ -216,6 +238,7 @@ html, body { max-width: 100vw !important; overflow-x: hidden !important; width: 
         flex-direction: column !important;
         gap: 6px !important;
         width: 100% !important;
+        box-sizing: border-box !important;
     }
 
     .material-item-card {
@@ -227,6 +250,7 @@ html, body { max-width: 100vw !important; overflow-x: hidden !important; width: 
         padding: 4px 8px !important;
         border-radius: 6px !important;
         width: 100% !important;
+        box-sizing: border-box !important;
     }
 
     .material-item-image-box {
@@ -273,13 +297,15 @@ html, body { max-width: 100vw !important; overflow-x: hidden !important; width: 
     .past-log-section { display: none !important; }
 
     .requisition-right-sidebar {
-        border-radius: 14px 14px 0 0 !important;
+        border-radius: 20px 20px 0 0 !important;
+        border: none !important;
         border-top: 2px solid #cbd5e0 !important;
         box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.12) !important;
         padding: 10px 14px !important;
         background: #ffffff !important;
         pointer-events: auto; 
         width: 100% !important;
+        box-sizing: border-box !important;
     }
 
     .sidebar-summary-title {
@@ -346,7 +372,7 @@ html, body { max-width: 100vw !important; overflow-x: hidden !important; width: 
                                         </div>
                                         <div class="material-item-name">
                                             <strong><?= htmlspecialchars($item['name']) ?></strong>
-                                            <div>(<?= floatval($item['pack_size']) ?> <?= $item['pack_unit'] ?>)</div>
+                                            <div>(Size: <?= floatval($item['pack_size']) ?> <?= $item['pack_unit'] ?>)</div>
                                         </div>
                                         <button type="button" class="btn-tab-styled-add" onclick="window.addMaterialToSidebar(<?= $item['id'] ?>, '<?= htmlspecialchars(addslashes($item['name'])) ?>')">+ Add</button>
                                     </div>
@@ -362,10 +388,10 @@ html, body { max-width: 100vw !important; overflow-x: hidden !important; width: 
             <div class="requisition-right-sidebar" id="mobileSummaryStickyWrapper" onclick="window.handleMobileDrawerCollapseToggle(event)">
                 <h3 class="sidebar-summary-title">📝 Requisition Summary</h3>
                 <div class="sidebar-cart-list" id="sidebarCartRowsContainer">
-                    <p style="color: #a0aec0; text-align: center; font-size: 12px; margin-top: 30px; font-style: italic;">No items added to this request list yet.</p>
+                    <p style="color: #a0aec0; text-align: center; font-size: 13px; margin-top: 40px; font-style: italic;">No items added to this request list yet.</p>
                 </div>
                 <div>
-                    <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 13px; margin-bottom: 10px; color: #111827;">
+                    <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 14px; margin-bottom: 10px; color: #111827;">
                         <span>Total Item Types:</span>
                         <span id="sidebarTotalCount">0</span>
                     </div>
@@ -421,9 +447,9 @@ html, body { max-width: 100vw !important; overflow-x: hidden !important; width: 
 </div>
 
 <div id="editReqModalPopup" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
-    <div class="modal-content" style="background: white; max-width: 580px; width: 92%; border-radius: 12px; padding: 20px; position: relative; color: #111827; text-align: left;">
+    <div class="modal-content" style="background: white; max-width: 580px; width: 92%; border-radius: 12px; padding: 25px; position: relative; color: #111827; text-align: left;">
         <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="window.closeEditReqModal()">✕</span>
-        <h3 style="font-size: 13px; font-weight: 700; text-transform: uppercase; margin-bottom: 12px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px;">Modify Stock Order</h3>
+        <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; letter-spacing: 0.5px;">Modify Stock Order</h3>
         
         <form method="POST" action="requisitions.php" style="margin: 0;">
             <input type="hidden" name="action_update_requisition" value="1">
@@ -438,9 +464,9 @@ html, body { max-width: 100vw !important; overflow-x: hidden !important; width: 
 </div>
 
 <div id="chefNewProductModal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
-    <div class="modal-content" style="background: white; max-width: 440px; width: 90%; border-radius: 12px; padding: 20px; color: #111827; text-align: left;">
+    <div class="modal-content" style="background: white; max-width: 440px; width: 90%; border-radius: 12px; padding: 25px; color: #111827; text-align: left;">
         <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="window.closeChefNewProductModal()">✕</span>
-        <h3 style="font-size: 13px; font-weight: 700; text-transform: uppercase; margin-bottom: 12px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; color: #d97706;">Request Unlisted Product</h3>
+        <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; color: #d97706;">Request Unlisted Product</h3>
         <form method="POST" action="requisitions.php" style="margin: 0;">
             <input type="hidden" name="action_create_chef_product" value="1">
             <div style="margin-bottom: 12px;">
@@ -749,14 +775,11 @@ window.triggerMemoryStateUpdate = function(catalogId, targetedState) {
     }
 };
 
-window.openChefNewProductModal = function() {
-    document.getElementById("chefNewProductModal").style.display = "flex";
-};
 window.closeChefNewProductModal = function() {
     document.getElementById("chefNewProductModal").style.display = "none";
 };
-window.closeEditReqModal = function() {
-    document.getElementById("editReqModalPopup").style.display = "none";
+window.openChefNewProductModal = function() {
+    document.getElementById("chefNewProductModal").style.display = "flex";
 };
 </script>
 
