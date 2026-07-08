@@ -29,16 +29,11 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
     <link rel="stylesheet" href="assets/css/style.css?v=<?= time(); ?>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* ==========================================================================
-           🔒 MASTER RESPONSIVE VIEWPORT LOCK (ELIMINATES HORIZONTAL SPILLS GLOBALLY)
-           ========================================================================== */
+        /* --- CLEAN DESKTOP CORE STYLING (LEAVE INTACT) --- */
         html, body {
-            max-width: 100vw !important;
-            width: 100% !important;
-            overflow-x: hidden !important;
-            box-sizing: border-box !important;
             margin: 0 !important;
             padding: 0 !important;
+            box-sizing: border-box !important;
         }
 
         .mobile-header-strip { display: none; background: #ffffff; padding: 8px 16px; border-bottom: 1px solid #e2e8f0; align-items: center; width: 100%; min-height: 56px; box-sizing: border-box; }
@@ -54,16 +49,21 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
         }
 
         /* ==========================================================================
-           ⚡ UNIFORM MOBILE INTERACTION RESPONSIVE OVERRIDES
+           ⚡ STRICT MOBILE RESPONSIVE OVERRIDES (COMPLETELY INSULATED FOR PHONES)
            ========================================================================== */
         @media (max-width: 1023px) {
+            html, body {
+                max-width: 100vw !important;
+                width: 100% !important;
+                overflow-x: hidden !important;
+            }
+
             .mobile-header-strip { 
                 display: flex !important; 
                 width: 100% !important;
                 box-sizing: border-box !important;
             }
             
-            /* Overrides top-level parent container layout fields */
             .app-container { 
                 display: block !important; 
                 width: 100% !important;
@@ -82,17 +82,14 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
                 float: none !important;
             }
 
-            /* 🔑 THE FIX: Absolute smash rule to kill layout grids causing spillages on phone screens */
-            .split-requisition-layout, 
-            div[class*="split-requisition-layout"],
-            [style*="grid-template-columns"] {
+            /* Flatten desktop layouts into single block containers ONLY on phone dimensions */
+            .split-requisition-layout {
                 display: block !important;
                 width: 100% !important;
                 max-width: 100vw !important;
                 box-sizing: border-box !important;
             }
 
-            /* Force column wrapper panels to drop wide dimensions and adapt cleanly */
             .materials-main-panel,
             .catalog-cards-box {
                 display: block !important;
