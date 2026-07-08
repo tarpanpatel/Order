@@ -30,7 +30,7 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         /* ==========================================================================
-           🔒 GLOBAL VIEWPORT LOCKS (PREVENTS HORIZONTAL OVERFLOW ON ALL PAGES)
+           🔒 MASTER RESPONSIVE VIEWPORT LOCK (ELIMINATES HORIZONTAL SPILLS GLOBALLY)
            ========================================================================== */
         html, body {
             max-width: 100vw !important;
@@ -54,7 +54,7 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
         }
 
         /* ==========================================================================
-           ⚡ UNIFORM MOBILE RESPONSIVE LAYOUT OVERRIDES (TARGETS MAIN WRAPPERS)
+           ⚡ UNIFORM MOBILE INTERACTION RESPONSIVE OVERRIDES
            ========================================================================== */
         @media (max-width: 1023px) {
             .mobile-header-strip { 
@@ -63,7 +63,7 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
                 box-sizing: border-box !important;
             }
             
-            /* Forces structural parent grid layouts to drop desktop column counts */
+            /* Overrides top-level parent container layout fields */
             .app-container { 
                 display: block !important; 
                 width: 100% !important;
@@ -73,7 +73,6 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
                 box-sizing: border-box !important;
             }
             
-            /* Tightens the background viewport width for all nested page code contents */
             .main-content { 
                 width: 100% !important; 
                 max-width: 100vw !important; 
@@ -81,6 +80,25 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
                 box-sizing: border-box !important;
                 display: block !important;
                 float: none !important;
+            }
+
+            /* 🔑 THE FIX: Absolute smash rule to kill layout grids causing spillages on phone screens */
+            .split-requisition-layout, 
+            div[class*="split-requisition-layout"],
+            [style*="grid-template-columns"] {
+                display: block !important;
+                width: 100% !important;
+                max-width: 100vw !important;
+                box-sizing: border-box !important;
+            }
+
+            /* Force column wrapper panels to drop wide dimensions and adapt cleanly */
+            .materials-main-panel,
+            .catalog-cards-box {
+                display: block !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                box-sizing: border-box !important;
             }
 
             .sidebar { 
@@ -96,7 +114,6 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
             }
             .sidebar.is-drawer-open { transform: translateX(0) !important; }
 
-            /* Universal Header/Text scaling down rules */
             .category-section { margin-bottom: 8px !important; padding: 0 4px !important; }
             .category-section h2, .category-title { font-size: 14px !important; font-weight: 700 !important; color: #374151 !important; }
         }
