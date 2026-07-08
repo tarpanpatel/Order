@@ -22,7 +22,7 @@ include "includes/header.php";
 .order-layout-split { display: grid; grid-template-columns: 1fr 360px; gap: 20px; width: 100%; align-items: start; }
 .menu-items-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
 
-/* RESTORED: Card formatting exactly matching your native design style */
+/* Card formatting exactly matching your native design style */
 .menu-card-item { 
     background: var(--card-bg); 
     border-radius: var(--radius); 
@@ -39,7 +39,7 @@ include "includes/header.php";
 }
 .menu-card-item:hover { transform: translateY(-2px); border-color: #06b6d4; }
 
-/* RESTORED: Pure circular profile thumbnail item images styling rules */
+/* Pure circular profile thumbnail item images styling rules */
 .menu-card-item img { 
     width: 44px; 
     height: 44px; 
@@ -212,13 +212,6 @@ function searchMenu() {
         row.style.setProperty("display", row.getAttribute("data-name").includes(q) ? "flex" : "none", "important");
     });
 }
-// Inside the script handling order submission (e.g., process_food_order.php or your POST handler)
-$stmt = $pdo->prepare("INSERT INTO orders (guest_id, order_time, status) VALUES (?, NOW(), 'Pending')");
-$stmt->execute([$guest_id]);
-$order_id = $pdo->lastInsertId();
-
-// ADD THIS AUDIT LOG TRIGGER:
-logUserAction($pdo, "Staff member (" . $_SESSION['username'] . ") recorded Food Order Ticket #" . $order_id);
 </script>
 
 <?php include "includes/footer.php"; ?>
