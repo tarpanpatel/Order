@@ -106,7 +106,7 @@ if (!in_array(date('Y-m'), $month_options)) {
     array_unshift($month_options, date('Y-m'));
 }
 
-// Scoped securely to the chosen filter month
+// Scoped securely to the chosen filter month (Limit omitted to manage chunks via Load More button)
 $stmt_expenses = $pdo->prepare("SELECT * FROM farm_utility_expenses WHERE DATE_FORMAT(expense_date, '%Y-%m') = ? ORDER BY expense_date DESC, id DESC");
 $stmt_expenses->execute([$selected_month]);
 $recent_expenses = $stmt_expenses->fetchAll(PDO::FETCH_ASSOC);
@@ -123,6 +123,10 @@ include "includes/header.php";
 .editable-click-cell { cursor: pointer; border-bottom: 1px dashed #06b6d4; padding: 2px 4px; border-radius: 4px; }
 .editable-click-cell:hover { background: #ecfeff; color: #0891b2; }
 .inline-cell-editor { width: 90px; padding: 4px; font-size: 13px; font-weight: bold; border: 2px solid #06b6d4; border-radius: 4px; }
+
+/* LOAD MORE ACTION STYLING */
+.btn-load-more { display: block; width: 180px; margin: 20px auto 5px auto; padding: 10px 14px; font-size: 13px; font-weight: bold; color: #fff; background: #06b6d4; border: none; border-radius: 8px; cursor: pointer; text-align: center; box-shadow: 0 2px 4px rgba(6,182,212,0.12); transition: background 0.15s ease; }
+.btn-load-more:hover { background: #0891b2; }
 </style>
 
 <div class="app-body" style="padding: 20px; font-family: sans-serif; text-align: left;">
@@ -132,7 +136,7 @@ include "includes/header.php";
     <?php endif; ?>
 
     <div style="max-width: 820px; margin: 0 auto; background: #ffffff; border: 1px solid #cbd5e0; border-radius: 12px; padding: 25px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
-        <h3 style="margin-top:0; color:#1e293b; border-bottom:1px solid #e2e8f0; padding-bottom:10px; text-transform:uppercase; font-size:15px; letter-spacing:0.5px;">📝 Expenses</h3>
+        <h3 style="margin-top:0; color:#1e293b; border-bottom:1px solid #e2e8f0; padding-bottom:10px; text-transform:uppercase; font-size:15px; letter-spacing:0.5px;">📝 Expenses Workspace</h3>
         
         <form method="POST" action="expenses.php" id="expenseRegistryForm" autocomplete="off">
             <input type="hidden" name="action_record_expense" value="1">
@@ -154,7 +158,6 @@ include "includes/header.php";
                 </div>
             </div>
 
-            <!-- RESTORED: Salaries Specific Container -->
             <div id="staffSalaryDropdownContainer" style="display:none; margin-bottom:15px; background:#f8fafc; padding:15px; border-radius:8px; border:1px dashed #06b6d4;">
                 <label class="form-label-header" style="color:#0891b2;">👤 Select Salary Recipient Member</label>
                 <select name="selected_staff_name" id="selectedStaffField" class="form-input-container">
@@ -165,7 +168,6 @@ include "includes/header.php";
                 </select>
             </div>
 
-            <!-- RESTORED: Predefined Description Autocomplete Container -->
             <div id="otherPredefinedAutocompleteContainer" style="display:none; margin-bottom:15px; background:#f8fafc; padding:15px; border-radius:8px; border:1px dashed #64748b; position:relative;">
                 <label class="form-label-header">🔍 Details Descriptions</label>
                 <input type="text" id="detailsDescriptionAutocompleteInput" name="predefined_item_selection" placeholder="Type to search items... (e.g., MCB, Petrol)" class="form-input-container" onkeyup="filterPredefinedSuggestions()" onfocus="filterPredefinedSuggestions()">
@@ -177,7 +179,6 @@ include "includes/header.php";
                 </div>
             </div>
 
-            <!-- RESTORED: Standard Input Fields Container -->
             <div id="standardExpenseInputsContainer" style="display:none;">
                 <div style="margin-bottom:15px;">
                     <label class="form-label-header">Detailed Description</label>
@@ -212,7 +213,6 @@ include "includes/header.php";
         </form>
     </div>
 
-    <!-- MONTH RANGE SYSTEM FILTERS TOOLBAR -->
     <div style="max-width:820px; margin:25px auto 0 auto; display: grid; grid-template-columns: 1fr 2fr; gap: 15px; background: #f8fafc; border: 1px solid #cbd5e0; padding: 16px; border-radius: 12px; align-items: end;">
         <div>
             <label class="form-label-header" style="color:var(--text-main);">📅 Select Ledger Month</label>
@@ -249,7 +249,7 @@ include "includes/header.php";
                 <?php if(!empty($recent_expenses)): foreach ($recent_expenses as $row): 
                     $search_meta = strtolower($row['category'] . ' ' . ($row['vendor_name'] ?? 'other') . ' ' . $row['description'] . ' ' . $row['payment_mode']);
                 ?>
-                    <tr style="border-bottom:1px solid #edf2f7;" class="expense-data-row-node" data-search-hash="<?= htmlspecialchars($search_meta) ?>">
+                    <tr style="border-bottom:1px solid #edf2f7; display: none;" class="expense-data-row-node" data-search-hash="<?= htmlspecialchars($search_meta) ?>">
                         <td style="padding:10px;">
                             <span class="editable-click-cell" id="cell-date-<?= $row['id'] ?>" onclick="openInlineFieldEditor(<?= $row['id'] ?>, 'date', '<?= $row['expense_date'] ?>')"><?= $row['expense_date'] ?></span>
                         </td>
@@ -261,16 +261,84 @@ include "includes/header.php";
                         <td style="padding:10px; text-align:center;"><span style="font-size:11px; font-weight:bold; color:#64748b;"><?= htmlspecialchars($row['payment_mode']) ?></span></td>
                     </tr>
                 <?php endforeach; else: ?>
-                    <tr id="emptyResultsRowFeedback"><td colspan="5" style="padding:20px; text-align:center; color:var(--text-muted); font-style:italic;">No expense records found for this month range.</td></tr>
+                    <tr id="emptyResultsRowFeedback" style="display: table-row !important;"><td colspan="5" style="padding:20px; text-align:center; color:var(--text-muted); font-style:italic;">No expense records found for this month range.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
+
+        <?php if (count($recent_expenses) > 10): ?>
+            <button type="button" id="loadMoreExpensesBtn" class="btn-load-more" onclick="window.revealNextExpenseBatch()">Load More</button>
+        <?php endif; ?>
+
     </div>
 </div>
 
 <script>
-// RESTORED: Predefined option matrix assigned once safely
 const datasetPredefinedOptions = <?php echo json_encode($predefined_items); ?>;
+
+// PAGINATION CONTROLLERS ENGINE variables
+let currentRenderedCount = 0;
+const entriesPerPageChunk = 10;
+let filteredNodesCache = [];
+
+function initializeExpenseTablePagination() {
+    const rows = Array.from(document.querySelectorAll(".expense-data-row-node"));
+    filteredNodesCache = rows;
+    currentRenderedCount = 0;
+    
+    rows.forEach(r => r.style.setProperty("display", "none", "important"));
+    window.revealNextExpenseBatch();
+}
+
+window.revealNextExpenseBatch = function() {
+    const nextBatchBound = currentRenderedCount + entriesPerPageChunk;
+    const loadMoreBtn = document.getElementById("loadMoreExpensesBtn");
+    
+    for (let i = currentRenderedCount; i < nextBatchBound && i < filteredNodesCache.length; i++) {
+        filteredNodesCache[i].style.setProperty("display", "table-row", "important");
+        currentRenderedCount++;
+    }
+    
+    if (loadMoreBtn) {
+        if (currentRenderedCount >= filteredNodesCache.length) {
+            loadMoreBtn.style.setProperty("display", "none", "important");
+        } else {
+            loadMoreBtn.style.setProperty("display", "block", "important");
+        }
+    }
+};
+
+function runLiveExpenseFilter() {
+    let query = document.getElementById("liveRowSearchField").value.toLowerCase().trim();
+    let rows = Array.from(document.querySelectorAll(".expense-data-row-node"));
+    const placeholder = document.getElementById("emptyResultsRowFeedback");
+    const loadMoreBtn = document.getElementById("loadMoreExpensesBtn");
+    
+    rows.forEach(r => r.style.setProperty("display", "none", "important"));
+    
+    if (query === "") {
+        filteredNodesCache = rows;
+        currentRenderedCount = 0;
+        if (placeholder) placeholder.style.setProperty("display", "none", "important");
+        window.revealNextExpenseBatch();
+        return;
+    }
+    
+    filteredNodesCache = rows.filter(row => {
+        let hash = row.getAttribute("data-search-hash") || "";
+        return hash.includes(query);
+    });
+    
+    currentRenderedCount = 0;
+    
+    if (filteredNodesCache.length === 0) {
+        if (placeholder) placeholder.style.setProperty("display", "table-row", "important");
+        if (loadMoreBtn) loadMoreBtn.style.setProperty("display", "none", "important");
+    } else {
+        if (placeholder) placeholder.style.setProperty("display", "none", "important");
+        window.revealNextExpenseBatch();
+    }
+}
 
 function toggleExpenseCategoryView() {
     const activeSelection = document.getElementById("costCategoryGroup").value;
@@ -323,20 +391,6 @@ function selectPredefinedItem(value) {
     document.getElementById("autocompleteSuggestionsMenu").style.display = "none";
     document.getElementById("moreInformationOptionalFieldWrapper").style.display = "block";
     setTimeout(() => { document.getElementById("moreInfoOptionalField").focus(); }, 50);
-}
-
-function runLiveExpenseFilter() {
-    let query = document.getElementById("liveRowSearchField").value.toLowerCase().trim();
-    let rows = document.querySelectorAll(".expense-data-row-node");
-    
-    rows.forEach(row => {
-        let hash = row.getAttribute("data-search-hash");
-        if (hash.includes(query)) {
-            row.style.display = "";
-        } else {
-            row.style.display = "none";
-        }
-    });
 }
 
 function openInlineFieldEditor(rowId, type, rawValue) {
@@ -403,7 +457,11 @@ document.addEventListener("click", function(e) {
     }
 });
 
-document.addEventListener("DOMContentLoaded", toggleExpenseCategoryView);
+// Run pagination scripts on startup
+document.addEventListener("DOMContentLoaded", () => {
+    toggleExpenseCategoryView();
+    initializeExpenseTablePagination();
+});
 </script>
 
 <?php include "includes/footer.php"; ?>
