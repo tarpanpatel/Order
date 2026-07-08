@@ -267,6 +267,71 @@ include "includes/header.php";
         padding-top: 0px !important;
     }
 }
+/* Find this section inside your @media (max-width: 1023px) block and update it: */
+@media (max-width: 1023px) {
+    .split-requisition-layout {
+        grid-template-columns: 1fr !important;
+        padding-bottom: 180px !important; /* Increased space so catalog items aren't blocked */
+    }
+    
+    .right-column-stack {
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        z-index: 9999 !important;
+        gap: 0 !important;
+        pointer-events: none; /* 🔑 CRITICAL: Allows clicks to pass through the invisible container wrapper */
+    }
+
+    .past-log-section {
+        display: none !important; 
+    }
+
+    .requisition-right-sidebar {
+        border-radius: 20px 20px 0 0 !important;
+        border: none !important;
+        border-top: 2px solid #cbd5e0 !important;
+        box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.15) !important;
+        padding: 12px 18px !important;
+        background: #ffffff !important;
+        pointer-events: auto; /* 🔑 CRITICAL: Restores clickability to the actual visible drawer card and buttons */
+    }
+
+    .sidebar-summary-title {
+        margin-bottom: 8px !important;
+        padding-bottom: 4px !important;
+        font-size: 13px !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        cursor: pointer !important;
+        user-select: none;
+    }
+    
+    .sidebar-summary-title::after {
+        content: "▲ Expand Drawer";
+        font-size: 11px;
+        color: #06b6d4;
+        font-weight: bold;
+    }
+    
+    .requisition-right-sidebar.drawer-open-state .sidebar-summary-title::after {
+        content: "▼ Collapse Content";
+    }
+
+    .sidebar-cart-list {
+        max-height: 0px !important;
+        overflow-y: auto !important;
+        margin-bottom: 0px !important;
+        transition: max-height 0.2s ease-out, margin 0.2s ease-out !important;
+    }
+
+    .requisition-right-sidebar.drawer-open-state .sidebar-cart-list {
+        max-height: 240px !important;
+        margin-bottom: 12px !important;
+    }
+}
 </style>
 
 <div class="app-body" style="max-width: 100% !important; width: 100% !important; display: block !important;">
