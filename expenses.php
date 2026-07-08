@@ -3,6 +3,7 @@
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once "config/db.php";
 
+// FIXED SYSTEM PATH: Load the dual-channel configuration engine safely
 if (file_exists(__DIR__ . "/config/telegram.php")) {
     require_once __DIR__ . "/config/telegram.php";
 }
@@ -62,6 +63,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_record_expense
         $stmt = $pdo->prepare("INSERT INTO farm_utility_expenses (expense_date, category, description, amount, payment_mode, vendor_name) VALUES (?, ?, ?, ?, ?, ?)");
         $stmt->execute([$expense_date, $category, $description, $amount, $payment_mode, $vendor_name]);
         
+        // ==========================================================================
+        // DUAL-CHANNEL NOTIFICATION ROUTER: FILTER SALARIES EXCLUSIVELY
+        // ==========================================================================
         if ($category !== 'Salaries' && function_exists('sendAdminTelegramMessage')) {
             $tg_exp = "💸 <b>NEW OPERATIONAL EXPENSE LOGGED</b>\n";
             $tg_exp .= "━━━━━━━━━━━━━━━━━━\n";
@@ -75,6 +79,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_record_expense
             
             sendAdminTelegramMessage($tg_exp);
         }
+        // ==========================================================================
         
         $_SESSION['expense_toast'] = "Expense recorded successfully!";
     }
@@ -84,20 +89,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_record_expense
 
 $db_staff = $pdo->query("SELECT username FROM users WHERE role != 'Super Admin' ORDER BY username ASC")->fetchAll(PDO::FETCH_COLUMN);
 $predefined_items = $pdo->query("SELECT item_name FROM expense_predefined_items ORDER BY item_name ASC")->fetchAll(PDO::FETCH_COLUMN);
-
-// --- MONTH FILTER WORKSPACE COMPUTATION ENGINE ---
-$selected_month = isset($_GET['filter_month']) ? trim($_GET['filter_month']) : date('Y-m');
-
-// Dynamically compile a dropdown list of all historic months containing logged expenses
-$month_options = $pdo->query("SELECT DISTINCT DATE_FORMAT(expense_date, '%Y-%m') as ym_val FROM farm_utility_expenses ORDER BY expense_date DESC")->fetchAll(PDO::FETCH_COLUMN);
-if (!in_array(date('Y-m'), $month_options)) {
-    array_unshift($month_options, date('Y-m'));
-}
-
-// Pull historical operational targets scoped securely to the chosen filter month
-$stmt_expenses = $pdo->prepare("SELECT * FROM farm_utility_expenses WHERE DATE_FORMAT(expense_date, '%Y-%m') = ? ORDER BY expense_date DESC, id DESC");
-$stmt_expenses->execute([$selected_month]);
-$recent_expenses = $stmt_expenses->fetchAll(PDO::FETCH_ASSOC);
+$recent_expenses = $pdo->query("SELECT * FROM farm_utility_expenses ORDER BY id DESC LIMIT 15")->fetchAll(PDO::FETCH_ASSOC);
 
 include "includes/header.php";
 ?>
@@ -120,7 +112,7 @@ include "includes/header.php";
     <?php endif; ?>
 
     <div style="max-width: 820px; margin: 0 auto; background: #ffffff; border: 1px solid #cbd5e0; border-radius: 12px; padding: 25px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
-        <h3 style="margin-top:0; color:#1e293b; border-bottom:1px solid #e2e8f0; padding-bottom:10px; text-transform:uppercase; font-size:15px; letter-spacing:0.5px;">📝 Expenses</h3>
+        <h3 style="margin-top:0; color:#1e293b; border-bottom:1px solid #e2e8f0; padding-bottom:10px; text-transform:uppercase; font-size:15px; letter-spacing:0.5px;">📝 Expenses Workspace</h3>
         
         <form method="POST" action="expenses.php" id="expenseRegistryForm" autocomplete="off">
             <input type="hidden" name="action_record_expense" value="1">
@@ -194,32 +186,12 @@ include "includes/header.php";
                 </div>
             </div>
 
-            <button type="submit" class="btn btn-bill" style="width:100%; padding:12px; font-size:14px; font-weight:bold; background:#14b8a6; border-color:#14b8a6; color:white; border-radius:8px;">Add Expense</button>
+            <button type="submit" class="btn btn-bill" style="width:100%; padding:12px; font-size:14px; font-weight:bold; background:#14b8a6; border-color:#14b8a6; color:white; border-radius:8px;">Commit & Sync to Workbook</button>
         </form>
     </div>
 
-    <div style="max-width:820px; margin:25px auto 0 auto; display: grid; grid-template-columns: 1fr 2fr; gap: 15px; background: #f8fafc; border: 1px solid #cbd5e0; padding: 16px; border-radius: 12px; align-items: end;">
-        <div>
-            <label class="form-label-header" style="color:var(--text-main);">📅 Select Ledger Month</label>
-            <form method="GET" id="monthFilterForm" style="margin:0;">
-                <select name="filter_month" class="form-input-container" style="font-weight: bold; border-color: #06b6d4;" onchange="document.getElementById('monthFilterForm').submit();">
-                    <?php foreach ($month_options as $ym): 
-                        $option_ts = strtotime($ym . "-01");
-                        $option_label = date("F Y", $option_ts);
-                    ?>
-                        <option value="<?= $ym ?>" <?= ($ym === $selected_month) ? 'selected' : ''; ?>><?= $option_label ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </form>
-        </div>
-        <div>
-            <label class="form-label-header" style="color:var(--text-main);">🔍 Search inside <?= date("F Y", strtotime($selected_month . "-01")) ?></label>
-            <input type="text" id="liveRowSearchField" placeholder="Filter by keyword, description or paid member..." class="form-input-container" style="border-color:#06b6d4;" oninput="runLiveExpenseFilter()">
-        </div>
-    </div>
-
-    <div style="max-width:820px; margin:15px auto 0 auto; background:#fff; border:1px solid #cbd5e0; border-radius:12px; padding:20px;">
-        <h4 style="margin-top:0; border-bottom:1px solid #e2e8f0; padding-bottom:8px; text-transform:uppercase; font-size:11px; color:#475569;">Cost Logs for <?= date("F Y", strtotime($selected_month . "-01")) ?></h4>
+    <div style="max-width:820px; margin:25px auto 0 auto; background:#fff; border:1px solid #cbd5e0; border-radius:12px; padding:20px;">
+        <h4 style="margin-top:0; border-bottom:1px solid #e2e8f0; padding-bottom:8px; text-transform:uppercase; font-size:11px; color:#475569;">Recent Operational Cost Logs (Click Date or Amount to edit inline)</h4>
         <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
             <thead>
                 <tr style="background:#f8fafc; border-bottom:2px solid #cbd5e0;">
@@ -230,11 +202,9 @@ include "includes/header.php";
                     <th style="padding:10px; text-align:center;">Mode</th>
                 </tr>
             </thead>
-            <tbody id="expenseLogsTableBody">
-                <?php if(!empty($recent_expenses)): foreach ($recent_expenses as $row): 
-                    $search_meta = strtolower($row['category'] . ' ' . ($row['vendor_name'] ?? 'other') . ' ' . $row['description'] . ' ' . $row['payment_mode']);
-                ?>
-                    <tr style="border-bottom:1px solid #edf2f7;" class="expense-data-row-node" data-search-hash="<?= htmlspecialchars($search_meta) ?>">
+            <tbody>
+                <?php if(!empty($recent_expenses)): foreach ($recent_expenses as $row): ?>
+                    <tr style="border-bottom:1px solid #edf2f7;" id="expense-row-id-<?= $row['id'] ?>">
                         <td style="padding:10px;">
                             <span class="editable-click-cell" id="cell-date-<?= $row['id'] ?>" onclick="openInlineFieldEditor(<?= $row['id'] ?>, 'date', '<?= $row['expense_date'] ?>')"><?= $row['expense_date'] ?></span>
                         </td>
@@ -245,16 +215,13 @@ include "includes/header.php";
                         </td>
                         <td style="padding:10px; text-align:center;"><span style="font-size:11px; font-weight:bold; color:#64748b;"><?= htmlspecialchars($row['payment_mode']) ?></span></td>
                     </tr>
-                <?php endforeach; else: ?>
-                    <tr id="emptyResultsRowFeedback"><td colspan="5" style="padding:20px; text-align:center; color:var(--text-muted); font-style:italic;">No expense records found for this month range.</td></tr>
-                <?php endif; ?>
+                <?php endforeach; endif; ?>
             </tbody>
         </table>
     </div>
 </div>
 
 <script>
-// FIXED REMOVAL: Variable declared uniquely once to clear browser console appendChild collision bug
 const datasetPredefinedOptions = <?php echo json_encode($predefined_items); ?>;
 
 function toggleExpenseCategoryView() {
@@ -318,20 +285,7 @@ function selectPredefinedItem(value) {
     setTimeout(() => { document.getElementById("moreInfoOptionalField").focus(); }, 50);
 }
 
-function runLiveExpenseFilter() {
-    let query = document.getElementById("liveRowSearchField").value.toLowerCase().trim();
-    let rows = document.querySelectorAll(".expense-data-row-node");
-    
-    rows.forEach(row => {
-        let hash = row.getAttribute("data-search-hash");
-        if (hash.includes(query)) {
-            row.style.display = "";
-        } else {
-            row.style.display = "none";
-        }
-    });
-}
-
+// Inline editing initialization handler
 function openInlineFieldEditor(rowId, type, rawValue) {
     const targetCell = document.getElementById(`cell-${type}-${rowId}`);
     if (targetCell.querySelector('input')) return;
@@ -350,6 +304,7 @@ function openInlineFieldEditor(rowId, type, rawValue) {
     });
 }
 
+// Inline blur sync save
 function saveInlineFieldChange(rowId, type, fallbackValue) {
     const targetCell = document.getElementById(`cell-${type}-${rowId}`);
     const inputEl = document.getElementById(`inline-edit-${type}-${rowId}`);
