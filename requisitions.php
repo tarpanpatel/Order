@@ -12,7 +12,7 @@ if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Chef" && $_SESSION["rol
     exit;
 }
 
-// --- CHEF NEW PRODUCT GENERATOR INTERCEPTOR ---[cite: 3]
+// --- CHEF NEW PRODUCT GENERATOR INTERCEPTOR ---
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_create_chef_product"])) {
     $item_name   = trim($_POST["chef_prod_name"]);
     $category_id = intval($_POST["chef_prod_category"]);
@@ -22,13 +22,18 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_create_chef_pr
     if (!empty($item_name) && $category_id > 0) {
         $stmt = $pdo->prepare("INSERT INTO req_catalog (item_name, category_id, unit_type, unit_label, pack_size, pack_unit, is_verified, unit_cost, image_path) VALUES (?, ?, 'Count', 'Packets', ?, ?, 0, 0.00, 'https://placehold.co/150x100?text=No+Image')");
         $stmt->execute([$item_name, $category_id, $pack_size, $pack_unit]);
+
+        // --- AUDIT TRAIL LOGGING ---
+        $audit_stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
+        $audit_stmt->execute([$_SESSION['user_id'], "User [" . $_SESSION['username'] . "] registered a new custom product catalog item: [" . $item_name . "]"]);
+
         $_SESSION['requisition_saved_toast'] = "Product requested with packing specifications!";
     }
     header("Location: requisitions.php");
     exit;
 }
 
-// --- MASTER SAVING BATCH SUBMISSION BLOCK ---[cite: 3]
+// --- MASTER SAVING BATCH SUBMISSION BLOCK ---
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_requisition"])) {
     $req_id = intval($_POST["update_req_id"]);
     $quantities = $_POST["req_item_qty"] ?? [];
@@ -75,11 +80,21 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_requisi
         if ($remainingItems === 0) {
             $deleteParent = $pdo->prepare("DELETE FROM requisitions WHERE id = ?");
             $deleteParent->execute([$req_id]);
+            
+            // --- AUDIT TRAIL LOGGING ---
+            $audit_stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
+            $audit_stmt->execute([$_SESSION['user_id'], "User [" . $_SESSION['username'] . "] entirely cleared and removed Requisition Ticket Sheet #" . $req_id]);
+
             $_SESSION['requisition_saved_toast'] = "Stock order entirely cleared and removed!";
         } else {
             $final_global_status = $all_fulfilled ? 'Fulfilled' : 'Pending';
             $stmt = $pdo->prepare("UPDATE requisitions SET status = ? WHERE id = ?");
             $stmt->execute([$final_global_status, $req_id]);
+
+            // --- AUDIT TRAIL LOGGING ---
+            $audit_stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
+            $audit_stmt->execute([$_SESSION['user_id'], "User [" . $_SESSION['username'] . "] updated items/quantities on open Requisition Sheet #" . $req_id . " (Global status set to: " . $final_global_status . ")"]);
+
             $_SESSION['requisition_saved_toast'] = "Notification Saved successfully!";
         }
 
@@ -459,7 +474,6 @@ window.submitSidebarRequisition = function() {
     if (window.reqCart.length === 0) return alert("Please select material choices first.");
     if (!confirm("Dispatch this material request list to inventory history logs?")) return;
 
-    // FIXED PATH TARGET: Points directly to the matching root processing script handler
     fetch("process_requisition.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
