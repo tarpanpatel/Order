@@ -120,6 +120,9 @@ include "includes/header.php";
 ?>
 
 <style>
+/* Master Viewport Lock Engine */
+html, body { max-width: 100vw !important; overflow-x: hidden !important; width: 100% !important; }
+
 /* --- BASE & DESKTOP WORKSPACE LAYOUT ENGINE --- */
 .split-requisition-layout { display: grid !important; grid-template-columns: 1fr 380px !important; gap: 20px !important; width: 100% !important; align-items: start !important; margin-top: 15px; box-sizing: border-box; }
 .materials-main-panel { display: flex; flex-direction: column; gap: 24px; width: 100%; box-sizing: border-box; }
@@ -187,56 +190,58 @@ include "includes/header.php";
    ⚡ MOBILE-SPECIFIC SLEEK ROWS FORMAT & COMPACT PADDING OPTIMIZATIONS
    ========================================================================== */
 @media (max-width: 1023px) {
-    /* Tighten up page container padding */
-    .app-body { padding: 8px !important; }
+    .app-body { padding: 8px !important; width: 100% !important; max-width: 100vw !important; overflow-x: hidden !important; }
     
     .split-requisition-layout {
         grid-template-columns: 1fr !important;
         padding-bottom: 140px !important; 
         margin-top: 5px !important;
+        width: 100% !important;
     }
     
-    /* Make catalog padding compact */
     .catalog-cards-box {
         padding: 10px !important;
         border-radius: 8px !important;
+        width: 100% !important;
     }
     
-    .category-section { margin-bottom: 10px !important; }
-    .category-section h2 { font-size: 18px !important; }
+    /* SHRINK TITLE HEADER AND ICON TEXT */
+    .category-section { margin-bottom: 8px !important; padding: 0 2px !important; }
+    .category-section h2 { font-size: 14px !important; font-weight: 700 !important; color: #374151 !important; }
 
-    /* Convert standard grids into clean, full-width rows format */
+    .category-block h4 { font-size: 11px !important; margin-bottom: 6px !important; }
+
     .material-item-grid {
         display: flex !important;
         flex-direction: column !important;
         gap: 6px !important;
+        width: 100% !important;
     }
 
-    /* Transform cards into compact row elements */
     .material-item-card {
         flex-direction: row !important;
         justify-content: space-between !important;
         align-items: center !important;
         min-height: auto !important;
-        height: 52px !important;
-        padding: 6px 10px !important;
+        height: 48px !important;
+        padding: 4px 8px !important;
         border-radius: 6px !important;
+        width: 100% !important;
     }
 
-    /* Remove heavy image blocks on phone screens to prioritize tracking space */
     .material-item-image-box {
         display: none !important;
     }
 
-    /* Left align descriptions inside row items and lower sizing */
     .material-item-name {
         text-align: left !important;
         font-size: 12px !important;
         margin-bottom: 0px !important;
         line-height: 1.2 !important;
         flex: 1 !important;
-        padding-right: 10px !important;
+        padding-right: 8px !important;
     }
+    .material-item-name strong { font-weight: 600 !important; }
     .material-item-name div {
         display: inline-block !important;
         margin-top: 0px !important;
@@ -245,16 +250,14 @@ include "includes/header.php";
         color: #64748b !important;
     }
 
-    /* Compact add button inside rows format */
     .btn-tab-styled-add {
         width: auto !important;
-        max-width: 75px !important;
-        padding: 6px 12px !important;
+        max-width: 65px !important;
+        padding: 4px 10px !important;
         font-size: 11px !important;
         margin: 0 !important;
     }
 
-    /* Fixed Sticky Drawer Box Setup */
     .right-column-stack {
         position: fixed !important;
         bottom: 0 !important;
@@ -276,21 +279,22 @@ include "includes/header.php";
         padding: 10px 14px !important;
         background: #ffffff !important;
         pointer-events: auto; 
+        width: 100% !important;
     }
 
     .sidebar-summary-title {
-        margin-bottom: 6px !important;
-        padding-bottom: 4px !important;
-        font-size: 12px !important;
+        margin-bottom: 4px !important;
+        padding-bottom: 2px !important;
+        font-size: 11px !important;
     }
     
-    .sidebar-summary-title::after { font-size: 10px !important; }
+    .sidebar-summary-title::after { font-size: 10px !important; content: "▲ Expand Drawer" !important; }
     .sidebar-cart-list { max-height: 0px !important; }
-    .requisition-right-sidebar.drawer-open-state .sidebar-cart-list { max-height: 200px !important; margin-bottom: 10px !important; }
+    .requisition-right-sidebar.drawer-open-state .sidebar-cart-list { max-height: 180px !important; margin-bottom: 8px !important; }
     
-    /* Make buttons and inputs slightly smaller on phone screen views */
     .btn-quick-search-box { padding: 8px 12px 8px 32px !important; font-size: 12px !important; }
-    .catalog-tab-btn { padding: 5px 10px !important; font-size: 11px !important; }
+    .catalog-tab-header { margin-bottom: 10px !important; padding-bottom: 6px !important; }
+    .catalog-tab-btn { padding: 4px 8px !important; font-size: 11px !important; }
     .btn-bill { padding: 10px !important; font-size: 12px !important; }
 }
 </style>
@@ -304,11 +308,10 @@ include "includes/header.php";
     <?php unset($_SESSION['requisition_saved_toast']); endif; ?>
 
     <div class="category-section">
-        <h2 class="category-title" style="text-transform: none; margin: 0;">📦 Material Requests Panel</h2>
+        <h2>📦 Material Requests</h2>
     </div>
 
     <div class="split-requisition-layout">
-        <!-- Left Column: Sleek Rows Stock Registry -->
         <div class="materials-main-panel">
             <div class="catalog-cards-box">
                 <div class="search-input-wrapper">
@@ -355,7 +358,6 @@ include "includes/header.php";
             </div>
         </div>
 
-        <!-- Right Column: Sticky Summary Panel Overlay -->
         <div class="right-column-stack">
             <div class="requisition-right-sidebar" id="mobileSummaryStickyWrapper" onclick="window.handleMobileDrawerCollapseToggle(event)">
                 <h3 class="sidebar-summary-title">📝 Requisition Summary</h3>
@@ -418,7 +420,6 @@ include "includes/header.php";
     </div>
 </div>
 
-<!-- Edit Requisition Modal -->
 <div id="editReqModalPopup" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
     <div class="modal-content" style="background: white; max-width: 580px; width: 92%; border-radius: 12px; padding: 20px; position: relative; color: #111827; text-align: left;">
         <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="window.closeEditReqModal()">✕</span>
@@ -436,7 +437,6 @@ include "includes/header.php";
     </div>
 </div>
 
-<!-- Chef New Product Modal -->
 <div id="chefNewProductModal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
     <div class="modal-content" style="background: white; max-width: 440px; width: 90%; border-radius: 12px; padding: 20px; color: #111827; text-align: left;">
         <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="window.closeChefNewProductModal()">✕</span>
