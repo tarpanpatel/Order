@@ -7,7 +7,7 @@ require_once "config/db.php";
 require_once "config/telegram.php"; 
 include_once __DIR__ . '/config/local_db_bridge.php';
 
-// FIXED ROLE ACCESS: Added "Super Admin" to the allowed authentication conditions alongside Admin and Chef
+// Role Access Validation
 if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Chef" && $_SESSION["role"] !== "Admin" && $_SESSION["role"] !== "Super Admin")) {
     header("Location: login.php");
     exit;
@@ -82,7 +82,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_requisi
             $deleteParent = $pdo->prepare("DELETE FROM requisitions WHERE id = ?");
             $deleteParent->execute([$req_id]);
             
-            // --- AUDIT TRAIL LOGGING ---
             $audit_stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
             $audit_stmt->execute([$_SESSION['user_id'], "User [" . $_SESSION['username'] . "] entirely cleared and removed Requisition Ticket Sheet #" . $req_id]);
 
@@ -92,7 +91,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_requisi
             $stmt = $pdo->prepare("UPDATE requisitions SET status = ? WHERE id = ?");
             $stmt->execute([$final_global_status, $req_id]);
 
-            // --- AUDIT TRAIL LOGGING ---
             $audit_stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
             $audit_stmt->execute([$_SESSION['user_id'], "User [" . $_SESSION['username'] . "] updated items/quantities on open Requisition Sheet #" . $req_id . " (Global status set to: " . $final_global_status . ")"]);
 
@@ -122,20 +120,21 @@ include "includes/header.php";
 ?>
 
 <style>
-.split-requisition-layout { display: grid !important; grid-template-columns: 1fr 380px !important; gap: 20px !important; width: 100% !important; align-items: start !important; margin-top: 15px; }
-.materials-main-panel { display: flex; flex-direction: column; gap: 24px; }
-.catalog-cards-box { background: #ffffff !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; padding: 20px !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important; }
+/* --- BASE & DESKTOP WORKSPACE LAYOUT ENGINE --- */
+.split-requisition-layout { display: grid !important; grid-template-columns: 1fr 380px !important; gap: 20px !important; width: 100% !important; align-items: start !important; margin-top: 15px; box-sizing: border-box; }
+.materials-main-panel { display: flex; flex-direction: column; gap: 24px; width: 100%; box-sizing: border-box; }
+.catalog-cards-box { background: #ffffff !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; padding: 20px !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important; width: 100%; box-sizing: border-box; }
 
 .right-column-stack { display: flex; flex-direction: column; gap: 20px; position: sticky !important; top: 20px !important; }
 .requisition-right-sidebar { background: #ffffff !important; border: 1px solid #cbd5e0 !important; border-radius: 12px !important; padding: 20px !important; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05) !important; display: flex; flex-direction: column; text-align: left; }
 
 .catalog-tab-header { 
     display: flex; 
-    gap: 8px; 
+    gap: 6px; 
     flex-wrap: nowrap; 
-    margin-bottom: 20px; 
+    margin-bottom: 15px; 
     border-bottom: 1px solid #edf2f7; 
-    padding-bottom: 12px;
+    padding-bottom: 10px;
     overflow-x: auto; 
     white-space: nowrap; 
     -webkit-overflow-scrolling: touch; 
@@ -146,21 +145,20 @@ include "includes/header.php";
 .catalog-tab-btn:hover { background: #e2e8f0; }
 .catalog-tab-btn.active { background: #06b6d4; color: white; border-color: #06b6d4; }
 
-.material-item-grid { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)) !important; gap: 12px !important; }
-.material-item-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; background: #fff; text-align: center; display: flex; flex-direction: column; justify-content: space-between; align-items: center; min-height: 175px; box-sizing: border-box; }
+.material-item-grid { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)) !important; gap: 12px !important; width: 100%; }
+.material-item-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; background: #fff; text-align: center; display: flex; flex-direction: column; justify-content: space-between; align-items: center; min-height: 175px; box-sizing: border-box; width: 100%; }
 .material-item-image-box { width: 100%; height: 50px; overflow: hidden; border-radius: 6px; border: 1px solid #edf2f7; background: #f8fafc; margin-bottom: 8px; }
 .material-item-image-box img { width: 100%; height: 100%; object-fit: cover; }
 .material-item-name { font-size: 12px; font-weight: 600; color: #111827; margin-bottom: 8px; line-height: 1.3; text-align: center; width: 100%; word-break: break-word; }
 
-.btn-quick-search-box { width: 100%; padding: 10px 14px 10px 35px; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 13px; font-weight: 600; color: #1e293b; background: #fff; outline: none; box-sizing: border-box; transition: all 0.2s; }
-.btn-quick-search-box:focus { border-color: #06b6d4; box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.15); }
+.btn-quick-search-box { width: 100%; padding: 10px 14px 10px 35px; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 13px; font-weight: 600; color: #1e293b; background: #fff; outline: none; box-sizing: border-box; }
 .search-input-wrapper { position: relative; margin-bottom: 15px; width: 100%; }
 .search-icon-inside { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 14px; pointer-events: none; }
 
 .btn-tab-styled-add { 
     display: inline-block !important; padding: 5px 14px !important; font-size: 12px !important; font-weight: 600 !important; 
     background: #ffffff !important; color: #475569 !important; border: 1px solid #cbd5e0 !important; border-radius: 6px !important; 
-    cursor: pointer !important; box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important; transition: all 0.15s ease !important; width: 100% !important; margin: 0 auto !important;
+    cursor: pointer !important; transition: all 0.15s ease !important; width: 100% !important; margin: 0 auto !important; box-sizing: border-box;
 }
 .btn-tab-styled-add:hover { background: #f8fafc !important; border-color: #94a3b8 !important; color: #0f172a !important; }
 
@@ -174,50 +172,89 @@ include "includes/header.php";
 .past-table th { background: #f8fafc; padding: 6px 4px; font-weight: 700; color: #4b5563; border-bottom: 2px solid #e2e8f0; text-align: left; }
 .past-table td { padding: 8px 4px; border-bottom: 1px solid #edf2f7; color: #111827; vertical-align: middle; }
 
-.btn-action-trigger { 
-    display: block !important; width: 100% !important; padding: 6px 4px !important; font-size: 10px !important; font-weight: 700 !important; 
-    text-transform: uppercase; border-radius: 6px !important; cursor: pointer !important; text-align: center !important; line-height: 1.3 !important; border: 1px solid transparent !important;
-}
+.btn-action-trigger { display: block !important; width: 100% !important; padding: 6px 4px !important; font-size: 10px !important; font-weight: 700 !important; text-transform: uppercase; border-radius: 6px !important; cursor: pointer; text-align: center; border: 1px solid transparent !important; }
 .btn-action-trigger span { display: block !important; font-size: 9px !important; font-weight: 800 !important; text-transform: lowercase; }
-
 .btn-status-pending { background: #fef3c7 !important; color: #d97706 !important; border-color: #f59e0b !important; }
-.btn-status-pending:hover { background: #fde68a !important; }
 .btn-status-fulfilled { background: #d1fae5 !important; color: #059669 !important; border-color: #10b981 !important; }
-.btn-status-fulfilled:hover { background: #a7f3d0 !important; }
-
-.btn-sidebar-past-link { display: block !important; text-align: center !important; width: 100% !important; padding: 8px !important; background: #f1f5f9 !important; color: #475569 !important; border: 1px solid #cbd5e0 !important; border-radius: 6px !important; font-size: 12px !important; font-weight: 600 !important; text-decoration: none !important; margin-top: 12px !important; }
-
-.binary-toggle-container { display: flex; gap: 4px; background: #f1f5f9; padding: 3px; border-radius: 6px; border: 1px solid #cbd5e0; }
-.toggle-choice-btn { padding: 6px 12px !important; font-size: 11px !important; font-weight: 700 !important; border: none !important; border-radius: 6px !important; color: #ffffff !important; cursor: pointer !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; }
-
-.btn-block-fulfilled { background: #10b981 !important; border: 1px solid #059669 !important; opacity: 1; }
-.btn-block-fulfilled:hover { background: #059669 !important; }
-.btn-block-fulfilled:disabled { background: #cbd5e0 !important; border-color: #cbd5e0 !important; color: #94a3b8 !important; cursor: not-allowed !important; opacity: 0.7; }
-
-.btn-block-remove { background: #ef4444 !important; border: 1px solid #dc2626 !important; opacity: 1; }
-.btn-block-remove:hover { background: #dc2626 !important; }
-.btn-block-remove:disabled { background: #cbd5e0 !important; border-color: #cbd5e0 !important; color: #94a3b8 !important; cursor: not-allowed !important; opacity: 0.7; }
-
-.row-state-greyed-out .item-text-title { color: #94a3b8 !important; text-decoration: line-through; }
-.row-state-green-highlight .item-text-title { color: #10b981 !important; font-weight: 800; }
 
 .modal-input-qty { width: 55px; padding: 6px 4px; border: 1px solid #cbd5e0; text-align: center; font-size: 13px; font-weight: 700; color: #1e293b; background: #fff !important; }
 .modal-qty-container { display: flex; align-items: center; border-radius: 6px; overflow: hidden; border: 1px solid #cbd5e0; background: #fff; }
 .modal-qty-btn { width: 28px; height: 31px; background: #f8fafc; border: none; color: #475569; font-weight: bold; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-.modal-qty-btn:hover { background: #e2e8f0; color: #0f172a; }
 
-.audit-history-subtitle { font-size: 11px; color: #64748b; font-weight: 600; display: block; margin-top: 2px; font-family: monospace; }
-.global-toast-notification { padding: 12px 24px; background: #10b981; color: white; font-size: 14px; font-weight: 800; text-align: center; border-radius: 8px; box-shadow: 0 4px 12px rgba(16,185,129,0.2); margin-bottom: 15px; border: 1px solid #059669; }
+.global-toast-notification { padding: 10px 20px; background: #10b981; color: white; font-size: 13px; font-weight: 800; text-align: center; border-radius: 8px; box-shadow: 0 4px 12px rgba(16,185,129,0.2); margin-bottom: 12px; border: 1px solid #059669; }
 
 /* ==========================================================================
-   MOBILE INTERACTION & CLICK PASS-THROUGH STYLING ENGINE
+   ⚡ MOBILE-SPECIFIC SLEEK ROWS FORMAT & COMPACT PADDING OPTIMIZATIONS
    ========================================================================== */
 @media (max-width: 1023px) {
+    /* Tighten up page container padding */
+    .app-body { padding: 8px !important; }
+    
     .split-requisition-layout {
         grid-template-columns: 1fr !important;
-        padding-bottom: 180px !important; 
+        padding-bottom: 140px !important; 
+        margin-top: 5px !important;
     }
     
+    /* Make catalog padding compact */
+    .catalog-cards-box {
+        padding: 10px !important;
+        border-radius: 8px !important;
+    }
+    
+    .category-section { margin-bottom: 10px !important; }
+    .category-section h2 { font-size: 18px !important; }
+
+    /* Convert standard grids into clean, full-width rows format */
+    .material-item-grid {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 6px !important;
+    }
+
+    /* Transform cards into compact row elements */
+    .material-item-card {
+        flex-direction: row !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        min-height: auto !important;
+        height: 52px !important;
+        padding: 6px 10px !important;
+        border-radius: 6px !important;
+    }
+
+    /* Remove heavy image blocks on phone screens to prioritize tracking space */
+    .material-item-image-box {
+        display: none !important;
+    }
+
+    /* Left align descriptions inside row items and lower sizing */
+    .material-item-name {
+        text-align: left !important;
+        font-size: 12px !important;
+        margin-bottom: 0px !important;
+        line-height: 1.2 !important;
+        flex: 1 !important;
+        padding-right: 10px !important;
+    }
+    .material-item-name div {
+        display: inline-block !important;
+        margin-top: 0px !important;
+        margin-left: 4px !important;
+        font-size: 11px !important;
+        color: #64748b !important;
+    }
+
+    /* Compact add button inside rows format */
+    .btn-tab-styled-add {
+        width: auto !important;
+        max-width: 75px !important;
+        padding: 6px 12px !important;
+        font-size: 11px !important;
+        margin: 0 !important;
+    }
+
+    /* Fixed Sticky Drawer Box Setup */
     .right-column-stack {
         position: fixed !important;
         bottom: 0 !important;
@@ -230,57 +267,35 @@ include "includes/header.php";
         pointer-events: none; 
     }
 
-    .past-log-section {
-        display: none !important; 
-    }
+    .past-log-section { display: none !important; }
 
     .requisition-right-sidebar {
-        border-radius: 20px 20px 0 0 !important;
-        border: none !important;
+        border-radius: 14px 14px 0 0 !important;
         border-top: 2px solid #cbd5e0 !important;
-        box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.15) !important;
-        padding: 12px 18px !important;
+        box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.12) !important;
+        padding: 10px 14px !important;
         background: #ffffff !important;
         pointer-events: auto; 
     }
 
     .sidebar-summary-title {
-        margin-bottom: 8px !important;
+        margin-bottom: 6px !important;
         padding-bottom: 4px !important;
-        font-size: 13px !important;
-        display: flex !important;
-        justify-content: space-between !important;
-        align-items: center !important;
-        cursor: pointer !important;
-        user-select: none;
+        font-size: 12px !important;
     }
     
-    .sidebar-summary-title::after {
-        content: "▲ Expand Drawer";
-        font-size: 11px;
-        color: #06b6d4;
-        font-weight: bold;
-    }
+    .sidebar-summary-title::after { font-size: 10px !important; }
+    .sidebar-cart-list { max-height: 0px !important; }
+    .requisition-right-sidebar.drawer-open-state .sidebar-cart-list { max-height: 200px !important; margin-bottom: 10px !important; }
     
-    .requisition-right-sidebar.drawer-open-state .sidebar-summary-title::after {
-        content: "▼ Collapse Content";
-    }
-
-    .sidebar-cart-list {
-        max-height: 0px !important;
-        overflow-y: auto !important;
-        margin-bottom: 0px !important;
-        transition: max-height 0.2s ease-out, margin 0.2s ease-out !important;
-    }
-
-    .requisition-right-sidebar.drawer-open-state .sidebar-cart-list {
-        max-height: 240px !important;
-        margin-bottom: 12px !important;
-    }
+    /* Make buttons and inputs slightly smaller on phone screen views */
+    .btn-quick-search-box { padding: 8px 12px 8px 32px !important; font-size: 12px !important; }
+    .catalog-tab-btn { padding: 5px 10px !important; font-size: 11px !important; }
+    .btn-bill { padding: 10px !important; font-size: 12px !important; }
 }
 </style>
 
-<div class="app-body" style="max-width: 100% !important; width: 100% !important; display: block !important;">
+<div class="app-body">
     
     <?php if (isset($_SESSION['requisition_saved_toast'])): ?>
         <div class="global-toast-notification">
@@ -288,11 +303,12 @@ include "includes/header.php";
         </div>
     <?php unset($_SESSION['requisition_saved_toast']); endif; ?>
 
-    <div class="category-section" style="margin-bottom: 20px;">
+    <div class="category-section">
         <h2 class="category-title" style="text-transform: none; margin: 0;">📦 Material Requests Panel</h2>
     </div>
 
     <div class="split-requisition-layout">
+        <!-- Left Column: Sleek Rows Stock Registry -->
         <div class="materials-main-panel">
             <div class="catalog-cards-box">
                 <div class="search-input-wrapper">
@@ -315,8 +331,8 @@ include "includes/header.php";
                         });
                         if (empty($catItems)) continue;
                     ?>
-                        <div class="category-block" id="cat_<?= $cat['id'] ?>" style="margin-bottom: 25px;">
-                            <h4 class="category-block-title" style="font-size: 13px; text-transform: uppercase; color: #4b5563; text-align: left; margin-bottom: 10px; font-weight: 700;"><?= $cat['name'] ?></h4>
+                        <div class="category-block" id="cat_<?= $cat['id'] ?>" style="margin-bottom: 15px;">
+                            <h4 class="category-block-title" style="font-size: 12px; text-transform: uppercase; color: #4b5563; text-align: left; margin-bottom: 8px; font-weight: 700;"><?= $cat['name'] ?></h4>
                             <div class="material-item-grid">
                                 <?php foreach ($catItems as $item): 
                                     $item_img = !empty($item['image_path']) ? $item['image_path'] : 'https://placehold.co/150x100?text=No+Image';
@@ -326,8 +342,8 @@ include "includes/header.php";
                                             <img src="<?= $item_img ?>" alt="" onerror="this.src='https://placehold.co/150x100?text=No+Image';">
                                         </div>
                                         <div class="material-item-name">
-                                            <?= htmlspecialchars($item['name']) ?>
-                                            <div style="font-size:10px; color:#64748b; font-weight:bold; margin-top:2px;">(Size: <?= floatval($item['pack_size']) ?> <?= $item['pack_unit'] ?>)</div>
+                                            <strong><?= htmlspecialchars($item['name']) ?></strong>
+                                            <div>(<?= floatval($item['pack_size']) ?> <?= $item['pack_unit'] ?>)</div>
                                         </div>
                                         <button type="button" class="btn-tab-styled-add" onclick="window.addMaterialToSidebar(<?= $item['id'] ?>, '<?= htmlspecialchars(addslashes($item['name'])) ?>')">+ Add</button>
                                     </div>
@@ -339,14 +355,15 @@ include "includes/header.php";
             </div>
         </div>
 
+        <!-- Right Column: Sticky Summary Panel Overlay -->
         <div class="right-column-stack">
             <div class="requisition-right-sidebar" id="mobileSummaryStickyWrapper" onclick="window.handleMobileDrawerCollapseToggle(event)">
                 <h3 class="sidebar-summary-title">📝 Requisition Summary</h3>
                 <div class="sidebar-cart-list" id="sidebarCartRowsContainer">
-                    <p style="color: #a0aec0; text-align: center; font-size: 13px; margin-top: 40px; font-style: italic;">No items added to this request list yet.</p>
+                    <p style="color: #a0aec0; text-align: center; font-size: 12px; margin-top: 30px; font-style: italic;">No items added to this request list yet.</p>
                 </div>
                 <div>
-                    <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 14px; margin-bottom: 12px; color: #111827;">
+                    <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 13px; margin-bottom: 10px; color: #111827;">
                         <span>Total Item Types:</span>
                         <span id="sidebarTotalCount">0</span>
                     </div>
@@ -401,10 +418,11 @@ include "includes/header.php";
     </div>
 </div>
 
+<!-- Edit Requisition Modal -->
 <div id="editReqModalPopup" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
-    <div class="modal-content" style="background: white; max-width: 580px; width: 92%; border-radius: 12px; padding: 25px; position: relative; color: #111827; text-align: left;">
+    <div class="modal-content" style="background: white; max-width: 580px; width: 92%; border-radius: 12px; padding: 20px; position: relative; color: #111827; text-align: left;">
         <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="window.closeEditReqModal()">✕</span>
-        <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; letter-spacing: 0.5px;">Modify Stock Order</h3>
+        <h3 style="font-size: 13px; font-weight: 700; text-transform: uppercase; margin-bottom: 12px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px;">Modify Stock Order</h3>
         
         <form method="POST" action="requisitions.php" style="margin: 0;">
             <input type="hidden" name="action_update_requisition" value="1">
@@ -418,10 +436,11 @@ include "includes/header.php";
     </div>
 </div>
 
+<!-- Chef New Product Modal -->
 <div id="chefNewProductModal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
-    <div class="modal-content" style="background: white; max-width: 440px; width: 90%; border-radius: 12px; padding: 25px; color: #111827; text-align: left;">
+    <div class="modal-content" style="background: white; max-width: 440px; width: 90%; border-radius: 12px; padding: 20px; color: #111827; text-align: left;">
         <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="window.closeChefNewProductModal()">✕</span>
-        <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; color: #d97706;">Request Unlisted Product</h3>
+        <h3 style="font-size: 13px; font-weight: 700; text-transform: uppercase; margin-bottom: 12px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; color: #d97706;">Request Unlisted Product</h3>
         <form method="POST" action="requisitions.php" style="margin: 0;">
             <input type="hidden" name="action_create_chef_product" value="1">
             <div style="margin-bottom: 12px;">
@@ -469,7 +488,6 @@ let activeFilteredTabId = 'all';
 
 window.handleMobileDrawerCollapseToggle = function(event) {
     if (window.innerWidth >= 1024) return; 
-    
     const sidebar = document.getElementById("mobileSummaryStickyWrapper");
     if (event.target.closest('.sidebar-summary-title')) {
         sidebar.classList.toggle("drawer-open-state");
@@ -496,10 +514,10 @@ window.quickSearchCatalogRegistry = function() {
             const isSearchMatch = searchName.includes(inputVal);
 
             if (isTabMatch && isSearchMatch) {
-                card.style.display = "flex";
+                card.style.setProperty("display", "flex", "important");
                 parentHasVisibleItem = true;
             } else {
-                card.style.display = "none";
+                card.style.setProperty("display", "none", "important");
             }
         });
 
@@ -517,7 +535,7 @@ window.filterMaterialCatalog = function(catId, btn) {
     document.querySelectorAll(".category-block").forEach(block => {
         if (catId === 'all' || block.id === catId) {
             block.style.display = "block";
-            block.querySelectorAll(".material-item-card").forEach(c => c.style.display = "flex");
+            block.querySelectorAll(".material-item-card").forEach(c => c.style.setProperty("display", "flex", "important"));
         } else {
             block.style.display = "none";
         }
@@ -546,7 +564,7 @@ window.renderSidebarCart = function() {
    
     if (!container) return;
     if (window.reqCart.length === 0) {
-        container.innerHTML = '<p style="color: #a0aec0; text-align: center; font-size: 13px; margin-top: 40px; font-style: italic;">No items added to this request list yet.</p>';
+        container.innerHTML = '<p style="color: #a0aec0; text-align: center; font-size: 12px; margin-top: 30px; font-style: italic;">No items added to this request list yet.</p>';
         totalCountEl.innerText = "0"; return;
     }
     totalCountEl.innerText = window.reqCart.length;
@@ -736,6 +754,9 @@ window.openChefNewProductModal = function() {
 };
 window.closeChefNewProductModal = function() {
     document.getElementById("chefNewProductModal").style.display = "none";
+};
+window.closeEditReqModal = function() {
+    document.getElementById("editReqModalPopup").style.display = "none";
 };
 </script>
 
