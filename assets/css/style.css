@@ -494,6 +494,7 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     .card-name { font-size: 12px; height: auto; margin-bottom: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
     .card-price { font-size: 11px; margin-top: 1px; margin-bottom: 0; }
 }
+@media (max-width: 1023px) {
     .material-item-name div {
         display: inline-block !important;
         margin-top: 0px !important;
@@ -501,4 +502,4 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
         font-size: 11px !important;
         color: #64748b !important;
     }
-    
+}
