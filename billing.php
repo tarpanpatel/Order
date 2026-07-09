@@ -269,7 +269,7 @@ include "includes/header.php";
                     <span>Advance Payment Received (Accommodation Credit):</span>
                     <strong style="color: #38a169;">+ ₹<?= number_format($advance_paid, 2) ?></strong>
                 </div>
-              
+                <div class="alert-highlight-pending">
                   
 // Ensure we have staff list for the dropdown
 $staff_list = $pdo->query("SELECT id, username FROM users ORDER BY username ASC")->fetchAll();
@@ -305,7 +305,7 @@ if ($guest && $guest['pending_amount'] > 0): ?>
         </form>
     </div>
 <?php endif; ?>
-               
+                </div>
             </div>
 
             <div class="billing-card">
