@@ -231,6 +231,32 @@ window.renderCartInterfaceElements = function() {
         form.style.display = "flex";
     }
 };
+window.submitFoodOrder = function(event) {
+    event.preventDefault();
+
+    const cartItems = [];
+    for (let id in window.activeCartStateMap) {
+        cartItems.push({
+            id: id,
+            qty: window.activeCartStateMap[id].qty,
+            notes: ""
+        });
+    }
+
+    // --- ADD THIS LINE TO DEBUG ---
+    console.log("Submitting these items:", cartItems);
+
+    if (cartItems.length === 0) {
+        alert("Cart is empty.");
+        return;
+    }
+
+    fetch("process_order.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: cartItems })
+    })
+  
 </script>
 
 <?php include "includes/footer.php"; ?>
