@@ -68,7 +68,7 @@ include "includes/header.php";
                                         </div>
                                         <div class="material-item-name">
                                             <strong><?= htmlspecialchars($item['name']) ?></strong>
-                                            <div>(₹<?= number_format($item['price'], 2) ?>)</div>
+                                            <div>₹<?= number_format($item['price'], 2) ?></div>
                                         </div>
                                         <button type="button" class="btn-tab-styled-add" onclick="window.addItemToCheckoutCart(<?= $item['id'] ?>, '<?= htmlspecialchars(addslashes($item['name'])) ?>', <?= $item['price'] ?>)">+ Add</button>
                                     </div>

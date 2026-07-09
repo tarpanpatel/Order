@@ -163,7 +163,7 @@ include "includes/header.php";
                                         </div>
                                         <div class="material-item-name">
                                             <strong><?= htmlspecialchars($item['name']) ?></strong>
-                                            <div>(Size: <?= floatval($item['pack_size']) ?> <?= htmlspecialchars($item['pack_unit']) ?>)</div>
+                                            <div>Size: <?= floatval($item['pack_size']) ?> <?= htmlspecialchars($item['pack_unit']) ?></div>
                                         </div>
                                         <button type="button" class="btn-tab-styled-add" onclick="window.addMaterialToSidebar(<?= $item['id'] ?>, '<?= htmlspecialchars(addslashes($item['name'])) ?>')">+ Add</button>
                                     </div>
