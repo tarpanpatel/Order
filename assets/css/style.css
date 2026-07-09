@@ -60,7 +60,7 @@ body {
         box-sizing: border-box !important;
     }
 
-    /* 🔑 THE DESKTOP FIX: Keeps panel aligned to the right of your sidebar without window spill */
+    /* 🔑 FIXED DESKTOP OFFSET PANEL LAYOUT */
     .main-content {
         flex: 1 !important;
         margin-left: 285px !important;
@@ -438,10 +438,6 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     .material-item-card { border: 1px solid #e5e7eb !important; border-radius: 6px !important; padding: 4px 10px !important; background: #fff !important; min-height: auto !important; height: 44px !important; display: flex !important; flex-direction: row !important; justify-content: space-between !important; align-items: center !important; width: 100% !important; box-sizing: border-box !important; }
     .material-item-image-box { display: none !important; }
     
-    .material-item-name { text-align: left !important; font-size: 12px !important; margin-bottom: 0px !important; line-height: 1.2 !important; flex: 1 !important; padding-right: 8px !important; }
-    .material-item-name strong { font-weight: 600 !important; color: #111827 !important; }
-    .material-item-name div { display: inline-block !important; margin-top: 0px !important; margin-left: 4px !important; font-size: 11px !important; color: #64748b !important; }
-    
     .btn-tab-styled-add { width: auto !important; max-width: 65px !important; padding: 4px 10px !important; font-size: 11px !important; margin: 0 !important; border: 1px solid #cbd5e0 !important; border-radius: 6px !important; cursor: pointer !important; font-weight: 600 !important; background: #fff !important; color: #475569 !important; }
 
     .right-column-stack { position: fixed !important; bottom: 0 !important; left: 0 !important; width: 100% !important; height: auto !important; top: auto !important; z-index: 9999 !important; gap: 0 !important; pointer-events: none; }
@@ -458,16 +454,31 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     .catalog-tab-btn { padding: 4px 8px !important; font-size: 11px !important; }
     .btn-bill { padding: 10px !important; font-size: 12px !important; }
 
-    .sidebar-total-row-wrapper {
+    /* 🔑 INCREASING SPECIFICITY MAPS TO BYPASS SIDEBAR DRAWER OVERRIDES */
+    .requisition-right-sidebar .sidebar-total-row-wrapper {
         display: flex !important;
         flex-direction: row !important;
         justify-content: space-between !important;
         align-items: center !important;
         width: 100% !important;
+        max-width: 100% !important;
         margin-bottom: 12px !important;
     }
-    .total-types-label { font-size: 14px !important; font-weight: 700 !important; color: #111827 !important; }
-    .total-types-value { font-size: 14px !important; font-weight: 800 !important; color: #111827 !important; }
+    .requisition-right-sidebar .sidebar-total-row-wrapper .total-types-label { 
+        font-size: 14px !important; 
+        font-weight: 700 !important; 
+        color: #111827 !important; 
+        width: auto !important;
+        margin: 0 !important;
+    }
+    .requisition-right-sidebar .sidebar-total-row-wrapper .total-types-value { 
+        font-size: 14px !important; 
+        font-weight: 800 !important; 
+        color: #111827 !important; 
+        width: auto !important;
+        margin: 0 !important;
+        text-align: right !important;
+    }
 }
 
 @media (max-width: 600px) {
