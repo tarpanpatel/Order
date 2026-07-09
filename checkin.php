@@ -27,8 +27,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_register_guest
     $per_night_charges   = floatval($_POST["per_night_charges"] ?? 0); 
     $advance_received_by = trim($_POST["advance_received_by"] ?? 'Unnamed');
     $pending_received_by = trim($_POST["pending_received_by"] ?? 'Unnamed');
-// Add this near your existing $pdo queries
-$all_system_users = $pdo->query("SELECT id, username FROM users ORDER BY username ASC")->fetchAll(PDO::FETCH_ASSOC);
+
     if ($checkout <= $checkin) {
         $message = "❌ Error: Check-out date must be after the check-in date.";
     } elseif (!empty($checkin) && !empty($checkout) && !empty($phone_number)) {
@@ -163,7 +162,8 @@ foreach ($bookings as $b) {
 }
 $disabledDatesJson = json_encode($disabledDatesArray);
 
-$db_staff = $pdo->query("SELECT username FROM users ORDER BY username ASC")->fetchAll(PDO::FETCH_COLUMN);
+// Add this near your existing $pdo queries
+$all_system_users = $pdo->query("SELECT id, username FROM users ORDER BY username ASC")->fetchAll(PDO::FETCH_ASSOC);
 
 // ==========================================================================
 // BACKGROUND AUTOMATION: 1-DAY BEFORE ADVANCE ARRIVAL NOTIFIER REMINDER
