@@ -77,7 +77,7 @@ foreach ($allowed_menus as $menu) {
         <?php foreach ($main_menus as $menu): ?>
             <?php if ($menu['title'] === 'Admin Control'): ?>
                 <div class="admin-settings-wrapper" style="margin-top: 6px; border-top: 1px solid #cbd5e0; padding-top: 6px;">
-                    <div onclick="toggleAdminSubMenu()" class="nav-link" style="display: flex; justify-content: space-between; cursor: pointer; padding: 10px 16px;">
+                    <div onclick="toggleAdminSubMenu()" class="nav-link" style="display: flex; justify-content: space-between; cursor: pointer; padding: 10px 16px;margin-bottom: 15px;">
                         <span><?= htmlspecialchars($menu['icon']) ?> Admin Control</span>
                         <span id="adminMenuChevron">▶</span>
                     </div>
