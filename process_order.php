@@ -19,7 +19,15 @@ header("Content-Type: application/json");
 $data = json_decode(file_get_contents("php://input"), true);
 $guest = $pdo->query("SELECT id FROM guests WHERE status = 'Active' LIMIT 1")->fetch();
 
-if(!$guest || empty($data["items"])) { echo json_encode(["success" => false]); exit; }
+// Replace the current if(!$guest || empty($data["items"])) block with this:
+if (!$guest) {
+    echo json_encode(["success" => false, "message" => "No active guest found. Please activate a ledger first."]);
+    exit;
+}
+if (empty($data["items"])) {
+    echo json_encode(["success" => false, "message" => "No items in order. Cart is empty."]);
+    exit;
+}
 
 $pdo->beginTransaction();
 try {
