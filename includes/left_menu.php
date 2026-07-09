@@ -68,7 +68,8 @@ foreach ($allowed_menus as $menu) {
                 </a>
             <?php endif; ?>
 
-           // 1. Check if there is an active guest ledger in the database
+            <?php
+// 1. Check if there is an active guest ledger in the database
 $active_guest_check = $pdo->query("SELECT id FROM guests WHERE status = 'Active' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 ?>
 
@@ -98,6 +99,7 @@ $active_guest_check = $pdo->query("SELECT id FROM guests WHERE status = 'Active'
         </div>
     <?php endif; ?>
 
+ 
         <?php endforeach; ?>
         
         <a href="logout.php" class="nav-link" style="margin-top: 20px; color: #e53e3e; text-align: center;">🔒 Sign Out</a>
