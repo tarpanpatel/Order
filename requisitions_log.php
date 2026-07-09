@@ -2,11 +2,7 @@
 // /home/apartment/artistsfarmjaipur.com/Order/requisitions_log.php
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once "config/db.php";
-
-if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Chef" && $_SESSION["role"] !== "Admin")) {
-    header("Location: login.php");
-    exit;
-}
+ 
 
 $selectedMonth = isset($_GET['month']) ? intval($_GET['month']) : intval(date('m'));
 $selectedYear  = isset($_GET['year']) ? intval($_GET['year']) : intval(date('Y'));

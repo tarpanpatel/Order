@@ -6,12 +6,7 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once "config/db.php";
 require_once "config/telegram.php"; 
 include_once __DIR__ . '/config/local_db_bridge.php';
-
-// Role Access Validation
-if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Chef" && $_SESSION["role"] !== "Admin" && $_SESSION["role"] !== "Super Admin")) {
-    header("Location: login.php");
-    exit;
-}
+ 
 
 // --- CHEF NEW PRODUCT GENERATOR INTERCEPTOR ---
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_create_chef_product"])) {

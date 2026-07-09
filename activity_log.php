@@ -2,16 +2,7 @@
 // /home/apartment/artistsfarmjaipur.com/Order/activity_logs.php
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once "config/db.php";
-
-if (!isset($_SESSION["user_id"])) { 
-    header("Location: login.php"); 
-    exit; 
-}
-
-// Restrict access strictly to Administrative roles
-if ($_SESSION["role"] !== "Admin" && $_SESSION["role"] !== "Super Admin") {
-    die("Security Exception: Access Denied.");
-}
+ 
 
 // Fetch up to 150 entries to keep historical data accessible via 'Load More'
 $query_string = "

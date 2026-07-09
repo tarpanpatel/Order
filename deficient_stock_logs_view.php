@@ -5,10 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 require_once "config/db.php";
 
-if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Admin" && $_SESSION["role"] !== "Super Admin")) {
-    header("Location: login.php");
-    exit;
-}
+ 
 
 // Fetch aggregate statistics for overview cards
 $stats = $pdo->query("

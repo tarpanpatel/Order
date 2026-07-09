@@ -2,7 +2,9 @@
 // /home/apartment/artistsfarmjaipur.com/Order/includes/header.php
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . "/../config/db.php";
-
+if (!isset($_SESSION["role"]) || !check_page_access($pdo)) {
+    die("Access Denied: You do not have permission to access this area.");
+}
 $todayString = date('Y-m-d');
 $has_active_guest = $pdo->query("SELECT COUNT(*) FROM guests WHERE status = 'Active'")->fetchColumn() > 0;
 $is_staff_role = isset($_SESSION['role']) && $_SESSION['role'] === 'Staff';
@@ -12,7 +14,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 $current_active_guest = $pdo->query("SELECT * FROM guests WHERE status = 'Active' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 
 $todaysStmt = $pdo->prepare("
-    SELECT id, CONCAT('📱 (', RIGHT(phone_number, 4), ')') as guest_name 
+    SELECT id, CONCAT(' (', RIGHT(phone_number, 4), ')') as guest_name 
     FROM guests 
     WHERE status = 'Booked' AND :today >= checkin_date AND :today2 < checkout_date
     ORDER BY id ASC

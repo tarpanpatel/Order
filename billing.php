@@ -10,9 +10,8 @@ if (file_exists(__DIR__ . "/config/telegram.php")) {
 }
 include_once __DIR__ . '/config/local_db_bridge.php';
 
-if (!isset($_SESSION["user_id"])) { 
-    header("Location: login.php"); 
-    exit; 
+if (!isset($_SESSION["role"]) || !check_page_access($pdo)) {
+    die("Access Denied: You do not have permission to access this area.");
 }
 
 $guest = $pdo->query("SELECT * FROM guests WHERE status = 'Active' LIMIT 1")->fetch();

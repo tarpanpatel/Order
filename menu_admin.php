@@ -6,9 +6,6 @@ error_reporting(E_ALL);
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once "config/db.php";
 
-if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Admin" && $_SESSION["role"] !== "Super Admin")) {
-    die("Access Denied: Administrative credentials required.");
-}
 
 // AUTOMATED IMAGE RESIZING AND CROPPING GD ENGINE (150x50)
 function cropAndScaleMenuPhoto($source_file, $target_file, $max_w = 150, $max_h = 50) {

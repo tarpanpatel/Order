@@ -3,11 +3,7 @@
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once "config/db.php";
 
-// 1. Strict Gatekeeper
-$user_role = $_SESSION["role"] ?? '';
-if ($user_role !== "Admin" && $user_role !== "Super Admin") {
-    die("Access Denied: Administrative credentials required.");
-}
+ 
 
 // --- HANDLE POST: ADD NEW STAFF MEMBER ---
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_add_staff"])) {

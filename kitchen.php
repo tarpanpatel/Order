@@ -5,15 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 require_once "config/db.php";
 require_once "config/telegram.php";
-
-// 🔑 ACCESS GATEKEEPER: Universal Super Admin access + Specific Role access
-$allowed_roles = ["Chef", "Admin", "Staff"];
-$is_super_admin = (isset($_SESSION["role"]) && $_SESSION["role"] === "Super Admin");
-
-if (!isset($_SESSION["role"]) || (!$is_super_admin && !in_array($_SESSION["role"], $allowed_roles))) {
-    header("Location: login.php");
-    exit;
-}
+ 
 
 // --- HANDLE DISPATCH SYSTEM COMPLETION TRIGGER WITH TELEGRAM GATEWAY ---
 if (isset($_POST["complete_order_id"])) { 

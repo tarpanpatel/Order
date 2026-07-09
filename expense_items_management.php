@@ -2,10 +2,7 @@
 // /home/apartment/artistsfarmjaipur.com/Order/expense_items_management.php
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once "config/db.php";
-
-if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Admin" && $_SESSION["role"] !== "Super Admin")) {
-    die("Access Denied: Administrative credentials required.");
-}
+ 
 
 // --- MASTER CONTROLLER: AJAX INLINE UPDATE INTERCEPTOR ---
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_ajax_update_item"])) {

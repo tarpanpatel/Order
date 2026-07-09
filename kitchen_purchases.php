@@ -6,13 +6,7 @@ require_once __DIR__ . "/config/db.php";
 if (file_exists(__DIR__ . "/config/telegram.php")) {
     require_once __DIR__ . "/config/telegram.php";
 }
-
-if (!isset($_SESSION["user_id"])) { 
-    header("Location: login.php"); 
-    exit; 
-}
-
-$message = "";
+ 
 
 // Dynamic Column Discovery Hook to prevent Column Not Found errors
 $columnCheck = $pdo->query("DESCRIBE kitchen_expenses")->fetchAll(PDO::FETCH_COLUMN);

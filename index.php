@@ -4,11 +4,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 require_once "config/db.php";
 
-if (!isset($_SESSION["user_id"])) { 
-    header("Location: login.php"); 
-    exit; 
-}
-
+ 
 // --- NEW FEATURE: AJAX/POST HANDLER FOR INCOMING DEFICIENT MATERIALS ---
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_receive_deficient_stock"])) {
     $log_id = intval($_POST["log_id"]);

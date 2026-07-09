@@ -2,10 +2,7 @@
 // /home/apartment/artistsfarmjaipur.com/Order/materials_admin.php
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once "config/db.php";
-
-if (!isset($_SESSION["role"]) || $_SESSION["role"] !== "Admin") {
-    die("Access Denied: Administrative clearance required.");
-}
+ 
 
 // AUTOMATED IMAGE RESIZING AND CROPPING GD ENGINE (150x50)
 function resizeAndCropToTarget150x50($source_file_path, $target_file_path, $thumb_w = 150, $thumb_h = 50) {

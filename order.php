@@ -2,11 +2,7 @@
 // /home/apartment/artistsfarmjaipur.com/Order/order.php
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once "config/db.php";
-
-if (!isset($_SESSION["user_id"])) { 
-    header("Location: login.php"); 
-    exit; 
-}
+ 
 
 // Fetching menu categories and configurations directly from the verified database mapping
 $categories = $pdo->query("SELECT * FROM menu_categories ORDER BY sort_order ASC")->fetchAll(PDO::FETCH_ASSOC);
