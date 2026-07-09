@@ -126,7 +126,7 @@ body {
     .modal-qty-btn { width: 28px; height: 31px; background: #f8fafc; border: none; color: #475569; font-weight: bold; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 }
 
-/* --- SYSTEM NAV LINKS --- */
+/* --- SYSTEM NAV CARD LINKS --- */
 .sidebar nav a {
     display: block;
     padding: 12px 16px;
@@ -294,7 +294,7 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
 }
 
 /* ==========================================================================
-   🛠_ GLOBAL MODAL LAYOUT & INDEPENDENT ACTION BUTTONS (WORKS FOR ALL PAGES)
+   🛠️ 🌟 GLOBAL MODAL LAYOUT & INDEPENDENT ACTION BUTTONS (WORKS FOR ALL PAGES)
    ========================================================================== */
 .verification-item-row-wrapper {
     display: flex !important;
@@ -351,6 +351,8 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     outline: none !important;
     -moz-appearance: textfield !important;
 }
+.modal-input-qty::-webkit-outer-spin-button,
+.modal-input-qty::-webkit-inner-spin-button { -webkit-appearance: none !important; margin: 0 !important; }
 
 .binary-toggle-container {
     display: flex !important;
@@ -380,25 +382,34 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     border-color: #a7f3d0 !important;
     background: #f0fdf4 !important;
 }
-.toggle-choice-btn.btn-block-fulfilled:hover { background: #10b981 !important; color: #ffffff !important; }
+.toggle-choice-btn.btn-block-fulfilled:hover {
+    background: #10b981 !important;
+    color: #ffffff !important;
+    border-color: #10b981 !important;
+}
 
 .toggle-choice-btn.btn-block-remove {
     color: #ef4444 !important;
     border-color: #fca5a5 !important;
     background: #fdf2f2 !important;
 }
-.toggle-choice-btn.btn-block-remove:hover { background: #ef4444 !important; color: #ffffff !important; }
+.toggle-choice-btn.btn-block-remove:hover {
+    background: #ef4444 !important;
+    color: #ffffff !important;
+    border-color: #ef4444 !important;
+}
 
-/* Active State Memory Styles */
 .row-state-green-highlight #toggleBtn_F_ {
     background: #10b981 !important;
     color: #ffffff !important;
     border-color: #10b981 !important;
+    box-shadow: 0 2px 4px rgba(16,185,129,0.2) !important;
 }
 .row-state-greyed-out #toggleBtn_C_ {
     background: #ef4444 !important;
     color: #ffffff !important;
     border-color: #ef4444 !important;
+    box-shadow: 0 2px 4px rgba(239,68,68,0.2) !important;
 }
 
 .row-state-green-highlight { background: #f0fdf4 !important; border-left: 4px solid #10b981 !important; }
@@ -428,7 +439,6 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     .material-item-card { border: 1px solid #e5e7eb !important; border-radius: 6px !important; padding: 4px 10px !important; background: #fff !important; min-height: auto !important; height: 44px !important; display: flex !important; flex-direction: row !important; justify-content: space-between !important; align-items: center !important; width: 100% !important; box-sizing: border-box !important; }
     .material-item-image-box { display: none !important; }
     
-    /* 🔑 FIXED: Restores your exact, native inline styling block structure for item name row cards */
     .material-item-name { 
         text-align: left !important; 
         font-size: 12px !important; 
@@ -443,7 +453,6 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     
     .btn-tab-styled-add { width: auto !important; max-width: 65px !important; padding: 4px 10px !important; font-size: 11px !important; margin: 0 !important; border: 1px solid #cbd5e0 !important; border-radius: 6px !important; cursor: pointer !important; font-weight: 600 !important; background: #fff !important; color: #475569 !important; }
 
-    /* 🔑 INITIAL WORKING DRAWER POSITION OVERRIDES RE-ANCHORED */
     .right-column-stack { 
         position: fixed !important; 
         bottom: 0 !important; 
@@ -458,7 +467,6 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     
     .past-log-section { display: none !important; }
     
-    /* 🔑 INITIAL WORKING SIDEBAR EXPANSION BASE OVERRIDES RE-ANCHORED */
     .requisition-right-sidebar { 
         border-radius: 20px 20px 0 0 !important; 
         border: none !important; 
@@ -474,7 +482,6 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     .sidebar-summary-title { margin-bottom: 4px !important; padding-bottom: 2px !important; font-size: 11px !important; }
     .sidebar-summary-title::after { font-size: 10px !important; content: " ▲ Expand Drawer" !important; }
     
-    /* 🔑 FIXED: Restores your initial maximum height viewport window container rules */
     .sidebar-cart-list { 
         max-height: 50px !important; 
         overflow-y: auto !important; 
@@ -488,6 +495,28 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     .catalog-tab-header { margin-bottom: 10px !important; padding-bottom: 6px !important; margin-left: 2px !important; }
     .catalog-tab-btn { padding: 4px 8px !important; font-size: 11px !important; }
     .btn-bill { padding: 10px !important; font-size: 12px !important; }
+
+    .sidebar-total-row-wrapper {
+        display: block !important;
+        width: 100% !important;
+        margin-bottom: 12px !important;
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+        clear: both !important;
+    }
+    .total-types-label { 
+        font-size: 14px !important; 
+        font-weight: 700 !important; 
+        color: #111827 !important; 
+        float: left !important;
+    }
+    .total-types-value { 
+        font-size: 14px !important; 
+        font-weight: 800 !important; 
+        color: #111827 !important; 
+        float: right !important;
+    }
 }
 
 @media (max-width: 600px) {
