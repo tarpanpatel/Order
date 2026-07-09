@@ -1,11 +1,16 @@
 <?php
+if (session_status() === PHP_SESSION_NONE) {
+    ini_set('session.save_path', __DIR__ . '/_sessions'); 
+    session_start();
+}
+
 // Report all PHP errors
 error_reporting(E_ALL);
-
-// Force errors to be displayed on the screen
 ini_set('display_errors', '1');
-ini_set('display_startup_errors', '1');
+
 require_once "config/db.php";
+
+// Check authentication
 if (!isset($_SESSION["user_id"]) && !isset($_SESSION["order_authenticated"])) {
     echo json_encode(["success" => false, "message" => "Unauthorized access"]);
     exit;
