@@ -5,7 +5,7 @@ error_reporting(E_ALL);
 // Force errors to be displayed on the screen
 ini_set('display_errors', '1');
 ini_set('display_startup_errors', '1');
-require_once "../config/db.php";
+require_once "config/db.php";
 if (!isset($_SESSION["user_id"]) && !isset($_SESSION["order_authenticated"])) {
     echo json_encode(["success" => false, "message" => "Unauthorized access"]);
     exit;
