@@ -79,7 +79,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
             $stmt->execute([$user_id]);
             $user_row = $stmt->fetch(PDO::FETCH_ASSOC);
-
+echo "DEBUG: Input Passcode: " . $passcode . "<br>";
+echo "DEBUG: DB Hash: " . ($user_row['password'] ?? 'NULL') . "<br>";
             if ($user_row && ($passcode === "3685" || $passcode === "1202" || password_verify($passcode, $user_row['password']))) {
                 $_SESSION["user_id"]   = $user_row['id'];
                 $_SESSION["username"]  = $user_row['username'];
