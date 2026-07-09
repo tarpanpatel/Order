@@ -84,7 +84,7 @@ include "includes/header.php";
                     Basket is empty.<br>Click items to load.
                 </div>
 
-                <form method="POST" action="process_food_order.php" id="checkoutCartSubmissionForm" style="display:none; margin:0; flex-direction:column; width:100%;">
+                <form method="POST" action="process_order.php" id="checkoutCartSubmissionForm" style="display:none; margin:0; flex-direction:column; width:100%;">
                     <input type="hidden" name="guest_id" value="<?= $current_active_guest['id'] ?? 0 ?>">
                     
                     <div class="sidebar-cart-list" id="cartItemsContainerRows">
