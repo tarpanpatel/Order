@@ -15,32 +15,33 @@ if (!isset($_SESSION["role"]) || !check_page_access($pdo)) {
 }
 
 $guest = $pdo->query("SELECT * FROM guests WHERE status = 'Active' LIMIT 1")->fetch();
-// --- HANDLE PAYMENT COLLECTION ---
-if (isset($_POST['action_collect_payment'])) {
-    $guest_id = intval($_POST['guest_id']);
-    $amount = floatval($_POST['payment_amount']);
-    $received_by = $_SESSION['username'];
+// --- HANDLE PENDING ACCOMMODATION PAYMENT ---
+if (isset($_POST['action_collect_pending'])) {
+    $guest_id     = intval($_POST['guest_id']);
+    $amount       = floatval($_POST['amount']);
+    $collector_id = intval($_POST['collector_id']);
+    $mode         = $_POST['payment_mode']; // Cash or UPI
 
-    if ($amount > 0) {
-        $pdo->beginTransaction();
-        try {
-            // Update the guest ledger
-            $stmt = $pdo->prepare("UPDATE guests SET 
-                pending_amount = pending_amount - ?, 
-                advance_paid = advance_paid + ? 
-                WHERE id = ?");
-            $stmt->execute([$amount, $amount, $guest_id]);
+    // Get collector name
+    $collector = $pdo->prepare("SELECT username FROM users WHERE id = ?");
+    $collector->execute([$collector_id]);
+    $collector_name = $collector->fetchColumn() ?: 'Unknown';
 
-            // Audit the transaction
-            $log = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
-            $log->execute([$_SESSION['user_id'], "Collected ₹$amount as pending payment from guest ID: $guest_id. Received by: $received_by"]);
+    try {
+        $stmt = $pdo->prepare("UPDATE guests SET 
+            pending_amount = 0, 
+            pending_received_by = ?, 
+            payment_mode = ? 
+            WHERE id = ?");
+        $stmt->execute([$collector_name, $mode, $guest_id]);
 
-            $pdo->commit();
-            $_SESSION['staff_success'] = "Payment of ₹$amount recorded successfully!";
-        } catch (Exception $e) {
-            $pdo->rollBack();
-            $_SESSION['staff_error'] = "Transaction failed: " . $e->getMessage();
-        }
+        // Audit Trail
+        $log = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
+        $log->execute([$_SESSION['user_id'], "Collected pending accommodation ₹$amount (Mode: $mode). Received by: $collector_name"]);
+
+        $_SESSION['staff_success'] = "Pending amount of ₹$amount collected.";
+    } catch (Exception $e) {
+        $_SESSION['staff_error'] = "Failed: " . $e->getMessage();
     }
     header("Location: billing.php");
     exit;
@@ -270,12 +271,41 @@ include "includes/header.php";
                 </div>
                 <div class="alert-highlight-pending">
                     <span>⚠️ Remaining Accommodation Pending Payment:</span>
-                    <span>₹<?= number_format($accommodation_pending, 2) ?></span>
-                    <span><button type="button" 
-        style="padding: 10px 20px; background: #059669; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 10px;" 
-        onclick="document.getElementById('paymentModal').style.display='flex'">
-    💰 Collect Pending
-</button></span>
+                    <span>₹<?= number_format($accommodation_pending, 2) ?></span><?php 
+// Ensure we have staff list for the dropdown
+$staff_list = $pdo->query("SELECT id, username FROM users ORDER BY username ASC")->fetchAll();
+
+if ($guest && $guest['pending_amount'] > 0): ?>
+    <div style="background: #fff7ed; border: 1px solid #f97316; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+        <h3 style="margin-top:0; color:#9a3412;">⚠️ Pending Accommodation: ₹<?= number_format($guest['pending_amount'], 2) ?></h3>
+        
+        <form method="POST" action="billing.php" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;">
+            <input type="hidden" name="action_collect_pending" value="1">
+            <input type="hidden" name="guest_id" value="<?= $guest['id'] ?>">
+            <input type="hidden" name="amount" value="<?= $guest['pending_amount'] ?>">
+            
+            <div style="flex: 1; min-width: 150px;">
+                <label style="font-size: 11px; font-weight:700;">Collected By</label>
+                <select name="collector_id" required style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0;">
+                    <option value="">-- Select Staff --</option>
+                    <?php foreach ($staff_list as $s): ?>
+                        <option value="<?= $s['id'] ?>"><?= htmlspecialchars($s['username']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            
+            <div style="flex: 1; min-width: 150px;">
+                <label style="font-size: 11px; font-weight:700;">Payment Mode</label>
+                <select name="payment_mode" required style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0;">
+                    <option value="Cash">Cash</option>
+                    <option value="UPI">UPI</option>
+                </select>
+            </div>
+            
+            <button type="submit" style="padding:8px 20px; background:#f97316; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Mark as Received</button>
+        </form>
+    </div>
+<?php endif; ?>
                 </div>
             </div>
 
@@ -496,21 +526,5 @@ function closeEditInvoiceModal() {
 
 document.addEventListener("DOMContentLoaded", toggleLabelRequirement);
 </script>
-<div id="paymentModal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 9999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
-    <div class="modal-content" style="background: white; max-width: 400px; width: 90%; border-radius: 12px; padding: 25px;">
-        <span style="float:right; cursor:pointer;" onclick="document.getElementById('paymentModal').style.display='none'">✕</span>
-        <h3 style="margin-top:0; border-bottom:1px solid #e2e8f0; padding-bottom:10px;">Collect Pending Payment</h3>
-        <form method="POST" action="billing.php">
-            <input type="hidden" name="action_collect_payment" value="1">
-            <input type="hidden" name="guest_id" value="<?= $guest['id'] ?>">
-            
-            <div style="margin-bottom:15px;">
-                <label style="font-size:12px; font-weight:bold;">Amount Received (₹)</label>
-                <input type="number" step="0.01" name="payment_amount" required style="width:100%; padding:10px; border:1px solid #cbd5e0; border-radius:6px;" value="<?= $guest['pending_amount'] ?>">
-            </div>
-            
-            <button type="submit" style="width:100%; padding:12px; background:#059669; color:white; border:none; border-radius:6px; font-weight:bold;">Confirm Payment</button>
-        </form>
-    </div>
-</div>
+
 <?php include "includes/footer.php"; ?>
