@@ -1,28 +1,37 @@
 <?php
 // /home/apartment/artistsfarmjaipur.com/Order/includes/left_menu.php
+
 $current_page = basename($_SERVER['PHP_SELF']);
 $user_role = $_SESSION['role'] ?? 'Staff';
 $is_super_admin = ($user_role === 'Super Admin');
 
-// 1. Fetch Dynamic Menus
+// Fetch Dynamic Menus based on Role Access
 if ($is_super_admin) {
-    $allowed_menus = $pdo->query("SELECT * FROM sys_menu ORDER BY parent_id ASC, sort_order ASC")->fetchAll(PDO::FETCH_ASSOC);
+    // Super Admin gets everything
+    $menuStmt = $pdo->query("SELECT * FROM sys_menu ORDER BY parent_id ASC, sort_order ASC");
+    $allowed_menus = $menuStmt->fetchAll(PDO::FETCH_ASSOC);
 } else {
-    $stmt = $pdo->prepare("SELECT m.* FROM sys_menu m JOIN sys_role_menu rm ON m.id = rm.menu_id WHERE rm.role_name = ? ORDER BY m.parent_id ASC, m.sort_order ASC");
-    $stmt->execute([$user_role]);
-    $allowed_menus = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    // Other roles check the access mapping table
+    $menuStmt = $pdo->prepare("
+        SELECT m.* FROM sys_menu m
+        JOIN sys_role_menu rm ON m.id = rm.menu_id
+        WHERE rm.role_name = ?
+        ORDER BY m.parent_id ASC, m.sort_order ASC
+    ");
+    $menuStmt->execute([$user_role]);
+    $allowed_menus = $menuStmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
-// 2. Separate Main, Sub, and Action Area
+// Organize into Main items and Sub-items
 $main_menus = [];
 $sub_menus = [];
 foreach ($allowed_menus as $menu) {
-    if ($menu['parent_id'] == 0) $main_menus[$menu['id']] = $menu;
-    else $sub_menus[$menu['parent_id']][] = $menu;
+    if ($menu['parent_id'] == 0) {
+        $main_menus[$menu['id']] = $menu;
+    } else {
+        $sub_menus[$menu['parent_id']][] = $menu;
+    }
 }
-
-// 3. Check for Active Guest for the Action Button
-$active_guest = $pdo->query("SELECT id, guest_name, phone_number FROM guests WHERE status = 'Active' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 ?>
 
 <div class="sidebar" id="appLeftNavigationMenu" style="position: fixed; top: 0; left: 0; height: 100vh; width: 280px; background: #ffffff; box-shadow: 4px 0 25px rgba(0,0,0,0.15); display: flex; flex-direction: column; z-index: 10001; box-sizing: border-box; padding: 15px 16px; overflow-y: auto;">
