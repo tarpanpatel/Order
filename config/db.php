@@ -9,7 +9,7 @@ if (!is_dir($sessionPath)) {
     mkdir($sessionPath, 0700, true);
 }
 
-// Enforce private directory path and expand lifetime parameters to 14 days (1,209,600 seconds)
+// Enforce private directory path and expand lifetime parameters to 14 days
 ini_set('session.save_path', $sessionPath);
 ini_set('session.gc_maxlifetime', 1209600);
 ini_set('session.cookie_lifetime', 1209600);
@@ -34,10 +34,13 @@ $db_pass = "tPatel13@";
 $db_name = "apartment_blue";  
 
 try {
-    $pdo = new PDO("mysql:host={$db_host};dbname={$db_name};charset=utf8mb4}", $db_user, $db_pass, [
+    /* 🔑 FIXED: Removed the stray closing brace right after utf8mb4 */
+    $pdo = new PDO("mysql:host={$db_host};dbname={$db_name};charset=utf8mb4", $db_user, $db_pass, [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION, 
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC 
     ]);
+    
+    // Force MySQL session synchronization to Indian Standard Time
     $pdo->exec("SET time_zone = '+05:30';"); 
 
 } catch (PDOException $e) {
