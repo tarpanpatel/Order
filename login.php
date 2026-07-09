@@ -1,6 +1,25 @@
 <?php
 // /home/apartment/artistsfarmjaipur.com/Order/login.php
+// Force error reporting to screen
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
 
+echo "DEBUG: Session Path is: " . __DIR__ . '/_sessions' . "<br>";
+echo "DEBUG: Is directory writable? " . (is_writable(__DIR__ . '/_sessions') ? 'YES' : 'NO') . "<br>";
+
+$sessionPath = __DIR__ . '/_sessions';
+if (!is_dir($sessionPath)) { 
+    if (!mkdir($sessionPath, 0755, true)) {
+        echo "DEBUG: Failed to create session directory!<br>";
+    }
+}
+
+ini_set('session.save_path', $sessionPath);
+session_start();
+
+echo "DEBUG: Session ID is: " . session_id() . "<br>";
+echo "DEBUG: SESSION array: "; var_dump($_SESSION);
 $sessionPath = __DIR__ . '/_sessions';
 // Use explicit permission handling
 if (!is_dir($sessionPath)) { 
