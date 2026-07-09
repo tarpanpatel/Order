@@ -154,16 +154,18 @@ include "includes/header.php";
                         if (empty($catItems)) continue;
                     ?>
                         <div class="category-block" id="cat_<?= $cat['id'] ?>" style="margin-bottom: 15px;">
-                            <h4 class="category-block-title" style="font-size: 12px; text-transform: uppercase; color: #4b5563; text-align: left; margin-bottom: 8px; font-weight: 700;"><?= $cat['name'] ?></h4>
+                            <h4 class="category-block-title" style="font-size: 12px; text-transform: uppercase; color: #4b5563; text-align: left; margin-bottom: 8px; font-weight: 700;">
+                                <?= htmlspecialchars($cat['name']) ?>
+                            </h4>
                             <div class="material-item-grid">
                                 <?php foreach ($catItems as $item): ?>
                                     <div class="material-item-card" data-search-name="<?= strtolower(htmlspecialchars($item['name'])) ?>">
                                         <div class="material-item-image-box">
-                                            <img src="<?= !empty($item['image_path']) ? $item['image_path'] : 'https://placehold.co/150x100?text=No+Image'; ?>" alt="" onerror="this.src='https://placehold.co/150x100?text=No+Image';">
+                                            <img src="<?= !empty($item['image_path']) ? htmlspecialchars($item['image_path']) : 'https://placehold.co/150x100?text=No+Image'; ?>" alt="" onerror="this.src='https://placehold.co/150x100?text=No+Image';">
                                         </div>
                                         <div class="material-item-name">
                                             <strong><?= htmlspecialchars($item['name']) ?></strong>
-                                            <div>(Size: <?= floatval($item['pack_size']) ?> <?= $item['pack_unit'] ?>)</div>
+                                            <div>(Size: <?= floatval($item['pack_size']) ?> <?= htmlspecialchars($item['pack_unit']) ?>)</div>
                                         </div>
                                         <button type="button" class="btn-tab-styled-add" onclick="window.addMaterialToSidebar(<?= $item['id'] ?>, '<?= htmlspecialchars(addslashes($item['name'])) ?>')">+ Add</button>
                                     </div>
@@ -182,7 +184,6 @@ include "includes/header.php";
                     <p style="color: #a0aec0; text-align: center; font-size: 12px; margin-top: 30px; font-style: italic;">No items added to this request list yet.</p>
                 </div>
                 <div>
-                   
                     <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 14px; margin-bottom: 10px; color: #111827;">
                         <span>Total Item Types:</span>
                         <span id="sidebarTotalCount">0</span>
@@ -376,7 +377,6 @@ window.updateSidebarQty = function(id, delta) {
     window.renderSidebarCart();
 };
 
-// 🔑 FIXED: Restored your exact horizontal sliding checkout listing rows cleanly
 window.renderSidebarCart = function() {
     const container = document.getElementById("sidebarCartRowsContainer");
     const totalCountEl = document.getElementById("sidebarTotalCount");
