@@ -9,8 +9,11 @@ error_reporting(E_ALL);
 // Force errors to be displayed on the screen
 ini_set('display_errors', '1');
 require_once "config/db.php";
-require_once "config/telegram.php";
- 
+
+// Load telegram config if it exists
+if (file_exists(__DIR__ . "/config/telegram.php")) {
+    require_once __DIR__ . "/config/telegram.php";
+}
 
 // --- HANDLE DISPATCH SYSTEM COMPLETION TRIGGER WITH TELEGRAM GATEWAY ---
 if (isset($_POST["complete_order_id"])) { 
@@ -33,34 +36,39 @@ if (isset($_POST["complete_order_id"])) {
         }
 
         try {
-        // ... (your existing database fetch code remains here) ...
+            $readyMsg = "✅ *ORDER PREPARED & READY TO SERVE*\n";
+            $readyMsg .= "--------------------------------------\n";
+            $readyMsg .= "👤 *Guest Name:* " . $guest_name . "\n";
+            $readyMsg .= "🆔 *Order Ticket:* #" . $order_id . "\n";
+            $readyMsg .= "⏰ *Completed at:* " . date('H:i') . "\n";
+            $readyMsg .= "--------------------------------------\n\n";
+            $readyMsg .= $itemsListBlock;
+            $readyMsg .= "\n--------------------------------------\n";
+            $readyMsg .= "🏃‍♂️ _Staff, please collect the order from the kitchen immediately._";
 
-        $readyMsg = "✅ *ORDER PREPARED & READY TO SERVE*\n";
-        $readyMsg .= "--------------------------------------\n";
-        $readyMsg .= "👤 *Guest Name:* " . $guest_name . "\n";
-        $readyMsg .= "🆔 *Order Ticket:* #" . $order_id . "\n";
-        $readyMsg .= "⏰ *Completed at:* " . date('H:i') . "\n";
-        $readyMsg .= "--------------------------------------\n\n";
-        $readyMsg .= $itemsListBlock;
-        $readyMsg .= "\n--------------------------------------\n";
-        $readyMsg .= "🏃‍♂️ _Staff, please collect the order from the kitchen immediately._";
+            // FIXED: Using sendAdminTelegramMessage (used across rest of app)
+            if (function_exists('sendAdminTelegramMessage')) {
+                sendAdminTelegramMessage($readyMsg);
+            } else {
+                error_log("Kitchen Warning: sendAdminTelegramMessage function not found.");
+            }
 
-        // 🔑 SAFETY FIX: Only call the function if it actually exists
-        if (function_exists('sendTelegramNotification')) {
-            sendTelegramNotification($readyMsg);
-        } else {
-            error_log("Kitchen Warning: sendTelegramNotification function not found.");
+        } catch (Exception $tgEx) {
+            // Safe catch block prevents connection errors
+            error_log("Telegram Error: " . $tgEx->getMessage());
         }
 
-    } catch (Exception $tgEx) {
-        // Safe catch block prevents connection errors
-    }
-    // 3. Finalize core application database status values update cleanly
-    $pdo->prepare("UPDATE orders SET status = 'Completed' WHERE id = ?")->execute([$order_id]); 
+        // 3. Finalize core application database status values update cleanly
+        $pdo->prepare("UPDATE orders SET status = 'Completed' WHERE id = ?")->execute([$order_id]); 
 
-    // --- AUDIT TRAIL LOGGING ---
-    $audit_stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
-    $audit_stmt->execute([$_SESSION['user_id'], "User [" . $_SESSION['username'] . "] marked Kitchen Ticket #" . $order_id . " as Completed/Ready to Serve."]);
+        // --- AUDIT TRAIL LOGGING ---
+        $audit_stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
+        $audit_stmt->execute([$_SESSION['user_id'] ?? 0, "User [" . ($_SESSION['username'] ?? 'System') . "] marked Kitchen Ticket #" . $order_id . " as Completed/Ready to Serve."]);
+
+    } catch (Exception $e) {
+        // FIXED: This catch block prevents the 500 error!
+        error_log("Database Error in Kitchen: " . $e->getMessage());
+    }
 
     header("Location: kitchen.php"); 
     exit;
