@@ -33,6 +33,41 @@ if (isset($_POST['action_collect_pending'])) {
         // 2. Clear Pending Amount
         $stmt = $pdo->prepare("UPDATE guests SET pending_amount = 0, pending_received_by = ? WHERE id = ?");
         $stmt->execute([$collector_name, $guest_id]);
+// --- HANDLE PENDING ACCOMMODATION PAYMENT ---
+if (isset($_POST['action_collect_pending'])) {
+    $guest_id = intval($_POST['guest_id']);
+    $amount = floatval($_POST['amount']);
+    $collector_id = intval($_POST['collector_id']); // Dropdown ID
+    $mode = $_POST['payment_mode'];                 // Cash or UPI
+
+    // Get Collector Name from users table
+    $collector = $pdo->prepare("SELECT username FROM users WHERE id = ?");
+    $collector->execute([$collector_id]);
+    $collector_name = $collector->fetchColumn() ?: 'Unknown';
+
+    try {
+        $pdo->beginTransaction();
+        // Update both the amount to 0 and the person who collected it
+        $stmt = $pdo->prepare("UPDATE guests SET 
+            pending_amount = 0, 
+            pending_received_by = ?, 
+            payment_status = 'Settled' 
+            WHERE id = ?");
+        $stmt->execute([$collector_name, $guest_id]);
+
+        // Audit Trail
+        $log = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
+        $log->execute([$_SESSION['user_id'], "Collected pending accommodation ₹$amount (Mode: $mode). Received by: $collector_name"]);
+
+        $pdo->commit();
+        $_SESSION['staff_success'] = "Payment recorded successfully.";
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        $_SESSION['staff_error'] = "Transaction failed: " . $e->getMessage();
+    }
+    header("Location: billing.php");
+    exit;
+}
 if (!$stmt->rowCount()) {
     die("DEBUG: The SQL executed but changed 0 rows. Check if guest_id " . $guest_id . " exists.");
 }
@@ -239,18 +274,7 @@ include "includes/header.php";
                 $food_subtotal += ($net_qty * $item['price']);
             }
         }
-$adjustments = $pdo->prepare("SELECT * FROM order_adjustments WHERE order_id = ?");
-$adjustments->execute([$guest['id']]);
-$adjustments = $adjustments->fetchAll(PDO::FETCH_ASSOC);
 
-// --- NEW LOGIC: Inject Pending Payment into the Bill if it exists ---
-if (!empty($guest['pending_received_by'])) {
-    $adjustments[] = [
-        'reason' => 'Pending Payment Received via ' . ($guest['payment_mode'] ?? 'Cash') . ' (By: ' . $guest['pending_received_by'] . ')',
-        'amount' => $guest['pending_amount'], // You might need to adjust this if you track original pending amount
-        'type'   => 'payment' // Use a type that isn't 'charge' so it shows as a credit
-    ];
-}
         $adjustments = [];
         if (!empty($guest['food_remark'])) {
             $adjustments = json_decode($guest['food_remark'], true) ?: [];
