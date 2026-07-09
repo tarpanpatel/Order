@@ -182,9 +182,10 @@ include "includes/header.php";
                     <p style="color: #a0aec0; text-align: center; font-size: 12px; margin-top: 30px; font-style: italic;">No items added to this request list yet.</p>
                 </div>
                 <div>
-                    <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 14px; margin-bottom: 10px; color: #111827;">
-                        <span>Total Item Types:</span>
-                        <span id="sidebarTotalCount">0</span>
+                   
+                    <div class="sidebar-total-row-wrapper" style="display: flex !important; justify-content: space-between !important; align-items: center !important; font-weight: 700; font-size: 14px; margin-bottom: 12px; color: #111827; width: 100%;">
+                        <span class="total-types-label" style="font-weight: 700; color: #111827;">Total Item Types:</span>
+                        <span id="sidebarTotalCount" class="total-types-value" style="font-weight: 800; color: #111827;">0</span>
                     </div>
                     <button type="button" class="btn btn-bill" style="width: 100%; padding: 12px; font-size: 13px; font-weight: bold; border-radius: 8px;" onclick="window.submitSidebarRequisition(event)">Submit Requisition</button>
                 </div>
@@ -449,7 +450,6 @@ window.openEditRequisitionModal = function(reqId, element) {
                 <div id="itemVerificationRow_${i.catalog_id}" class="verification-item-row-wrapper ${rowStateClass}">
                     <div style="flex:1; min-width:0; text-align:left;">
                         <span class="item-text-title" style="font-size:13px; font-weight:700; color:#1e293b; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${i.name}</span>
-                        <span style="font-size:11px; color:#475569; font-weight:bold; display:block; margin-bottom:2px;">Packing Spec: ${pSize} ${pUnit} | Target: ${currentLabel}</span>
                         <span id="qtyAuditSubtitle_${i.catalog_id}" class="audit-history-subtitle" data-original="${i.quantity}">Ordered: ${i.quantity}</span>
                     </div>
                    
