@@ -120,11 +120,10 @@ include "includes/header.php";
 
 <style>
 /* ==========================================================================
-   🖥️ DESKTOP-SPECIFIC WORKSPACE GRID LAYOUT (>= 1024px VIEWPORTS)
+   🖥️ DESKTOP-SPECIFIC WORKSPACE LAYOUT (>= 1024px VIEWPORTS)
    ========================================================================== */
 @media (min-width: 1024px) {
-    /* 🔑 THE CRITICAL FIX: Shifts the main view container completely to the right of the fixed navigation menu 
-       and shrinks its maximum width boundary to 100% of the remaining visible space so nothing spills out */
+    /* Shifts everything out from underneath the fixed menu sidebar area */
     .main-content {
         margin-left: 280px !important;
         width: calc(100% - 280px) !important;
@@ -133,35 +132,60 @@ include "includes/header.php";
         padding: 20px !important;
     }
 
+    /* FIXED: Prevent shifting downward by removing wrap flex instructions, locking layout till window view */
     .split-requisition-layout { 
-        display: grid !important; 
-        grid-template-columns: 1fr 340px !important; 
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important; 
         gap: 20px !important; 
         width: 100% !important; 
         max-width: 100% !important;
-        align-items: start !important; 
-        margin-top: 15px; 
         box-sizing: border-box !important; 
+        align-items: start !important;
     }
-    .materials-main-panel { display: flex !important; flex-direction: column !important; gap: 24px !important; width: 100% !important; box-sizing: border-box !important; }
+    
+    /* FIXED: Added flex-shrink and flex-basis bounds to safely lock space footprint calculations */
+    .materials-main-panel { 
+        flex: 1 1 auto !important;
+        min-width: 0 !important; 
+        max-width: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 24px !important;
+        box-sizing: border-box !important;
+    }
+    
     .catalog-cards-box { background: #ffffff !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; padding: 20px !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important; width: 100% !important; box-sizing: border-box !important; }
-    .right-column-stack { display: flex !important; flex-direction: column !important; gap: 20px !important; position: sticky !important; top: 20px !important; width: 100% !important; box-sizing: border-box !important; }
+    
+    /* Fixed horizontal sizing locks sidebar to the view layer right edge */
+    .right-column-stack { 
+        width: 340px !important;
+        min-width: 340px !important;
+        flex: 0 0 340px !important; 
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 20px !important;
+        position: sticky !important;
+        top: 20px !important;
+        box-sizing: border-box !important;
+    }
+    
     .requisition-right-sidebar { background: #ffffff !important; border: 1px solid #cbd5e0 !important; border-radius: 12px !important; padding: 15px !important; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05) !important; display: flex !important; flex-direction: column !important; text-align: left !important; width: 100% !important; box-sizing: border-box !important; }
     
-    .material-item-grid { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)) !important; gap: 12px !important; width: 100% !important; }
-    .material-item-card { display: flex !important; flex-direction: column !important; justify-content: space-between !important; align-items: center !important; border: 1px solid #e2e8f0 !important; border-radius: 8px !important; padding: 10px !important; background: #fff !important; min-height: 175px !important; box-sizing: border-box !important; width: 100% !important; }
-    .material-item-image-box { display: block !important; width: 100% !important; height: 50px !important; overflow: hidden !important; border-radius: 6px !important; border: 1px solid #edf2f7 !important; background: #f8fafc !important; margin-bottom: 8px !important; }
-    .material-item-image-box img { width: 100% !important; height: 100% !important; object-fit: cover !important; }
-    .material-item-name { font-size: 12px !important; font-weight: 600 !important; color: #111827 !important; margin-bottom: 8px !important; line-height: 1.3 !important; text-align: center !important; width: 100% !important; word-break: break-word !important; }
-    .material-item-name div { display: block !important; font-size: 10px !important; color: #64748b !important; font-weight: bold !important; margin-top: 2px !important; }
-    .btn-tab-styled-add { display: inline-block !important; padding: 5px 14px !important; font-size: 12px !important; font-weight: 600 !important; background: #ffffff !important; color: #475569 !important; border: 1px solid #cbd5e0 !important; border-radius: 6px !important; cursor: pointer !important; transition: all 0.15s ease !important; width: 100% !important; margin: 0 auto !important; box-sizing: border-box; }
+    .material-item-grid { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)) !important; gap: 10px !important; width: 100% !important; }
+    .material-item-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; background: #fff; text-align: center; display: flex; flex-direction: column; justify-content: space-between; align-items: center; min-height: 165px; box-sizing: border-box; width: 100%; }
+    .material-item-image-box { width: 100%; height: 50px; overflow: hidden; border-radius: 6px; border: 1px solid #edf2f7; background: #f8fafc; margin-bottom: 6px; }
+    .material-item-image-box img { width: 100%; height: 100%; object-fit: cover; }
+    .material-item-name { font-size: 12px; font-weight: 600; color: #111827; margin-bottom: 6px; line-height: 1.3; text-align: center; width: 100%; word-break: break-word; }
+    .material-item-name div { display: block; font-size: 10px; color: #64748b; font-weight: bold; margin-top: 2px; }
+    .btn-tab-styled-add { display: inline-block !important; padding: 4px 10px !important; font-size: 12px !important; font-weight: 600 !important; background: #ffffff !important; color: #475569 !important; border: 1px solid #cbd5e0 !important; border-radius: 6px !important; cursor: pointer !important; transition: all 0.15s ease !important; width: 100% !important; margin: 0 auto !important; box-sizing: border-box; }
     
     .sidebar-summary-title { font-size: 14px; font-weight: 700; text-transform: uppercase; color: #111827; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; margin-bottom: 15px; margin-top: 0; }
     .sidebar-cart-list { max-height: 240px; overflow-y: auto; margin-bottom: 15px; }
     .past-log-section { background: #ffffff !important; border: 1px solid #cbd5e0 !important; border-radius: 12px !important; padding: 14px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important; text-align: left; width: 100%; box-sizing: border-box; }
 }
 
-/* --- COMMON SYSTEM DESIGN PARAMETERS --- */
+/* --- SYSTEM CONSTANTS DESIGN PARAMETERS --- */
 .catalog-tab-header { display: flex; gap: 6px; flex-wrap: nowrap; margin-bottom: 15px; border-bottom: 1px solid #edf2f7; padding-bottom: 10px; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
 .catalog-tab-header::-webkit-scrollbar { display: none; }
 .catalog-tab-btn { padding: 6px 12px; font-size: 12px; font-weight: 600; background: #f7fafc; border: 1px solid #cbd5e0; border-radius: 6px; cursor: pointer; color: #475569; transition: all 0.15s ease; }
@@ -179,6 +203,7 @@ include "includes/header.php";
 .modal-input-qty { width: 55px; padding: 6px 4px; border: 1px solid #cbd5e0; text-align: center; font-size: 13px; font-weight: 700; color: #1e293b; background: #fff !important; }
 .modal-qty-container { display: flex; align-items: center; border-radius: 6px; overflow: hidden; border: 1px solid #cbd5e0; background: #fff; }
 .modal-qty-btn { width: 28px; height: 31px; background: #f8fafc; border: none; color: #475569; font-weight: bold; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.global-toast-notification { padding: 12px 24px; background: #10b981; color: white; font-size: 14px; font-weight: 800; text-align: center; border-radius: 8px; box-shadow: 0 4px 12px rgba(16,185,129,0.2); margin-bottom: 15px; border: 1px solid #059669; }
 
 /* ==========================================================================
    ⚡ PHONE VIEWPORTS ONLY: COMPACT FORMAT OVERRIDES (< 1024px VIEWPORTS)
@@ -319,7 +344,7 @@ include "includes/header.php";
                                         <?= date('d/m/y', strtotime($pRow['requested_at'])) ?><br>
                                         <span style="color: #94a3b8; font-size: 10px;"><?= date('H:i', strtotime($pRow['requested_at'])) ?></span>
                                     </td>
-                                    <td style="max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; font-size: 11px; padding-right: 4px;" title="<?= htmlspecialchars($summary_clean) ?>"><?= $summary_clean ?></td>
+                                    <td style="max-width: 140px; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; font-size: 11px; padding-right: 4px;" title="<?= htmlspecialchars($summary_clean) ?>"><?= $summary_clean ?></td>
                                     <td style="text-align: center;">
                                         <button type="button" class="btn-action-trigger <?= $status_style ?>" data-items='<?= htmlspecialchars($serializedItems, ENT_QUOTES, 'UTF-8') ?>' onclick="window.openEditRequisitionModal(<?= $pRow['id'] ?>, this)">
                                             <span>(<?= strtolower($status_label) ?>)</span>
