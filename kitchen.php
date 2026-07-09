@@ -6,6 +6,9 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once "config/db.php";
 require_once "config/telegram.php";
  
+// Report all PHP errors
+error_reporting(E_ALL);
+ini_set('display_errors', '1');
 
 // --- HANDLE DISPATCH SYSTEM COMPLETION TRIGGER WITH TELEGRAM GATEWAY ---
 if (isset($_POST["complete_order_id"])) { 

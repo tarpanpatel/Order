@@ -3,7 +3,7 @@ if (session_status() === PHP_SESSION_NONE) {
     ini_set('session.save_path', __DIR__ . '/_sessions'); 
     session_start();
 }
- 
+
 
 require_once "config/db.php";
 
