@@ -10,11 +10,6 @@ if (file_exists(__DIR__ . "/config/telegram.php")) {
 }
 include_once __DIR__ . '/config/local_db_bridge.php';
 
-if (!isset($_SESSION["role"]) || ($_SESSION["role"] !== "Admin" && $_SESSION["role"] !== "Chef")) {
-    header("Location: login.php");
-    exit;
-}
-
 $message = "";
 $todayString = date('Y-m-d');
 
