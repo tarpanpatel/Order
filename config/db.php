@@ -1,32 +1,25 @@
 <?php
 // /home/apartment/artistsfarmjaipur.com/Order/config/db.php
 
-// ==========================================================================
-// 🔒 SAFE LONG-LIVED PRIVATE SESSION MANAGER (PREVENTS AUTO-LOGOUTS)
-// ==========================================================================
-$sessionPath = __DIR__ . '/../_sessions';
-ini_set('session.save_path', $sessionPath);
-ini_set('session.gc_maxlifetime', 1209600);
-ini_set('session.cookie_lifetime', 1209600);
-
-if (session_status() === PHP_SESSION_NONE) { 
-    // Do not re-set path if already set by login.php
-    session_start(); 
-}
-
-// ==========================================================================
-// TEMPORARY DEVELOPMENT DEBUGGING ENGINE
-// ==========================================================================
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+// REMOVE all session_start() and ini_set() calls from here.
+// Login.php handles the session. This file should only handle DB connection.
 
 date_default_timezone_set('Asia/Kolkata');
 
-$db_host = "localhost";   
-$db_user = "apartment_blue";   
-$db_pass = "tPatel13@";   
-$db_name = "apartment_blue";  
+$db_host = "localhost";
+$db_user = "apartment_blue";
+$db_pass = "tPatel13@";
+$db_name = "apartment_blue";
+
+try {
+    $pdo = new PDO("mysql:host={$db_host};dbname={$db_name};charset=utf8mb4", $db_user, $db_pass, [
+        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+    ]);
+    $pdo->exec("SET time_zone = '+05:30';");
+} catch (PDOException $e) {
+    die("Database connection failed: " . $e->getMessage());
+}
 
 try {
     /* 🔑 FIXED: Removed the stray closing brace right after utf8mb4 */
