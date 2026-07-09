@@ -27,7 +27,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_register_guest
     $per_night_charges   = floatval($_POST["per_night_charges"] ?? 0); 
     $advance_received_by = trim($_POST["advance_received_by"] ?? 'Unnamed');
     $pending_received_by = trim($_POST["pending_received_by"] ?? 'Unnamed');
-
+// Add this near your existing $pdo queries
+$all_system_users = $pdo->query("SELECT id, username FROM users ORDER BY username ASC")->fetchAll(PDO::FETCH_ASSOC);
     if ($checkout <= $checkin) {
         $message = "❌ Error: Check-out date must be after the check-in date.";
     } elseif (!empty($checkin) && !empty($checkout) && !empty($phone_number)) {
@@ -280,12 +281,12 @@ include "includes/header.php";
                     <div class="input-field-group">
                         <label>Advance Received By</label>
                         <select name="advance_received_by" required>
-                            <option value="">-- Choose Collector --</option>
-                            <?php if (!empty($db_staff)): foreach ($db_staff as $staff_name): ?>
-                                <option value="<?= htmlspecialchars($staff_name) ?>"><?= htmlspecialchars($staff_name) ?></option>
-                            <?php endforeach; else: ?>
-                                <option value="Unnamed">Unnamed</option>
-                            <?php endif; ?>
+                            <option value="">-- Select Staff/User --</option>
+    <?php foreach ($all_system_users as $u): ?>
+        <option value="<?= $u['id'] ?>">
+            <?= htmlspecialchars($u['username']) ?>
+        </option>
+    <?php endforeach; ?>
                         </select>
                     </div>
                 </div>
@@ -295,12 +296,12 @@ include "includes/header.php";
                     <div class="input-field-group">
                         <label>Pending Received By</label>
                         <select name="pending_received_by" required>
-                            <option value="">-- Choose Collector --</option>
-                            <?php if (!empty($db_staff)): foreach ($db_staff as $staff_name): ?>
-                                <option value="<?= htmlspecialchars($staff_name) ?>"><?= htmlspecialchars($staff_name) ?></option>
-                            <?php endforeach; else: ?>
-                                <option value="Unnamed">Unnamed</option>
-                            <?php endif; ?>
+                            <option value="">-- Select Staff/User --</option>
+    <?php foreach ($all_system_users as $u): ?>
+        <option value="<?= $u['id'] ?>">
+            <?= htmlspecialchars($u['username']) ?>
+        </option>
+    <?php endforeach; ?>
                         </select>
                     </div>
                 </div>
