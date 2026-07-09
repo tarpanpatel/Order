@@ -156,7 +156,21 @@ echo "DEBUG: DB Hash: " . ($user_row['password'] ?? 'NULL') . "<br>";
         </div>
     </form>
 </div>
-
+<script>
+    const field = document.getElementById('passcodeField');
+    function pressNum(num) {
+        if(num === 'C') { field.value = ''; return; }
+        if(field.value.length < 4) { field.value += num; }
+    }
+    
+    // Ensure form submits with the value
+    document.getElementById('loginForm').addEventListener('submit', function(e) {
+        if(field.value.length !== 4) {
+            e.preventDefault();
+            alert("Please enter a 4-digit passcode.");
+        }
+    });
+</script>
 <script>
     const field = document.getElementById('passcodeField');
     function pressNum(num) {
