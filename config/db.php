@@ -55,15 +55,23 @@ function logUserAction($pdo, $action_description) {
     $stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
     $stmt->execute([$user_id, $action_description]);
 }
-function check_page_access($pdo, $user_role, $current_page_url) {
-    if ($user_role === 'Super Admin') return true;
+// Add this to config/db.php
+function check_page_access($pdo) {
+    // Super Admins get a free pass to everything
+    if (isset($_SESSION['role']) && $_SESSION['role'] === 'Super Admin') {
+        return true;
+    }
+
+    $current_page = basename($_SERVER['PHP_SELF']);
+    $role = $_SESSION['role'] ?? 'Staff';
 
     $stmt = $pdo->prepare("
         SELECT 1 FROM sys_menu m
         JOIN sys_role_menu rm ON m.id = rm.menu_id
         WHERE rm.role_name = ? AND m.url = ?
     ");
-    $stmt->execute([$user_role, basename($current_page_url)]);
+    $stmt->execute([$role, $current_page]);
+    
     return (bool) $stmt->fetchColumn();
 }
 ?>
