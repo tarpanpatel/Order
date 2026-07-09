@@ -270,7 +270,7 @@ include "includes/header.php";
                     <strong style="color: #38a169;">+ ₹<?= number_format($advance_paid, 2) ?></strong>
                 </div>
               
-                  <?php 
+                 <?php 
 // Ensure we have staff list for the dropdown
 $staff_list = $pdo->query("SELECT id, username FROM users ORDER BY username ASC")->fetchAll();
 
