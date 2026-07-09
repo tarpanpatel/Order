@@ -49,12 +49,12 @@ foreach ($allowed_menus as $menu) {
     
     <button type="button" class="close-drawer-btn" onclick="toggleLeftMenu(false)" style="position:absolute; top:12px; right:15px; background:none; border:none; font-size:20px; cursor:pointer;">✕</button>
 
-    <nav style="display: flex; flex-direction: column; gap: 4px; width: 100%; padding-top: 30px;">
+    <nav style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
         
-        <div id="sidebarActionArea" style="margin-bottom: 20px;">
+        <div id="sidebarActionArea" style="">
             <?php if ($active_guest): ?>
                 <a href="billing.php" class="sidebar-action-card" style="background: #e53e3e; color: white; display:flex; justify-content:center; align-items:center;">
-                    🛑 Guest Checkout (<? //= htmlspecialchars($active_guest['guest_name']) ?>)
+                    🛑 Guest Checkout<? //= htmlspecialchars($active_guest['guest_name']) ?>
                 </a>
             <?php else: ?>
                 <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px;">
