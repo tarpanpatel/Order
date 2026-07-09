@@ -10,7 +10,9 @@ error_reporting(E_ALL);
 ini_set('display_errors', '1');
 
 require_once "config/db.php";
-
+$raw_input = file_get_contents("php://input");
+file_put_contents('debug.log', "Raw Input: " . $raw_input . "\n", FILE_APPEND);
+// Report all PHP errors
 // Check authentication
 if (!isset($_SESSION["user_id"]) && !isset($_SESSION["order_authenticated"])) {
     echo json_encode(["success" => false, "message" => "Unauthorized access"]);
