@@ -1,19 +1,21 @@
 <?php
 // /home/apartment/artistsfarmjaipur.com/Order/login.php
 
-// 🔑 SAFE SESSION INITIALIZATION PRESETS (MUST RUN BEFORE FIRST SESSION_START)
 $sessionPath = __DIR__ . '/_sessions';
-if (!is_dir($sessionPath)) { mkdir($sessionPath, 0700, true); }
+// Use explicit permission handling
+if (!is_dir($sessionPath)) { 
+    mkdir($sessionPath, 0755, true); 
+}
 ini_set('session.save_path', $sessionPath);
 ini_set('session.gc_maxlifetime', 1209600);
 ini_set('session.cookie_lifetime', 1209600);
 ini_set('session.use_only_cookies', 1);
 
-session_start();
+// Debugging Session Startup
+if (!session_start()) {
+    die("CRITICAL ERROR: Session could not be started. Check permissions on " . $sessionPath);
+}
 require_once "config/db.php";
-
-$error = "";
-
 // 1. FETCH ALL REGISTERED USERS FOR THE SECURE DROPDOWN
 try {
     $db_users = $pdo->query("SELECT id, username, role FROM users ORDER BY username ASC")->fetchAll(PDO::FETCH_ASSOC);
