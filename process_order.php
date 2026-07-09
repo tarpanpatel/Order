@@ -4,8 +4,11 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-
 require_once "config/db.php";
+
+if (file_exists(__DIR__ . "/config/telegram.php")) {
+    require_once __DIR__ . "/config/telegram.php";
+}
 
 // Check authentication
 if (!isset($_SESSION["user_id"]) && !isset($_SESSION["order_authenticated"])) {
@@ -14,9 +17,8 @@ if (!isset($_SESSION["user_id"]) && !isset($_SESSION["order_authenticated"])) {
 }
 header("Content-Type: application/json");
 $data = json_decode(file_get_contents("php://input"), true);
-$guest = $pdo->query("SELECT id FROM guests WHERE status = 'Active' LIMIT 1")->fetch();
+$guest = $pdo->query("SELECT id, guest_name FROM guests WHERE status = 'Active' LIMIT 1")->fetch();
 
-// Replace the current if(!$guest || empty($data["items"])) block with this:
 if (!$guest) {
     echo json_encode(["success" => false, "message" => "No active guest found. Please activate a ledger first."]);
     exit;
@@ -37,6 +39,23 @@ try {
     }
     $pdo->commit();
     
+    // TELEGRAM NOTIFICATION (Alerts kitchen that a new order has arrived)
+    if (function_exists('sendAdminTelegramMessage')) {
+        try {
+            $newOrderMsg = "🔔 *NEW KITCHEN TICKET* (#$order_id)\n";
+            $newOrderMsg .= "👤 Guest: " . ($guest['guest_name'] ?: 'Walk-in') . "\n";
+            $newOrderMsg .= "⏰ Time: " . date('H:i') . "\n";
+            $newOrderMsg .= "------------------------\n";
+            foreach($data["items"] as $item) {
+                $itemName = $pdo->query("SELECT name FROM menu_items WHERE id = " . intval($item['id']))->fetchColumn();
+                $newOrderMsg .= "🔸 *" . $item['qty'] . "x* " . $itemName . "\n";
+            }
+            sendAdminTelegramMessage($newOrderMsg);
+        } catch (Exception $tgE) {
+            error_log("Failed to send new order telegram msg: " . $tgE->getMessage());
+        }
+    }
+    
     // ONE-WAY DATA PUSH ENGINE OUT TO GOOGLE APP SCRIPT WEBHOOK URL
     $google_sheets_webhook_url = "https://script.google.com/macros/s/AKfycbxXnEepbFDYwOYO2hVcqyguihNEdl0YuoMPjCzi7Qx6x0kcgVOoYdFjZYzVmtikdTsi6A/exec";
     
@@ -50,7 +69,7 @@ try {
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload_data));
     curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 4); // Quick timeout drops connection immediately after dispatching
+    curl_setopt($ch, CURLOPT_TIMEOUT, 4); 
     curl_exec($ch);
     curl_close($ch);
 
