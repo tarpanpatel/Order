@@ -147,6 +147,7 @@ include "includes/header.php";
         max-width: calc(100% - 280px) !important;
         box-sizing: border-box !important;
         padding: 20px !important;
+                margin-left: 285px;
     }
 
     .split-requisition-layout { 
