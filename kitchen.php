@@ -30,7 +30,8 @@ if (isset($_POST["complete_order_id"])) {
             $itemsListBlock .= "🔹 *x" . $item['quantity'] . "* " . $item['name'] . $instructionBadge . "\n";
         }
 
-       $readyMsg = "✅ *ORDER PREPARED & READY TO SERVE*\n";
+        // 2. Build the Telegram text ticket string payload
+        $readyMsg = "✅ *ORDER PREPARED & READY TO SERVE*\n";
         $readyMsg .= "--------------------------------------\n";
         $readyMsg .= "👤 *Guest Name:* " . $guest_name . "\n";
         $readyMsg .= "🆔 *Order Ticket:* #" . $order_id . "\n";
@@ -40,15 +41,11 @@ if (isset($_POST["complete_order_id"])) {
         $readyMsg .= "\n--------------------------------------\n";
         $readyMsg .= "🏃‍♂️ _Staff, please collect the order from the kitchen immediately._";
 
-        // 🔑 SAFETY FIX: Only call the function if it actually exists
-        if (function_exists('sendTelegramNotification')) {
-            sendTelegramNotification($readyMsg);
-        } else {
-            error_log("Kitchen Warning: sendTelegramNotification function not found.");
-        }
+        // Dispatch out through your internal whitelisted local gateway proxy route
+        sendTelegramNotification($readyMsg);
 
     } catch (Exception $tgEx) {
-        // Safe catch block prevents connection errors
+        // Safe catch block prevents connection errors from crashing database updates
     }
 
     // 3. Finalize core application database status values update cleanly
