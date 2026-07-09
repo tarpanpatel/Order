@@ -54,7 +54,7 @@ foreach ($allowed_menus as $menu) {
         <div id="sidebarActionArea" style="margin-bottom: 20px;">
             <?php if ($active_guest): ?>
                 <a href="billing.php" class="sidebar-action-card" style="background: #e53e3e; color: white; display:flex; justify-content:center; align-items:center;">
-                    🛑 Guest Checkout (<?= htmlspecialchars($active_guest['guest_name']) ?>)
+                    🛑 Guest Checkout (<? //= htmlspecialchars($active_guest['guest_name']) ?>)
                 </a>
             <?php else: ?>
                 <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px;">
