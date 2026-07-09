@@ -269,7 +269,7 @@ include "includes/header.php";
                     <span>Advance Payment Received (Accommodation Credit):</span>
                     <strong style="color: #38a169;">+ ₹<?= number_format($advance_paid, 2) ?></strong>
                 </div>
-                <div class="alert-highlight-pending">
+              
                     <span>⚠️ Remaining Accommodation Pending Payment:</span>
                     <span>₹<?= number_format($accommodation_pending, 2) ?></span><?php 
 // Ensure we have staff list for the dropdown
@@ -306,7 +306,7 @@ if ($guest && $guest['pending_amount'] > 0): ?>
         </form>
     </div>
 <?php endif; ?>
-                </div>
+              
             </div>
 
             <div class="billing-card">
