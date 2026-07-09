@@ -6,10 +6,10 @@ $sessionPath = __DIR__ . '/_sessions';
 if (!is_dir($sessionPath)) { 
     mkdir($sessionPath, 0755, true); 
 }
-// ini_set('session.save_path', $sessionPath);
-// ini_set('session.gc_maxlifetime', 1209600);
-// ini_set('session.cookie_lifetime', 1209600);
-// ini_set('session.use_only_cookies', 1);
+ini_set('session.save_path', $sessionPath);
+ini_set('session.gc_maxlifetime', 1209600);
+ini_set('session.cookie_lifetime', 1209600);
+ini_set('session.use_only_cookies', 1);
 
 // Debugging Session Startup
 if (!session_start()) {
