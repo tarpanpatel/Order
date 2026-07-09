@@ -238,14 +238,14 @@ include "includes/header.php";
 </div>
 
 <div id="editReqModalPopup" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
-    <div class="modal-content" style="background: white; max-width: 580px; width: 92%; border-radius: 12px; padding: 20px; position: relative; color: #111827; text-align: left;">
+    <div class="modal-content" style="background: white; max-width: 620px; width: 92%; border-radius: 12px; padding: 20px; position: relative; color: #111827; text-align: left;">
         <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="window.closeEditReqModal()">✕</span>
         <h3 style="font-size: 13px; font-weight: 700; text-transform: uppercase; margin-bottom: 12px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px;">Modify Stock Order</h3>
         
         <form method="POST" action="requisitions.php" style="margin: 0;">
             <input type="hidden" name="action_update_requisition" value="1">
             <input type="hidden" name="update_req_id" id="mdlUpdateId">
-            <div id="mdlItemsContainer" style="max-height: 290px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px; margin-bottom: 20px; background: #fafafa;"></div>
+            <div id="mdlItemsContainer" style="max-height: 340px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin-bottom: 20px; background: #fafafa;"></div>
             <div style="display: flex; gap: 10px; justify-content: flex-end; align-items: center;">
                 <button type="button" class="btn btn-log" style="padding: 10px 18px;" onclick="window.closeEditReqModal()">Cancel</button>
                 <button type="submit" class="btn btn-start" style="padding: 10px 24px; font-weight: 800;">Save</button>
@@ -439,16 +439,14 @@ window.openEditRequisitionModal = function(reqId, element) {
             const pUnit = i.pack_unit || 'Pcs';
             
             let rowStateClass = '';
-            let fDisabled = '';
-            let rDisabled = '';
            
-            if (initialStatus === 'Fulfilled') { rowStateClass = 'row-state-green-highlight'; fDisabled = 'disabled'; }
-            if (initialStatus === 'Cancelled') { rowStateClass = 'row-state-greyed-out'; rDisabled = 'disabled'; }
+            if (initialStatus === 'Fulfilled') { rowStateClass = 'row-state-green-highlight'; }
+            if (initialStatus === 'Cancelled') { rowStateClass = 'row-state-greyed-out'; }
 
             const computationFactor = (unitType === 'Weight') ? 0.25 : 1;
 
             return `
-                <div id="itemVerificationRow_${i.catalog_id}" class="verification-item-row-wrapper ${rowStateClass}" style="display:flex; justify-content:space-between; align-items:center; padding:12px 10px; border-bottom:1px solid #e2e8f0; background:#ffffff; margin-bottom:6px; border-radius:8px; gap:12px; width:100%; box-sizing:border-box;">
+                <div id="itemVerificationRow_${i.catalog_id}" class="verification-item-row-wrapper ${rowStateClass}">
                     <div style="flex:1; min-width:0; text-align:left;">
                         <span class="item-text-title" style="font-size:13px; font-weight:700; color:#1e293b; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${i.name}</span>
                         <span style="font-size:11px; color:#475569; font-weight:bold; display:block; margin-bottom:2px;">Packing Spec: ${pSize} ${pUnit} | Target: ${currentLabel}</span>
@@ -463,10 +461,10 @@ window.openEditRequisitionModal = function(reqId, element) {
                         </div>
                     </div>
 
-                    <div class="binary-toggle-container" style="background:transparent; border:none; padding:0;">
+                    <div class="binary-toggle-container">
                         <input type="hidden" id="mdlStatusHidden_${i.catalog_id}" name="req_item_status[${i.catalog_id}]" value="${initialStatus}">
-                        <button type="button" id="toggleBtn_F_${i.catalog_id}" ${fDisabled} class="toggle-choice-btn btn-block-fulfilled" onclick="window.triggerMemoryStateUpdate(${i.catalog_id}, 'Fulfilled')">Fulfilled</button>
-                        <button type="button" id="toggleBtn_C_${i.catalog_id}" ${rDisabled} class="toggle-choice-btn btn-block-remove" onclick="window.triggerMemoryStateUpdate(${i.catalog_id}, 'Cancelled')">Remove</button>
+                        <button type="button" id="toggleBtn_F_${i.catalog_id}" class="toggle-choice-btn btn-block-fulfilled" onclick="window.triggerMemoryStateUpdate(${i.catalog_id}, 'Fulfilled')">Fulfilled</button>
+                        <button type="button" id="toggleBtn_C_${i.catalog_id}" class="toggle-choice-btn btn-block-remove" onclick="window.triggerMemoryStateUpdate(${i.catalog_id}, 'Cancelled')">Remove</button>
                     </div>
                 </div>
             `;
@@ -505,21 +503,16 @@ window.handleQuantityInputChangeDirect = function(catalogId) {
 window.reactivateActionRowButtons = function(catalogId, activeValue) {
     const hiddenStatus = document.getElementById(`mdlStatusHidden_${catalogId}`);
     const rowWrapper   = document.getElementById(`itemVerificationRow_${catalogId}`);
-    const btnFulfilled = document.getElementById("toggleBtn_F_" + catalogId);
-    const btnCancelled = document.getElementById("toggleBtn_C_" + catalogId);
 
-    if (!hiddenStatus || !rowWrapper || !btnFulfilled || !btnCancelled) return;
+    if (!hiddenStatus || !rowWrapper) return;
 
     rowWrapper.classList.remove('row-state-greyed-out', 'row-state-green-highlight');
-    btnFulfilled.removeAttribute('disabled');
-    btnCancelled.removeAttribute('disabled');
-
     hiddenStatus.value = (activeValue > 0) ? 'Pending' : 'Cancelled';
+    
     if (activeValue === 0) {
         rowWrapper.classList.add('row-state-greyed-out');
-        btnCancelled.setAttribute('disabled', 'disabled');
-        window.syncRowAuditText(catalogId);
     }
+    window.syncRowAuditText(catalogId);
 };
 
 window.syncRowAuditText = function(catalogId) {
@@ -541,27 +534,22 @@ window.triggerMemoryStateUpdate = function(catalogId, targetedState) {
     const hiddenStatus = document.getElementById(`mdlStatusHidden_${catalogId}`);
     const rowWrapper   = document.getElementById(`itemVerificationRow_${catalogId}`);
     const qtyInput     = document.getElementById(`mdlQtyInput_${catalogId}`);
-    const btnFulfilled = document.getElementById("toggleBtn_F_" + catalogId);
-    const btnCancelled = document.getElementById("toggleBtn_C_" + catalogId);
 
-    if (!hiddenStatus || !rowWrapper || !qtyInput || !btnFulfilled || !btnCancelled) return;
-
-    rowWrapper.classList.remove('row-state-greyed-out', 'row-state-green-highlight');
-    btnFulfilled.removeAttribute('disabled');
-    btnCancelled.removeAttribute('disabled');
+    if (!hiddenStatus || !rowWrapper || !qtyInput) return;
 
     if (hiddenStatus.value === targetedState) {
         hiddenStatus.value = 'Pending';
+        rowWrapper.classList.remove('row-state-greyed-out', 'row-state-green-highlight');
     } else {
         hiddenStatus.value = targetedState;
+        rowWrapper.classList.remove('row-state-greyed-out', 'row-state-green-highlight');
+        
         if (targetedState === 'Cancelled') {
             qtyInput.value = 0;
             rowWrapper.classList.add('row-state-greyed-out');
-            btnCancelled.setAttribute('disabled', 'disabled');
             window.syncRowAuditText(catalogId);
         } else if (targetedState === 'Fulfilled') {
             rowWrapper.classList.add('row-state-green-highlight');
-            btnFulfilled.setAttribute('disabled', 'disabled');
         }
     }
 };
