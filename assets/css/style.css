@@ -60,7 +60,6 @@ body {
         box-sizing: border-box !important;
     }
 
-    /* 🔑 THE DESKTOP FIX: Keeps panel aligned to the right of your sidebar without window spill */
     .main-content {
         flex: 1 !important;
         margin-left: 285px !important;
@@ -217,13 +216,7 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
 .p-btn-confirm { background: var(--primary); color: white; }
 .p-btn-cancel { background: #edf2f7; color: var(--text-muted); }
 
-/* ==========================================================================
-   🎨 🌟 REQUISITIONS LOG STATUS AND ACTION BADGE DECORATORS
-   ========================================================================== */
-.past-table td {
-    padding: 10px 6px !important;
-}
-
+/* Base button properties for Action Triggers */
 .btn-action-trigger {
     display: block !important;
     width: 100% !important;
@@ -350,8 +343,6 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     outline: none !important;
     -moz-appearance: textfield !important;
 }
-.modal-input-qty::-webkit-outer-spin-button,
-.modal-input-qty::-webkit-inner-spin-button { -webkit-appearance: none !important; margin: 0 !important; }
 
 .binary-toggle-container {
     display: flex !important;
@@ -381,34 +372,25 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     border-color: #a7f3d0 !important;
     background: #f0fdf4 !important;
 }
-.toggle-choice-btn.btn-block-fulfilled:hover {
-    background: #10b981 !important;
-    color: #ffffff !important;
-    border-color: #10b981 !important;
-}
+.toggle-choice-btn.btn-block-fulfilled:hover { background: #10b981 !important; color: #ffffff !important; }
 
 .toggle-choice-btn.btn-block-remove {
     color: #ef4444 !important;
     border-color: #fca5a5 !important;
     background: #fdf2f2 !important;
 }
-.toggle-choice-btn.btn-block-remove:hover {
-    background: #ef4444 !important;
-    color: #ffffff !important;
-    border-color: #ef4444 !important;
-}
+.toggle-choice-btn.btn-block-remove:hover { background: #ef4444 !important; color: #ffffff !important; }
 
+/* Active State Memory Styles */
 .row-state-green-highlight #toggleBtn_F_ {
     background: #10b981 !important;
     color: #ffffff !important;
     border-color: #10b981 !important;
-    box-shadow: 0 2px 4px rgba(16,185,129,0.2) !important;
 }
 .row-state-greyed-out #toggleBtn_C_ {
     background: #ef4444 !important;
     color: #ffffff !important;
     border-color: #ef4444 !important;
-    box-shadow: 0 2px 4px rgba(239,68,68,0.2) !important;
 }
 
 .row-state-green-highlight { background: #f0fdf4 !important; border-left: 4px solid #10b981 !important; }
@@ -470,13 +452,50 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     
     .sidebar-summary-title { margin-bottom: 4px !important; padding-bottom: 2px !important; font-size: 11px !important; }
     .sidebar-summary-title::after { font-size: 10px !important; content: " ▲ Expand Drawer" !important; }
-    .sidebar-cart-list { max-height: 0px !important; }
-    .requisition-right-sidebar.drawer-open-state .sidebar-cart-list { max-height: 180px !important; margin-bottom: 8px !important; }
+    
+    /* 🔑 FIXED: Restores explicit overflow boundaries in the collapsed state view */
+    .sidebar-cart-list { 
+        max-height: 50px !important; 
+        overflow-y: auto !important; 
+        margin-bottom: 10px !important;
+        display: block !important;
+        width: 100% !important;
+    }
+    
+    /* 🔑 FIXED: Opens height bounds layout cleanly when drawer toggle matches open states */
+    .requisition-right-sidebar.drawer-open-state .sidebar-cart-list { 
+        max-height: 180px !important; 
+        overflow-y: auto !important;
+        margin-bottom: 8px !important; 
+    }
     
     .btn-quick-search-box { padding: 8px 12px 8px 32px !important; font-size: 12px !important; }
     .catalog-tab-header { margin-bottom: 10px !important; padding-bottom: 6px !important; margin-left: 2px !important; }
     .catalog-tab-btn { padding: 4px 8px !important; font-size: 11px !important; }
     .btn-bill { padding: 10px !important; font-size: 12px !important; }
+
+    /* 🔑 FIXED: Enforces clear responsive bounds layout to hold the row text baseline cleanly */
+    .sidebar-total-row-wrapper {
+        display: block !important;
+        width: 100% !important;
+        margin-bottom: 12px !important;
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+        clear: both !important;
+    }
+    .total-types-label { 
+        font-size: 14px !important; 
+        font-weight: 700 !important; 
+        color: #111827 !important; 
+        float: left !important;
+    }
+    .total-types-value { 
+        font-size: 14px !important; 
+        font-weight: 800 !important; 
+        color: #111827 !important; 
+        float: right !important;
+    }
 }
 
 @media (max-width: 600px) {
