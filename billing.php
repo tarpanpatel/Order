@@ -311,12 +311,42 @@ include "includes/header.php";
               
                  <?php 
 // Ensure we have staff list for the dropdown
-$staff_list = $pdo->query("SELECT id, username FROM users ORDER BY username ASC")->fetchAll();
+// Add this with your other data queries
+$staff_list = $pdo->query("SELECT id, username FROM users ORDER BY username ASC")->fetchAll(PDO::FETCH_ASSOC);
 
 if ($guest && $guest['pending_amount'] > 0): ?>
     <div style="background: #fff7ed; border: 1px solid #f97316; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
         <h3 style="margin-top:0; color:#9a3412;">⚠️ Pending Accommodation: ₹<?= number_format($guest['pending_amount'], 2) ?></h3>
-        
+        <?php if ($guest && $guest['pending_amount'] > 0): ?>
+    <div style="background: #fff7ed; border: 1px solid #f97316; padding: 20px; border-radius: 12px; margin-top: 15px;">
+        <h4 style="margin-top:0; color:#9a3412;">Collect Pending Payment</h4>
+        <form method="POST" action="billing.php" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; align-items: flex-end;">
+            <input type="hidden" name="action_collect_pending" value="1">
+            <input type="hidden" name="guest_id" value="<?= $guest['id'] ?>">
+            <input type="hidden" name="amount" value="<?= $guest['pending_amount'] ?>">
+            
+            <div>
+                <label style="font-size: 11px; font-weight:700; display:block; margin-bottom:4px;">Collected By</label>
+                <select name="collector_id" required style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0;">
+                    <option value="">-- Staff --</option>
+                    <?php foreach ($staff_list as $s): ?>
+                        <option value="<?= $s['id'] ?>"><?= htmlspecialchars($s['username']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            
+            <div>
+                <label style="font-size: 11px; font-weight:700; display:block; margin-bottom:4px;">Payment Mode</label>
+                <select name="payment_mode" required style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0;">
+                    <option value="Cash">Cash</option>
+                    <option value="UPI">UPI</option>
+                </select>
+            </div>
+            
+            <button type="submit" style="padding:8px; background:#f97316; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Mark Received</button>
+        </form>
+    </div>
+<?php endif; ?>
         <form method="POST" action="billing.php" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;">
             <input type="hidden" name="action_collect_pending" value="1">
             <input type="hidden" name="guest_id" value="<?= $guest['id'] ?>">
