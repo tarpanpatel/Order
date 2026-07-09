@@ -237,6 +237,7 @@ include "includes/header.php";
     </div>
 </div>
 
+<!-- Edit Requisition Modal -->
 <div id="editReqModalPopup" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
     <div class="modal-content" style="background: white; max-width: 620px; width: 92%; border-radius: 12px; padding: 20px; position: relative; color: #111827; text-align: left;">
         <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="window.closeEditReqModal()">✕</span>
@@ -254,6 +255,7 @@ include "includes/header.php";
     </div>
 </div>
 
+<!-- Chef New Product Modal -->
 <div id="chefNewProductModal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
     <div class="modal-content" style="background: white; max-width: 440px; width: 90%; border-radius: 12px; padding: 25px; color: #111827; text-align: left;">
         <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="window.closeChefNewProductModal()">✕</span>
@@ -375,6 +377,7 @@ window.updateSidebarQty = function(id, delta) {
     window.renderSidebarCart();
 };
 
+// 🔑 FIXED: Transformed into a clean horizontal grid list generator to replicate original image format
 window.renderSidebarCart = function() {
     const container = document.getElementById("sidebarCartRowsContainer");
     const totalCountEl = document.getElementById("sidebarTotalCount");
@@ -384,14 +387,17 @@ window.renderSidebarCart = function() {
         container.innerHTML = '<p style="color: #a0aec0; text-align: center; font-size: 12px; margin-top: 30px; font-style: italic;">No items added to this request list yet.</p>';
         totalCountEl.innerText = "0"; return;
     }
+    
     totalCountEl.innerText = window.reqCart.length;
+    
+    // Generates a compact fluid row layout wrapping title descriptors and counter toggles side-by-side
     container.innerHTML = window.reqCart.map(item => `
-        <div class="sidebar-cart-row">
-            <div style="font-weight: 600; color: #111827; max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${item.name}</div>
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <button type="button" class="qty-btn-sm" onclick="window.updateSidebarQty(${item.id}, -1)">-</button>
-                <span style="font-weight: 700; font-size: 13px; width: 25px; text-align: center;">${item.qty}</span>
-                <button type="button" class="qty-btn-sm" onclick="window.updateSidebarQty(${item.id}, 1)">+</button>
+        <div class="sidebar-cart-row" style="display: flex !important; justify-content: space-between !important; align-items: center !important; font-size: 13px !important; padding: 6px 0 !important; border-bottom: 1px solid #edf2f7 !important; gap: 10px !important; width: 100% !important; box-sizing: border-box !important;">
+            <div class="sidebar-cart-item-name" style="font-weight: 700 !important; color: #111827 !important; flex: 1 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; text-align: left !important;">${item.name}</div>
+            <div class="sidebar-cart-qty-controls" style="display: flex !important; align-items: center !important; border: 1px solid #cbd5e0 !important; border-radius: 6px !important; overflow: hidden !important; background: #ffffff !important; height: 28px !important; flex-shrink: 0 !important;">
+                <button type="button" class="qty-btn-sm" style="width: 26px !important; height: 100% !important; background: #f8fafc !important; border: none !important; font-weight: bold !important; cursor: pointer !important; padding: 0 !important; display: flex !important; align-items: center !important; justify-content: center !important;" onclick="window.updateSidebarQty(${item.id}, -1)">-</button>
+                <span style="font-weight: 800 !important; font-size: 12px !important; width: 30px !important; text-align: center !important; display: inline-block !important; color: #1e293b !important;">${item.qty}</span>
+                <button type="button" class="qty-btn-sm" style="width: 26px !important; height: 100% !important; background: #f8fafc !important; border: none !important; font-weight: bold !important; cursor: pointer !important; padding: 0 !important; display: flex !important; align-items: center !important; justify-content: center !important;" onclick="window.updateSidebarQty(${item.id}, 1)">+</button>
             </div>
         </div>
     `).join('');
