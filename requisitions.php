@@ -120,23 +120,39 @@ include "includes/header.php";
 
 <style>
 /* ==========================================================================
-   🖥️ DESKTOP-SPECIFIC WORKSPACE LAYOUT (>= 1024px VIEWPORTS)
+   🖥️ DESKTOP MONITOR WINDOW CONFIGURATIONS (>= 1024px VIEWPORTS)
    ========================================================================== */
 @media (min-width: 1024px) {
-    /* Shifts everything out from underneath the fixed menu sidebar area */
+    /* 🔑 THE ABSOLUTE ALTERNATIVE CORRECTION: Forces the core document template columns container 
+       to respect a fluid width calculation that adjusts automatically for your 280px navigation drawer menu */
+    .app-container {
+        display: flex !important;
+        flex-direction: row !important;
+        width: 100% !important;
+        max-width: 100vw !important;
+    }
+
+    /* Resets the inline navigation sidebar card container parameters safely */
+    .sidebar {
+        width: 280px !important;
+        min-width: 280px !important;
+        flex: 0 0 280px !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Main body workspace area calculation fits the remaining horizontal monitor pixels */
     .main-content {
-        margin-left: 280px !important;
+        flex: 1 !important;
         width: calc(100% - 280px) !important;
         max-width: calc(100% - 280px) !important;
         box-sizing: border-box !important;
         padding: 20px !important;
     }
 
-    /* FIXED: Prevent shifting downward by removing wrap flex instructions, locking layout till window view */
     .split-requisition-layout { 
         display: flex !important;
         flex-direction: row !important;
-        flex-wrap: nowrap !important; 
+        flex-wrap: nowrap !important;
         gap: 20px !important; 
         width: 100% !important; 
         max-width: 100% !important;
@@ -144,11 +160,9 @@ include "includes/header.php";
         align-items: start !important;
     }
     
-    /* FIXED: Added flex-shrink and flex-basis bounds to safely lock space footprint calculations */
     .materials-main-panel { 
         flex: 1 1 auto !important;
-        min-width: 0 !important; 
-        max-width: 100% !important;
+        min-width: 0 !important;
         display: flex !important;
         flex-direction: column !important;
         gap: 24px !important;
@@ -157,11 +171,11 @@ include "includes/header.php";
     
     .catalog-cards-box { background: #ffffff !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; padding: 20px !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important; width: 100% !important; box-sizing: border-box !important; }
     
-    /* Fixed horizontal sizing locks sidebar to the view layer right edge */
+    /* Locks the right panel so it fills the screen perfectly */
     .right-column-stack { 
         width: 340px !important;
         min-width: 340px !important;
-        flex: 0 0 340px !important; 
+        flex: 0 0 340px !important;
         display: flex !important;
         flex-direction: column !important;
         gap: 20px !important;
@@ -185,7 +199,7 @@ include "includes/header.php";
     .past-log-section { background: #ffffff !important; border: 1px solid #cbd5e0 !important; border-radius: 12px !important; padding: 14px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important; text-align: left; width: 100%; box-sizing: border-box; }
 }
 
-/* --- SYSTEM CONSTANTS DESIGN PARAMETERS --- */
+/* --- COMMON GLOBAL UTILITY CSS PARAMETERS --- */
 .catalog-tab-header { display: flex; gap: 6px; flex-wrap: nowrap; margin-bottom: 15px; border-bottom: 1px solid #edf2f7; padding-bottom: 10px; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
 .catalog-tab-header::-webkit-scrollbar { display: none; }
 .catalog-tab-btn { padding: 6px 12px; font-size: 12px; font-weight: 600; background: #f7fafc; border: 1px solid #cbd5e0; border-radius: 6px; cursor: pointer; color: #475569; transition: all 0.15s ease; }
@@ -203,10 +217,9 @@ include "includes/header.php";
 .modal-input-qty { width: 55px; padding: 6px 4px; border: 1px solid #cbd5e0; text-align: center; font-size: 13px; font-weight: 700; color: #1e293b; background: #fff !important; }
 .modal-qty-container { display: flex; align-items: center; border-radius: 6px; overflow: hidden; border: 1px solid #cbd5e0; background: #fff; }
 .modal-qty-btn { width: 28px; height: 31px; background: #f8fafc; border: none; color: #475569; font-weight: bold; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-.global-toast-notification { padding: 12px 24px; background: #10b981; color: white; font-size: 14px; font-weight: 800; text-align: center; border-radius: 8px; box-shadow: 0 4px 12px rgba(16,185,129,0.2); margin-bottom: 15px; border: 1px solid #059669; }
 
 /* ==========================================================================
-   ⚡ PHONE VIEWPORTS ONLY: COMPACT FORMAT OVERRIDES (< 1024px VIEWPORTS)
+   ⚡ MOBILE SMARTPHONE OVERRIDES ENGINE (< 1024px FRAME BOUNDARIES)
    ========================================================================== */
 @media (max-width: 1023px) {
     .main-content { margin-left: 0 !important; width: 100% !important; max-width: 100% !important; padding: 4px !important; }
