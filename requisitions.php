@@ -120,24 +120,39 @@ include "includes/header.php";
 
 <style>
 /* ==========================================================================
-   🖥️ ORIGINAL DESKTOP STYLING WORKSPACE (RUNS ON LARGE SCREENS)
+   🖥️ DESKTOP-SPECIFIC BASELINE MEDIA QUERY (>= 1024px)
    ========================================================================== */
-.split-requisition-layout { display: grid !important; grid-template-columns: 1fr 380px !important; gap: 20px !important; width: 100% !important; align-items: start !important; margin-top: 15px; box-sizing: border-box; }
-.materials-main-panel { display: flex; flex-direction: column; gap: 24px; width: 100%; box-sizing: border-box; }
-.catalog-cards-box { background: #ffffff !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; padding: 20px !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important; width: 100%; box-sizing: border-box; }
-.right-column-stack { display: flex; flex-direction: column; gap: 20px; position: sticky !important; top: 20px !important; }
-.requisition-right-sidebar { background: #ffffff !important; border: 1px solid #cbd5e0 !important; border-radius: 12px !important; padding: 20px !important; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05) !important; display: flex; flex-direction: column; text-align: left; }
+@media (min-width: 1024px) {
+    /* FIXED: Changed columns layout width definitions to scale down fluidly inside narrow window viewports */
+    .split-requisition-layout { 
+        display: grid !important; 
+        grid-template-columns: 1fr minmax(300px, 340px) !important; 
+        gap: 15px !important; 
+        width: 100% !important; 
+        max-width: 100% !important;
+        align-items: start !important; 
+        margin-top: 15px; 
+        box-sizing: border-box; 
+    }
+    .materials-main-panel { display: flex; flex-direction: column; gap: 20px; width: 100%; box-sizing: border-box; }
+    .catalog-cards-box { background: #ffffff !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; padding: 15px !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important; width: 100%; box-sizing: border-box; }
+    .right-column-stack { display: flex; flex-direction: column; gap: 20px; position: sticky !important; top: 20px !important; width: 100%; }
+    .requisition-right-sidebar { background: #ffffff !important; border: 1px solid #cbd5e0 !important; border-radius: 12px !important; padding: 15px !important; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05) !important; display: flex; flex-direction: column; text-align: left; width: 100%; box-sizing: border-box; }
+    
+    .material-item-grid { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)) !important; gap: 10px !important; width: 100%; }
+    .material-item-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; background: #fff; text-align: center; display: flex; flex-direction: column; justify-content: space-between; align-items: center; min-height: 165px; box-sizing: border-box; width: 100%; }
+    .material-item-image-box { width: 100%; height: 50px; overflow: hidden; border-radius: 6px; border: 1px solid #edf2f7; background: #f8fafc; margin-bottom: 6px; }
+    .material-item-image-box img { width: 100%; height: 100%; object-fit: cover; }
+    .material-item-name { font-size: 11px; font-weight: 600; color: #111827; margin-bottom: 6px; line-height: 1.3; text-align: center; width: 100%; word-break: break-word; }
+    .material-item-name div { display: block; font-size: 10px; color: #64748b; font-weight: bold; margin-top: 2px; }
+    .btn-tab-styled-add { display: inline-block !important; padding: 4px 10px !important; font-size: 11px !important; font-weight: 600 !important; background: #ffffff !important; color: #475569 !important; border: 1px solid #cbd5e0 !important; border-radius: 6px !important; cursor: pointer !important; transition: all 0.15s ease !important; width: 100% !important; margin: 0 auto !important; box-sizing: border-box; }
+    
+    .sidebar-summary-title { font-size: 13px; font-weight: 700; text-transform: uppercase; color: #111827; border-bottom: 1px dashed #e2e8f0; padding-bottom: 6px; margin-bottom: 12px; margin-top: 0; }
+    .sidebar-cart-list { max-height: 220px; overflow-y: auto; margin-bottom: 12px; }
+    .past-log-section { background: #ffffff !important; border: 1px solid #cbd5e0 !important; border-radius: 12px !important; padding: 12px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important; text-align: left; width: 100%; box-sizing: border-box; }
+}
 
-/* Desktop Multi-column Grid Cards Layout Configuration */
-.material-item-grid { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)) !important; gap: 12px !important; width: 100%; }
-.material-item-card { display: flex !important; flex-direction: column !important; justify-content: space-between !important; align-items: center !important; border: 1px solid #e2e8f0 !important; border-radius: 8px !important; padding: 10px !important; background: #fff !important; min-height: 175px !important; box-sizing: border-box !important; width: 100% !important; }
-.material-item-image-box { display: block !important; width: 100% !important; height: 50px !important; overflow: hidden !important; border-radius: 6px !important; border: 1px solid #edf2f7 !important; background: #f8fafc !important; margin-bottom: 8px !important; }
-.material-item-image-box img { width: 100% !important; height: 100% !important; object-fit: cover !important; }
-.material-item-name { font-size: 12px !important; font-weight: 600 !important; color: #111827 !important; margin-bottom: 8px !important; line-height: 1.3 !important; text-align: center !important; width: 100% !important; word-break: break-word !important; }
-.material-item-name div { display: block !important; font-size: 10px !important; color: #64748b !important; font-weight: bold !important; margin-top: 2px !important; }
-.btn-tab-styled-add { display: inline-block !important; padding: 5px 14px !important; font-size: 12px !important; font-weight: 600 !important; background: #ffffff !important; color: #475569 !important; border: 1px solid #cbd5e0 !important; border-radius: 6px !important; cursor: pointer !important; transition: all 0.15s ease !important; width: 100% !important; margin: 0 auto !important; box-sizing: border-box; }
-
-/* --- SHARED STUCTURAL DESIGN ELEMENTS --- */
+/* --- GLOBAL COMPONENT CONSTANTS --- */
 .catalog-tab-header { display: flex; gap: 6px; flex-wrap: nowrap; margin-bottom: 15px; border-bottom: 1px solid #edf2f7; padding-bottom: 10px; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
 .catalog-tab-header::-webkit-scrollbar { display: none; }
 .catalog-tab-btn { padding: 6px 12px; font-size: 12px; font-weight: 600; background: #f7fafc; border: 1px solid #cbd5e0; border-radius: 6px; cursor: pointer; color: #475569; transition: all 0.15s ease; }
@@ -146,11 +161,8 @@ include "includes/header.php";
 .btn-quick-search-box { width: 100%; padding: 10px 14px 10px 35px; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 13px; font-weight: 600; color: #1e293b; background: #fff; outline: none; box-sizing: border-box; }
 .search-input-wrapper { position: relative; margin-bottom: 15px; width: 100%; }
 .search-icon-inside { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 14px; pointer-events: none; }
-.sidebar-summary-title { font-size: 14px; font-weight: 700; text-transform: uppercase; color: #111827; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; margin-bottom: 15px; margin-top: 0; }
-.sidebar-cart-list { max-height: 240px; overflow-y: auto; margin-bottom: 15px; }
 .sidebar-cart-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; padding: 8px 0; border-bottom: 1px solid #f7fafc; }
 .qty-btn-sm { padding: 2px 8px; font-size: 12px; font-weight: bold; border: 1px solid #cbd5e0; background: #f7fafc; border-radius: 4px; cursor: pointer; }
-.past-log-section { background: #ffffff !important; border: 1px solid #cbd5e0 !important; border-radius: 12px !important; padding: 14px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important; text-align: left; width: 100%; box-sizing: border-box; }
 .past-table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
 .past-table th { background: #f8fafc; padding: 6px 4px; font-weight: 700; color: #4b5563; border-bottom: 2px solid #e2e8f0; text-align: left; }
 .past-table td { padding: 8px 4px; border-bottom: 1px solid #edf2f7; color: #111827; vertical-align: middle; }
@@ -160,12 +172,10 @@ include "includes/header.php";
 .modal-qty-btn { width: 28px; height: 31px; background: #f8fafc; border: none; color: #475569; font-weight: bold; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 
 /* ==========================================================================
-   ⚡ PHONE VIEWPORTS ONLY: STRICTOR ISOLATION ON MOBILE SCREEN DIMENSIONS
+   ⚡ PHONE VIEWPORTS ONLY: STRICTOR MEDIA QUERY PACKS (< 1024px)
    ========================================================================== */
 @media (max-width: 1023px) {
     .app-body { padding: 8px !important; width: 100% !important; box-sizing: border-box !important; }
-    
-    /* 🔑 Force grids to strip wide multi-columns layouts strictly inside mobile frame rules */
     .split-requisition-layout { display: block !important; width: 100% !important; padding-bottom: 140px !important; margin-top: 5px !important; box-sizing: border-box !important; }
     .materials-main-panel { display: block !important; width: 100% !important; box-sizing: border-box !important; }
     .catalog-cards-box { background: #ffffff !important; border: 1px solid #e2e8f0 !important; padding: 10px !important; border-radius: 8px !important; width: 100% !important; box-sizing: border-box !important; }
@@ -174,7 +184,6 @@ include "includes/header.php";
     .category-section h2 { font-size: 13px !important; font-weight: 700 !important; color: #374151 !important; }
     .category-block h4 { font-size: 11px !important; margin-bottom: 4px !important; padding-left: 4px; }
 
-    /* Forces nested grid loops into sleek rows format */
     .material-item-grid { display: flex !important; flex-direction: column !important; gap: 5px !important; width: 100% !important; box-sizing: border-box !important; }
     .material-item-card { border: 1px solid #e5e7eb !important; border-radius: 6px !important; padding: 4px 10px !important; background: #fff !important; min-height: auto !important; height: 44px !important; display: flex !important; flex-direction: row !important; justify-content: space-between !important; align-items: center !important; width: 100% !important; box-sizing: border-box !important; }
     .material-item-image-box { display: none !important; }
@@ -245,7 +254,7 @@ include "includes/header.php";
                                             <img src="<?= !empty($item['image_path']) ? $item['image_path'] : 'https://placehold.co/150x100?text=No+Image'; ?>" alt="" onerror="this.src='https://placehold.co/150x100?text=No+Image';">
                                         </div>
                                         <div class="material-item-name">
-                                            <strong><?= htmlspecialchars($item['name']) ?></strong>
+                                            strong><?= htmlspecialchars($item['name']) ?></strong>
                                             <div>(Size: <?= floatval($item['pack_size']) ?> <?= $item['pack_unit'] ?>)</div>
                                         </div>
                                         <button type="button" class="btn-tab-styled-add" onclick="window.addMaterialToSidebar(<?= $item['id'] ?>, '<?= htmlspecialchars(addslashes($item['name'])) ?>')">+ Add</button>
@@ -262,7 +271,7 @@ include "includes/header.php";
             <div class="requisition-right-sidebar" id="mobileSummaryStickyWrapper" onclick="window.handleMobileDrawerCollapseToggle(event)">
                 <h3 class="sidebar-summary-title">📝 Requisition Summary</h3>
                 <div class="sidebar-cart-list" id="sidebarCartRowsContainer">
-                    <p style="color: #a0aec0; text-align: center; font-size: 13px; margin-top: 40px; font-style: italic;">No items added to this request list yet.</p>
+                    <p style="color: #a0aec0; text-align: center; font-size: 12px; margin-top: 30px; font-style: italic;">No items added to this request list yet.</p>
                 </div>
                 <div>
                     <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 14px; margin-bottom: 10px; color: #111827;">
@@ -321,7 +330,7 @@ include "includes/header.php";
 </div>
 
 <div id="editReqModalPopup" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
-    <div class="modal-content" style="background: white; max-width: 580px; width: 92%; border-radius: 12px; padding: 25px; position: relative; color: #111827; text-align: left;">
+    <div class="modal-content" style="background: white; max-width: 580px; width: 92%; border-radius: 12px; padding: 20px; position: relative; color: #111827; text-align: left;">
         <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="window.closeEditReqModal()">✕</span>
         <h3 style="font-size: 13px; font-weight: 700; text-transform: uppercase; margin-bottom: 12px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px;">Modify Stock Order</h3>
         
