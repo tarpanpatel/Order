@@ -189,7 +189,6 @@ window.updateCartRowQtyChange = function(id, delta) {
     window.renderCartInterfaceElements();
 };
 
-// Layout perfectly mapped to .sidebar-cart-row logic configured inside style.css
 window.renderCartInterfaceElements = function() {
     const container = document.getElementById("cartItemsContainerRows");
     const form = document.getElementById("checkoutCartSubmissionForm");
@@ -232,6 +231,43 @@ window.renderCartInterfaceElements = function() {
     }
 };
 
+window.submitFoodOrder = function(event) {
+    event.preventDefault(); 
+
+    const cartItems = [];
+    for (let id in window.activeCartStateMap) {
+        cartItems.push({
+            id: id,
+            qty: window.activeCartStateMap[id].qty,
+            notes: "" 
+        });
+    }
+
+    if (cartItems.length === 0) {
+        alert("Cart is empty.");
+        return;
+    }
+
+    fetch("process_order.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: cartItems })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            alert("✔ Order sent to kitchen successfully!");
+            window.activeCartStateMap = {};
+            window.renderCartInterfaceElements();
+        } else {
+            alert("❌ Order Failed: " + (data.message || "Unknown error"));
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert("❌ Network error: Could not reach process_order.php");
+    });
+};
 </script>
 
 <?php include "includes/footer.php"; ?>
