@@ -429,3 +429,126 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     .card-name { font-size: 12px; height: auto; margin-bottom: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
     .card-price { font-size: 11px; margin-top: 1px; margin-bottom: 0; }
 }
+/* ==========================================================================
+   🛠️ MODAL CONTROL LAYOUT & SLICK POPUP ELEMENT STYLING
+   ========================================================================== */
+.verification-item-row-wrapper {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 12px 14px !important;
+    border: 1px solid #e2e8f0 !important;
+    background: #ffffff !important;
+    margin-bottom: 10px !important;
+    border-radius: 10px !important;
+    gap: 15px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* Quantity Box Input Framework Controls */
+.modal-qty-container {
+    display: inline-flex !important;
+    align-items: center !important;
+    border: 1px solid #cbd5e0 !important;
+    border-radius: 6px !important;
+    overflow: hidden !important;
+    background: #ffffff !important;
+    height: 34px !important;
+}
+
+.modal-qty-btn {
+    width: 32px !important;
+    height: 100% !important;
+    background: #f8fafc !important;
+    border: none !important;
+    color: #475569 !important;
+    font-weight: bold !important;
+    font-size: 15px !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: background 0.15s ease !important;
+}
+.modal-qty-btn:hover { background: #e2e8f0 !important; color: #0f172a !important; }
+
+.modal-input-qty {
+    width: 50px !important;
+    height: 100% !important;
+    border: none !important;
+    border-left: 1px solid #cbd5e0 !important;
+    border-right: 1px solid #cbd5e0 !important;
+    text-align: center !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    color: #1e293b !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+    outline: none !important;
+    -moz-appearance: textfield !important;
+}
+.modal-input-qty::-webkit-outer-spin-button,
+.modal-input-qty::-webkit-inner-spin-button { -webkit-appearance: none !important; margin: 0 !important; }
+
+/* 🔑 THE INDEPENDENT FIX: Converts choices to separate standalone button targets */
+.binary-toggle-container {
+    display: flex !important;
+    gap: 8px !important;
+    background: transparent !important;
+    padding: 0 !important;
+    border: none !important;
+    align-items: center !important;
+}
+
+.toggle-choice-btn {
+    padding: 8px 14px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    border: 1px solid #cbd5e0 !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    background: #ffffff !important;
+    color: #475569 !important;
+    transition: all 0.15s ease-in-out !important;
+}
+
+/* 🟢 Fulfilled Button - Independent Styling Rules */
+.toggle-choice-btn.btn-block-fulfilled {
+    color: #10b981 !important;
+    border-color: #a7f3d0 !important;
+    background: #f0fdf4 !important;
+}
+.toggle-choice-btn.btn-block-fulfilled:hover {
+    background: #10b981 !important;
+    color: #ffffff !important;
+    border-color: #10b981 !important;
+}
+
+/* 🔴 Remove Button - Independent Styling Rules */
+.toggle-choice-btn.btn-block-remove {
+    color: #ef4444 !important;
+    border-color: #fca5a5 !important;
+    background: #fdf2f2 !important;
+}
+.toggle-choice-btn.btn-block-remove:hover {
+    background: #ef4444 !important;
+    color: #ffffff !important;
+    border-color: #ef4444 !important;
+}
+
+/* Active State Memory Classes injected by Javascript */
+.row-state-green-highlight #toggleBtn_F_ {
+    background: #10b981 !important;
+    color: #ffffff !important;
+    border-color: #10b981 !important;
+    box-shadow: 0 2px 4px rgba(16,185,129,0.2) !important;
+}
+.row-state-greyed-out #toggleBtn_C_ {
+    background: #ef4444 !important;
+    color: #ffffff !important;
+    border-color: #ef4444 !important;
+    box-shadow: 0 2px 4px rgba(239,68,68,0.2) !important;
+}
