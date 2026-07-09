@@ -5,7 +5,9 @@ if (!isset($pdo)) {
 }
 
 $current_page = basename($_SERVER['PHP_SELF']);
- 
+$user_role = $_SESSION['role'] ?? 'Staff';
+$is_super_admin = ($user_role === 'Super Admin');
+
 // 🔑 FIXED: Initialize variable to NULL to prevent "Undefined" warnings
 $active_guest = null;
 
