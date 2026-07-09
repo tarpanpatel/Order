@@ -150,6 +150,8 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_fina
         header("Location: billing.php");
         exit;
     }
+    $accommodation_due_now = $accommodation_pending > 0 ? 0 : $accommodation_pending;
+    $checkout_total_due = $accommodation_due_now + $food_bill_total;
     
     $itemsQuery = $pdo->prepare("
         SELECT oi.*, mi.name, mi.price 
@@ -227,7 +229,7 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_fina
     $tg_msg .= "• Total Kitchen Settlement: <b>₹" . number_format($food_bill_total, 2) . "</b>\n";
     $tg_msg .= "👤 <i>Collected By: " . htmlspecialchars($food_collected_by) . "</i>\n";
     $tg_msg .= "━━━━━━━━━━━━━━━━━━\n";
-    $tg_msg .= "💰 <b>TOTAL REVENUE PAYABLE: ₹" . number_format(($accommodation_pending + $food_bill_total), 2) . "</b>\n";
+    $tg_msg .= "💰 <b>TOTAL OUTSTANDING PAYABLE: ₹" . number_format($checkout_total_due, 2) . "</b>\n";
 
     if (function_exists('sendAdminTelegramMessage')) {
         sendAdminTelegramMessage($tg_msg); 
@@ -308,6 +310,8 @@ include "includes/header.php";
         $advance_collector = resolveLedgerUserName($pdo, $guest['advance_received_by'] ?? 'Unnamed');
         $pending_collector = resolveLedgerUserName($pdo, $guest['pending_received_by'] ?? 'Unnamed');
         $pending_payment_collected = $accommodation_pending <= 0 || !isUnassignedCollector($pending_collector);
+        $accommodation_due_now = $pending_payment_collected ? 0 : $accommodation_pending;
+        $checkout_total_due = $accommodation_due_now + $total_incidentals_bill;
         $staff_list = $pdo->query("SELECT id, username FROM users ORDER BY username ASC")->fetchAll(PDO::FETCH_ASSOC);
     ?>
 
@@ -449,8 +453,12 @@ include "includes/header.php";
                     
                     <div style="padding:10px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:15px; font-size:12px; line-height:1.5;">
                         <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                            <span>Accommodation Outstanding:</span>
-                            <span style="font-weight:700; color:#c53030;">₹<?= number_format($accommodation_pending, 2) ?></span>
+                            <span>Accommodation Pending Collected:</span>
+                            <span style="font-weight:700; color:#065f46;">₹<?= number_format($pending_payment_collected ? $accommodation_pending : 0, 2) ?></span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                            <span>Accommodation Still Due:</span>
+                            <span style="font-weight:700; color:<?= $accommodation_due_now > 0 ? '#c53030' : '#065f46' ?>;">₹<?= number_format($accommodation_due_now, 2) ?></span>
                         </div>
                         <div style="display:flex; justify-content:space-between; border-bottom:1px dashed #cbd5e0; padding-bottom:6px; margin-bottom:6px;">
                             <span>Food & Incidentals Total:</span>
@@ -458,7 +466,7 @@ include "includes/header.php";
                         </div>
                         <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:bold;">
                             <span>Total Due at Checkout:</span>
-                            <span style="color:#059669;">₹<?= number_format(($accommodation_pending + $total_incidentals_bill), 2) ?></span>
+                            <span style="color:#059669;">₹<?= number_format($checkout_total_due, 2) ?></span>
                         </div>
                     </div>
 
@@ -523,8 +531,8 @@ include "includes/header.php";
             <span><?= htmlspecialchars($advance_collector) ?></span>
         </div>
         <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:bold; margin-bottom:15px; border-bottom:1px dashed #000; padding-bottom:6px;">
-            <span>Stay Balance Due:</span>
-            <span>₹<?= number_format($accommodation_pending, 2) ?></span>
+            <span>Pending Accommodation Collected:</span>
+            <span>₹<?= number_format($pending_payment_collected ? $accommodation_pending : 0, 2) ?></span>
         </div>
         <?php if ($accommodation_pending > 0): ?>
             <div style="display:flex; justify-content:space-between; font-size:11px; margin-top:-10px; margin-bottom:15px; color:#444;">
@@ -532,13 +540,17 @@ include "includes/header.php";
                 <span><?= $pending_payment_collected ? htmlspecialchars($pending_collector) : 'Not recorded' ?></span>
             </div>
         <?php endif; ?>
+        <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:bold; margin-bottom:15px; border-bottom:1px dashed #000; padding-bottom:6px;">
+            <span>Stay Balance Still Due:</span>
+            <span>₹<?= number_format($accommodation_due_now, 2) ?></span>
+        </div>
 
         <div style="font-size:12px; font-weight:bold; text-transform:uppercase; margin-bottom:6px; border-bottom:1px solid #000;">KOT Food & Incidentals</div>
         <div id="popupReceiptItems" style="border-bottom:2px dashed #000; padding-bottom:8px; margin-bottom:12px;"></div>
 
         <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:bold; text-transform:uppercase;">
             <span>Total Outstanding Payable:</span>
-            <span style="font-size:15px; border-bottom:4px double #000;">₹<?= number_format(($accommodation_pending + $total_incidentals_bill), 2) ?></span>
+            <span style="font-size:15px; border-bottom:4px double #000;">₹<?= number_format($checkout_total_due, 2) ?></span>
         </div>
         <div style="margin-top: 20px; display: flex; gap: 8px; justify-content: flex-end;">
             <button class="btn" style="background: #4a5568; max-width: 80px; color: white; padding:6px 12px; font-size:12px; cursor:pointer;" onclick="window.print()">Print</button>
