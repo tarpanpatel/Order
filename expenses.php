@@ -7,12 +7,6 @@ if (file_exists(__DIR__ . "/config/telegram.php")) {
     require_once __DIR__ . "/config/telegram.php";
 }
 
-if (!isset($_SESSION["user_id"])) { 
-    header("Location: login.php"); 
-    exit; 
-}
-
-$user_role = $_SESSION["role"] ?? 'Staff';
 
 // --- BACKEND LOGIC: AJAX INLINE ROW UPDATE INTERCEPTOR ---
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_ajax_update_expense"])) {
@@ -249,7 +243,7 @@ include "includes/header.php";
                 <?php if(!empty($recent_expenses)): foreach ($recent_expenses as $row): 
                     $search_meta = strtolower($row['category'] . ' ' . ($row['vendor_name'] ?? 'other') . ' ' . $row['description'] . ' ' . $row['payment_mode']);
                 ?>
-                    <tr style="border-bottom:1px solid #edf2f7; display: none;" class="expense-data-row-node" data-search-hash="<?= htmlspecialchars($search_meta) ?>">
+                    <tr style="border-bottom:1px solid #edf2f7;  " class="expense-data-row-node" data-search-hash="<?= htmlspecialchars($search_meta) ?>">
                         <td style="padding:10px;">
                             <span class="editable-click-cell" id="cell-date-<?= $row['id'] ?>" onclick="openInlineFieldEditor(<?= $row['id'] ?>, 'date', '<?= $row['expense_date'] ?>')"><?= $row['expense_date'] ?></span>
                         </td>
