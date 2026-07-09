@@ -217,9 +217,163 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
 .p-btn-confirm { background: var(--primary); color: white; }
 .p-btn-cancel { background: #edf2f7; color: var(--text-muted); }
 
-/* Custom verification buttons selection colors setup */
-.toggle-choice-btn.active-fulfilled { background: #38a169 !important; background-color: #38a169 !important; color: #ffffff !important; box-shadow: 0 1px 2px rgba(0,0,0,0.15) !important; }
-.toggle-choice-btn.active-cancelled { background: #e53e3e !important; background-color: #e53e3e !important; color: #ffffff !important; box-shadow: 0 1px 2px rgba(0,0,0,0.15) !important; }
+/* ==========================================================================
+   🎨 🌟 REQUISITIONS LOG STATUS AND ACTION BADGE DECORATORS
+   ========================================================================== */
+.past-table td {
+    padding: 10px 6px !important;
+}
+
+/* Base button properties for Action Triggers */
+.btn-action-trigger {
+    display: block !important;
+    width: 100% !important;
+    padding: 6px 8px !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    text-align: center !important;
+    line-height: 1.4 !important;
+    border: 1px solid transparent !important;
+    transition: all 0.15s ease-in-out !important;
+}
+
+/* 🟠 Pending Status Badge - Warm Orange Theme */
+.btn-status-pending {
+    background: #fff7ed !important;
+    color: #c2410c !important;
+    border: 1px solid #fdba74 !important;
+}
+.btn-status-pending:hover {
+    background: #ffedd5 !important;
+    color: #9a3412 !important;
+    border-color: #f97316 !important;
+}
+
+/* 🟢 Fulfilled Status Badge - Clean Green Theme */
+.btn-status-fulfilled {
+    background: #f0fdf4 !important;
+    color: #15803d !important;
+    border: 1px solid #86efac !important;
+}
+.btn-status-fulfilled:hover {
+    background: #dcfce7 !important;
+    color: #166534 !important;
+    border-color: #22c55e !important;
+}
+
+/* Label span formatting inside the action buttons */
+.btn-action-trigger span {
+    display: block !important;
+    font-size: 9px !important;
+    opacity: 0.85 !important;
+    letter-spacing: 0.3px !important;
+    font-weight: 600 !important;
+    margin-bottom: 1px !important;
+}
+
+.btn-sidebar-past-link {
+    display: block !important;
+    text-align: center !important;
+    width: 100% !important;
+    padding: 9px !important;
+    background: #f1f5f9 !important;
+    color: #475569 !important;
+    border: 1px solid #cbd5e0 !important;
+    border-radius: 6px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    text-decoration: none !important;
+    margin-top: 14px !important;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: all 0.15s ease;
+}
+.btn-sidebar-past-link:hover {
+    background: #e2e8f0 !important;
+    color: #1e293b !important;
+}
+
+/* ==========================================================================
+   🛠️ 🌟 MODAL ACTION POPUP LAYOUT AND VERIFICATION SWITCHES
+   ========================================================================== */
+.audit-history-subtitle {
+    font-size: 11px !important;
+    color: #64748b !important;
+    font-weight: 600 !important;
+    display: block !important;
+    margin-top: 3px !important;
+    font-family: monospace !important;
+}
+
+/* Interactive custom toggle button groupings */
+.binary-toggle-container {
+    display: flex !important;
+    gap: 4px !important;
+    background: #f1f5f9 !important;
+    padding: 3px !important;
+    border-radius: 8px !important;
+    border: 1px solid #cbd5e0 !important;
+    align-items: center !important;
+}
+
+/* Individual choice target components inside the binary wrapper */
+.toggle-choice-btn {
+    padding: 6px 12px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    border: 1px solid transparent !important;
+    border-radius: 6px !important;
+    color: #475569 !important;
+    background: transparent !important;
+    cursor: pointer !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.3px !important;
+    transition: all 0.15s ease !important;
+}
+
+/* High-specificity selection active maps logged by script rules */
+.toggle-choice-btn.btn-block-fulfilled:disabled,
+.row-state-green-highlight #toggleBtn_F_ {
+    background: #10b981 !important;
+    color: #ffffff !important;
+    border-color: #059669 !important;
+    box-shadow: 0 1px 3px rgba(16,185,129,0.2) !important;
+    opacity: 1 !important;
+    cursor: default !important;
+}
+
+.toggle-choice-btn.btn-block-remove:disabled,
+.row-state-greyed-out #toggleBtn_C_ {
+    background: #ef4444 !important;
+    color: #ffffff !important;
+    border-color: #dc2626 !important;
+    box-shadow: 0 1px 3px rgba(239,68,68,0.2) !important;
+    opacity: 1 !important;
+    cursor: default !important;
+}
+
+/* Row wrapper highlight adjustments based on tracking updates */
+.row-state-green-highlight {
+    background: #f0fdf4 !important;
+    border-left: 4px solid #10b981 !important;
+}
+.row-state-green-highlight .item-text-title {
+    color: #15803d !important;
+    font-weight: 800 !important;
+}
+
+.row-state-greyed-out {
+    background: #f8fafc !important;
+    border-left: 4px solid #94a3b8 !important;
+    opacity: 0.75;
+}
+.row-state-greyed-out .item-text-title {
+    color: #94a3b8 !important;
+    text-decoration: line-through !important;
+}
 
 /* ==========================================================================
    ⚡ MOBILE DRAWER & PHONE COMPACT INTERACTION FORMAT VIEWPORT CONFIGURATIONS (< 1024px)
