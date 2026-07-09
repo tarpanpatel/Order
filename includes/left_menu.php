@@ -68,22 +68,35 @@ foreach ($allowed_menus as $menu) {
                 </a>
             <?php endif; ?>
 
-            <?php if ($menu['title'] === 'Dashboard'): ?>
-                <div style="margin: 4px 0; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px;">
-                    <form method="POST" action="checkin.php" style="margin: 0;">
-                        <input type="hidden" name="action_sidebar_activate" value="1">
-                        <select name="sidebar_guest_select" required style="width: 100%; padding: 6px; margin-bottom: 6px; border-radius: 6px; border: 1px solid #cbd5e0; font-size: 11px; background: #fff; color: #1e293b;">
-                            <option value="">-- Choose Guest --</option>
-                            <?php
-                            $activeGuests = $pdo->query("SELECT id, guest_name, phone_number FROM guests WHERE status = 'Active' ORDER BY checkin_date DESC")->fetchAll(PDO::FETCH_ASSOC);
-                            foreach ($activeGuests as $g): ?>
-                                <option value="<?= $g['id'] ?>"><?= htmlspecialchars($g['guest_name']) ?> (<?= substr($g['phone_number'], -4) ?>)</option>
-                            <?php endforeach; ?>
-                        </select>
-                        <button type="submit" class="sidebar-action-card sb-btn-inactive">▶ Activate Ledger</button>
-                    </form>
-                </div>
-            <?php endif; ?>
+           // 1. Check if there is an active guest ledger in the database
+$active_guest_check = $pdo->query("SELECT id FROM guests WHERE status = 'Active' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+?>
+
+<nav style="display: flex; flex-direction: column; gap: 4px; width: 100%; padding-top: 5px;">
+    <a href="index.php" class="nav-link">📊 Dashboard</a>
+
+    <?php if ($active_guest_check): ?>
+        <div style="margin: 4px 0; background: #fff5f5; border: 1px solid #feb2b2; border-radius: 8px; padding: 8px;">
+            <a href="billing.php" class="sidebar-action-card" style="background: #e53e3e; color: white; border: none; justify-content: center; display: flex; align-items: center; text-decoration: none;">
+                🛑 Guest Checkout
+            </a>
+        </div>
+    <?php else: ?>
+        <div style="margin: 4px 0; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px;">
+            <form method="POST" action="checkin.php" style="margin: 0;">
+                <input type="hidden" name="action_sidebar_activate" value="1">
+                <select name="sidebar_guest_select" required style="width: 100%; padding: 6px; margin-bottom: 6px; border-radius: 6px; border: 1px solid #cbd5e0; font-size: 11px; background: #fff; color: #1e293b;">
+                    <option value="">-- Choose Guest --</option>
+                    <?php
+                    $activeGuests = $pdo->query("SELECT id, guest_name, phone_number FROM guests WHERE status = 'Checked In' OR status = 'Active' ORDER BY checkin_date DESC")->fetchAll(PDO::FETCH_ASSOC);
+                    foreach ($activeGuests as $g): ?>
+                        <option value="<?= $g['id'] ?>"><?= htmlspecialchars($g['guest_name']) ?> (<?= substr($g['phone_number'], -4) ?>)</option>
+                    <?php endforeach; ?>
+                </select>
+                <button type="submit" class="sidebar-action-card sb-btn-inactive">▶ Activate Ledger</button>
+            </form>
+        </div>
+    <?php endif; ?>
 
         <?php endforeach; ?>
         
