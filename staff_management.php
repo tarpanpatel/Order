@@ -31,32 +31,35 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_add_staff"])) 
 }
 
 // --- HANDLE POST: UPDATE ACCESS PERMISSION MATRIX ---
-if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_permissions"])) {
-    $permissions = $_POST['permissions'] ?? [];
-    $pdo->beginTransaction();
-    try {
-        // Clear old permissions for the roles we are managing
-        $pdo->query("DELETE FROM sys_role_menu WHERE role_name IN ('Admin', 'Chef', 'Staff')");
-        
-        // Insert new checked permissions
-        if (!empty($permissions)) {
-            $insertStmt = $pdo->prepare("INSERT INTO sys_role_menu (role_name, menu_id) VALUES (?, ?)");
-            foreach ($permissions as $role_key => $menu_ids) {
-                foreach ($menu_ids as $m_id => $checked) {
-                    $insertStmt->execute([$role_key, $m_id]);
-                }
+// --- HANDLE GET: DELETE STAFF MEMBER ---
+if (isset($_GET['delete_id'])) {
+    $del_id = intval($_GET['delete_id']);
+    
+    // DEBUGGING: Stop here to see if the ID is passed correctly
+    // echo "DEBUG: Attempting to delete ID: " . $del_id . "<br>";
+    // echo "DEBUG: Session ID: " . $_SESSION["user_id"] . "<br>";
+    
+    if ($del_id !== intval($_SESSION["user_id"])) {
+        try {
+            $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
+            $stmt->execute([$del_id]);
+            
+            // Success check
+            if ($stmt->rowCount() > 0) {
+                $_SESSION['staff_success'] = "User profile permanently removed.";
+            } else {
+                $_SESSION['staff_error'] = "Delete failed: User ID $del_id not found in database.";
             }
+        } catch (PDOException $e) {
+            // This catches Foreign Key constraints (e.g., if user has audit logs)
+            $_SESSION['staff_error'] = "Database Error: " . $e->getMessage();
         }
-        $pdo->commit();
-        $_SESSION['staff_success'] = "Access Matrix Updated!";
-    } catch (Exception $e) {
-        $pdo->rollBack();
-        $_SESSION['staff_error'] = "Update failed: " . $e->getMessage();
+    } else {
+        $_SESSION['staff_error'] = "You cannot delete your own profile.";
     }
     header("Location: staff_management.php");
     exit;
 }
-
 // --- DATA FETCHING ---
 // 🔑 FIXED: Used COALESCE to ensure role is never blank in UI
 $all_users = $pdo->query("SELECT id, username, COALESCE(role, 'Staff') as role FROM users ORDER BY role ASC, username ASC")->fetchAll(PDO::FETCH_ASSOC);
