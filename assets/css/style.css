@@ -488,25 +488,27 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
 
     /* 🔑 EXPLICIT MOB-BAR ALIGNMENT SETTINGS */
     .sidebar-total-row-wrapper {
-        display: block !important;
+        display: flex !important;
+        flex-direction: row !important;
+        justify-content: space-between !important;
+        align-items: center !important;
         width: 100% !important;
         margin-bottom: 12px !important;
         background: transparent !important;
         border: none !important;
         padding: 0 !important;
-        clear: both !important;
     }
     .total-types-label { 
         font-size: 14px !important; 
         font-weight: 700 !important; 
         color: #111827 !important; 
-        float: left !important;
+        float: none !important;
     }
     .total-types-value { 
         font-size: 14px !important; 
         font-weight: 800 !important; 
         color: #111827 !important; 
-        float: right !important;
+        float: none !important;
     }
 }
 
