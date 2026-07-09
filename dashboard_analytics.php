@@ -21,7 +21,7 @@ if (isset($_GET['action_ajax_load_more'])) {
     exit;
 }
 
-// 2. Fetch Available Date Ranges Dynamically across tables to build filters
+// 2. Fetch Available Date Ranges Dynamically across tables to build filters (FIXED: Removed farm_bookings)
 $filterDates = $pdo->query("
     SELECT DISTINCT MONTH(checkin_date) as m, YEAR(checkin_date) as y FROM guests WHERE checkin_date IS NOT NULL
     UNION 
@@ -30,8 +30,6 @@ $filterDates = $pdo->query("
     SELECT DISTINCT MONTH(date) as m, YEAR(date) as y FROM farm_expenses WHERE date IS NOT NULL
     UNION
     SELECT DISTINCT MONTH(expense_date) as m, YEAR(expense_date) as y FROM farm_utility_expenses WHERE expense_date IS NOT NULL
-    UNION
-    SELECT DISTINCT MONTH(check_in_date) as m, YEAR(check_in_date) as y FROM farm_bookings WHERE check_in_date IS NOT NULL
     ORDER BY y DESC, m DESC
 ")->fetchAll(PDO::FETCH_ASSOC);
 
@@ -44,7 +42,8 @@ $bookingIncomeStmt = $pdo->prepare("SELECT COALESCE(SUM(total_charge + decoratio
 $bookingIncomeStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
 $totalBookingIncome = $bookingIncomeStmt->fetchColumn();
 
-$foodIncomeStmt = $pdo->prepare("SELECT COALESCE(SUM(total_food_bill), 0) FROM farm_bookings WHERE MONTH(check_in_date) = :m AND YEAR(check_in_date) = :y");
+// FIXED: Sourcing Food Revenue directly from guests.total_food column
+$foodIncomeStmt = $pdo->prepare("SELECT COALESCE(SUM(total_food), 0) FROM guests WHERE MONTH(checkin_date) = :m AND YEAR(checkin_date) = :y");
 $foodIncomeStmt->execute([':m' => $selectedMonth, ':y' => $selectedYear]);
 $totalFoodIncome = $foodIncomeStmt->fetchColumn();
 
