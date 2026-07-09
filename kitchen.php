@@ -6,9 +6,6 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once "config/db.php";
 require_once "config/telegram.php";
  
-// Report all PHP errors
-error_reporting(E_ALL);
-ini_set('display_errors', '1');
 
 // --- HANDLE DISPATCH SYSTEM COMPLETION TRIGGER WITH TELEGRAM GATEWAY ---
 if (isset($_POST["complete_order_id"])) { 
@@ -30,7 +27,9 @@ if (isset($_POST["complete_order_id"])) {
             $itemsListBlock .= "🔹 *x" . $item['quantity'] . "* " . $item['name'] . $instructionBadge . "\n";
         }
 
-        // 2. Build the Telegram text ticket string payload
+        try {
+        // ... (your existing database fetch code remains here) ...
+
         $readyMsg = "✅ *ORDER PREPARED & READY TO SERVE*\n";
         $readyMsg .= "--------------------------------------\n";
         $readyMsg .= "👤 *Guest Name:* " . $guest_name . "\n";
@@ -41,13 +40,16 @@ if (isset($_POST["complete_order_id"])) {
         $readyMsg .= "\n--------------------------------------\n";
         $readyMsg .= "🏃‍♂️ _Staff, please collect the order from the kitchen immediately._";
 
-        // Dispatch out through your internal whitelisted local gateway proxy route
-        sendTelegramNotification($readyMsg);
+        // 🔑 SAFETY FIX: Only call the function if it actually exists
+        if (function_exists('sendTelegramNotification')) {
+            sendTelegramNotification($readyMsg);
+        } else {
+            error_log("Kitchen Warning: sendTelegramNotification function not found.");
+        }
 
     } catch (Exception $tgEx) {
-        // Safe catch block prevents connection errors from crashing database updates
+        // Safe catch block prevents connection errors
     }
-
     // 3. Finalize core application database status values update cleanly
     $pdo->prepare("UPDATE orders SET status = 'Completed' WHERE id = ?")->execute([$order_id]); 
 
