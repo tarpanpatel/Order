@@ -34,26 +34,49 @@ foreach ($allowed_menus as $menu) {
 }
 ?>
 
-<div class="sidebar" id="appLeftNavigationMenu" style="position: fixed; top: 0; left: 0; height: 100vh; width: 280px; background: #ffffff; box-shadow: 4px 0 25px rgba(0,0,0,0.15); display: flex; flex-direction: column; z-index: 10001; box-sizing: border-box; padding: 15px 16px; overflow-y: auto;">
+<div class="sidebar" id="appLeftNavigationMenu" style="position: fixed; top: 0; left: 0; height: 100vh; width: 280px; background: #ffffff; box-shadow: 4px 0 25px rgba(0,0,0,0.15); display: flex; flex-direction: column; z-index: 10001; box-sizing: border-box; padding: 15px 16px; overflow-y: auto; -webkit-overflow-scrolling: touch;">
     
-    <button type="button" class="close-drawer-btn" onclick="toggleLeftMenu(false)" style="position:absolute; top:12px; right:15px; background:none; border:none; font-size:20px; cursor:pointer;">✕</button>
-
-    <nav style="display: flex; flex-direction: column; gap: 4px; width: 100%; padding-top: 30px;">
+    <div style="position: absolute; top: 12px; right: -42px; z-index: 10002; margin: 0; padding: 0;">
+        <button type="button" class="close-drawer-btn" onclick="event.stopPropagation(); toggleLeftMenu(false);" style="background: #ffffff; border: 1px solid #cbd5e0; border-radius: 50%; font-size: 1.1rem; cursor: pointer; font-weight: bold; color: #e53e3e; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">✕</button>
+    </div>
+    
+    <nav style="display: flex; flex-direction: column; gap: 4px; width: 100%; padding-top: 5px;">
         
-        <div id="sidebarActionArea" style="margin-bottom: 20px;">
-            <?php if ($active_guest): ?>
-                <a href="billing.php" class="sidebar-action-card" style="background: #e53e3e; color: white; display:flex; justify-content:center; align-items:center;">
-                    🛑 Guest Checkout (<?= htmlspecialchars($active_guest['guest_name']) ?>)
-                </a>
+        <?php foreach ($main_menus as $menu): ?>
+            
+            <?php if ($menu['title'] === 'Admin Control'): ?>
+                <?php if (!empty($sub_menus[$menu['id']])): ?>
+                    <div class="admin-settings-wrapper" style="margin-top: 6px; border-top: 1px solid #cbd5e0; padding-top: 6px; width: 100%;">
+                        <div onclick="toggleAdminSubMenu()" class="nav-link" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 700; color: #475569; padding: 10px 16px;">
+                            <span><?= htmlspecialchars($menu['icon']) ?> <?= htmlspecialchars($menu['title']) ?></span>
+                            <span id="adminMenuChevron" style="font-size: 10px; transition: transform 0.2s; transform: rotate(0deg);">▶</span>
+                        </div>
+        
+                        <div id="adminSubMenuContent" style="display: none; flex-direction: column; gap: 4px; padding-left: 15px; margin-top: 4px;">
+                            <?php foreach ($sub_menus[$menu['id']] as $sub): ?>
+                                <a href="<?= htmlspecialchars($sub['url']) ?>" class="nav-link <?= ($current_page === $sub['url']) ? 'active' : '' ?>" style="font-size: 12px; padding: 8px 12px;">
+                                    <?= htmlspecialchars($sub['icon']) ?> <?= htmlspecialchars($sub['title']) ?>
+                                </a>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
             <?php else: ?>
-                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px;">
+                <a href="<?= htmlspecialchars($menu['url']) ?>" class="nav-link <?= ($current_page === $menu['url']) ? 'active' : '' ?>">
+                    <?= htmlspecialchars($menu['icon']) ?> <?= htmlspecialchars($menu['title']) ?>
+                </a>
+            <?php endif; ?>
+
+            <?php if ($menu['title'] === 'Dashboard'): ?>
+                <div style="margin: 4px 0; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px;">
                     <form method="POST" action="checkin.php" style="margin: 0;">
                         <input type="hidden" name="action_sidebar_activate" value="1">
-                        <select name="sidebar_guest_select" required style="width: 100%; padding: 6px; margin-bottom: 6px; border-radius: 6px; border: 1px solid #cbd5e0; font-size: 11px;">
-                            <option value="">-- Choose Guest to Activate --</option>
-                            <?php 
-                            $guests = $pdo->query("SELECT id, guest_name, phone_number FROM guests WHERE status = 'Checked In' ORDER BY checkin_date DESC")->fetchAll();
-                            foreach ($guests as $g): ?>
+                        <select name="sidebar_guest_select" required style="width: 100%; padding: 6px; margin-bottom: 6px; border-radius: 6px; border: 1px solid #cbd5e0; font-size: 11px; background: #fff; color: #1e293b;">
+                            <option value="">-- Choose Guest --</option>
+                            <?php
+                            $activeGuests = $pdo->query("SELECT id, guest_name, phone_number FROM guests WHERE status = 'Active' ORDER BY checkin_date DESC")->fetchAll(PDO::FETCH_ASSOC);
+                            foreach ($activeGuests as $g): ?>
                                 <option value="<?= $g['id'] ?>"><?= htmlspecialchars($g['guest_name']) ?> (<?= substr($g['phone_number'], -4) ?>)</option>
                             <?php endforeach; ?>
                         </select>
@@ -61,28 +84,9 @@ foreach ($allowed_menus as $menu) {
                     </form>
                 </div>
             <?php endif; ?>
-        </div>
 
-        <?php foreach ($main_menus as $menu): ?>
-            <?php if ($menu['title'] === 'Admin Control'): ?>
-                <div class="admin-settings-wrapper" style="margin-top: 6px; border-top: 1px solid #cbd5e0; padding-top: 6px;">
-                    <div onclick="toggleAdminSubMenu()" class="nav-link" style="display: flex; justify-content: space-between; cursor: pointer; padding: 10px 16px;">
-                        <span><?= htmlspecialchars($menu['icon']) ?> Admin Control</span>
-                        <span id="adminMenuChevron">▶</span>
-                    </div>
-                    <div id="adminSubMenuContent" style="display: none; padding-left: 15px;">
-                        <?php foreach ($sub_menus[$menu['id']] ?? [] as $sub): ?>
-                            <a href="<?= htmlspecialchars($sub['url']) ?>" class="nav-link" style="font-size: 12px; padding: 8px 12px;"><?= htmlspecialchars($sub['title']) ?></a>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-            <?php else: ?>
-                <a href="<?= htmlspecialchars($menu['url']) ?>" class="nav-link <?= ($current_page === $menu['url']) ? 'active' : '' ?>">
-                    <?= htmlspecialchars($menu['icon']) ?> <?= htmlspecialchars($menu['title']) ?>
-                </a>
-            <?php endif; ?>
         <?php endforeach; ?>
-
+        
         <a href="logout.php" class="nav-link" style="margin-top: 20px; color: #e53e3e; text-align: center;">🔒 Sign Out</a>
     </nav>
 </div>
