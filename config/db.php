@@ -5,9 +5,9 @@
 // 🔒 SAFE LONG-LIVED PRIVATE SESSION MANAGER (PREVENTS AUTO-LOGOUTS)
 // ==========================================================================
 $sessionPath = __DIR__ . '/../_sessions';
-ini_set('session.save_path', $sessionPath);
-ini_set('session.gc_maxlifetime', 1209600);
-ini_set('session.cookie_lifetime', 1209600);
+// ini_set('session.save_path', $sessionPath);
+// ini_set('session.gc_maxlifetime', 1209600);
+// ini_set('session.cookie_lifetime', 1209600);
 
 if (session_status() === PHP_SESSION_NONE) { 
     // Do not re-set path if already set by login.php
