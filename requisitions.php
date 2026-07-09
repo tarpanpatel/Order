@@ -154,18 +154,16 @@ include "includes/header.php";
                         if (empty($catItems)) continue;
                     ?>
                         <div class="category-block" id="cat_<?= $cat['id'] ?>" style="margin-bottom: 15px;">
-                            <h4 class="category-block-title" style="font-size: 12px; text-transform: uppercase; color: #4b5563; text-align: left; margin-bottom: 8px; font-weight: 700;">
-                                <?= htmlspecialchars($cat['name']) ?>
-                            </h4>
+                            <h4 class="category-block-title" style="font-size: 12px; text-transform: uppercase; color: #4b5563; text-align: left; margin-bottom: 8px; font-weight: 700;"><?= $cat['name'] ?></h4>
                             <div class="material-item-grid">
                                 <?php foreach ($catItems as $item): ?>
                                     <div class="material-item-card" data-search-name="<?= strtolower(htmlspecialchars($item['name'])) ?>">
                                         <div class="material-item-image-box">
-                                            <img src="<?= !empty($item['image_path']) ? htmlspecialchars($item['image_path']) : 'https://placehold.co/150x100?text=No+Image'; ?>" alt="" onerror="this.src='https://placehold.co/150x100?text=No+Image';">
+                                            <img src="<?= !empty($item['image_path']) ? $item['image_path'] : 'https://placehold.co/150x100?text=No+Image'; ?>" alt="" onerror="this.src='https://placehold.co/150x100?text=No+Image';">
                                         </div>
                                         <div class="material-item-name">
                                             <strong><?= htmlspecialchars($item['name']) ?></strong>
-                                            <div>(Size: <?= floatval($item['pack_size']) ?> <?= htmlspecialchars($item['pack_unit']) ?>)</div>
+                                            <div>(Size: <?= floatval($item['pack_size']) ?> <?= $item['pack_unit'] ?>)</div>
                                         </div>
                                         <button type="button" class="btn-tab-styled-add" onclick="window.addMaterialToSidebar(<?= $item['id'] ?>, '<?= htmlspecialchars(addslashes($item['name'])) ?>')">+ Add</button>
                                     </div>
@@ -178,15 +176,15 @@ include "includes/header.php";
         </div>
 
         <div class="right-column-stack">
-            <div class="requisition-right-sidebar drawer-open-state" id="mobileSummaryStickyWrapper" onclick="window.handleMobileDrawerCollapseToggle(event)">
+           
+            <div class="requisition-right-sidebar" id="mobileSummaryStickyWrapper" onclick="window.handleMobileDrawerCollapseToggle(event)">
                 <h3 class="sidebar-summary-title">📝 Requisition Summary</h3>
                 <div class="sidebar-cart-list" id="sidebarCartRowsContainer">
                     <p style="color: #a0aec0; text-align: center; font-size: 12px; margin-top: 30px; font-style: italic;">No items added to this request list yet.</p>
                 </div>
                 <div>
-                    <!-- 🔑 FIXED: Restored clean independent text layers matching image_8ff641.jpg perfectly -->
-                    <div style="display: flex !important; justify-content: space-between !important; font-weight: 700; font-size: 14px; margin-bottom: 10px; color: #111827; width: 100%;">
-                        <span>Total Item Types:</span>
+                    <div class="sidebar-total-row-wrapper">
+                        <span class="total-types-label">Total Item Types:</span>
                         <span id="sidebarTotalCount">0</span>
                     </div>
                     <button type="button" class="btn btn-bill" style="width: 100%; padding: 12px; font-size: 13px; font-weight: bold; border-radius: 8px;" onclick="window.submitSidebarRequisition(event)">Submit Requisition</button>
@@ -240,7 +238,6 @@ include "includes/header.php";
     </div>
 </div>
 
-<!-- Edit Requisition Modal -->
 <div id="editReqModalPopup" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
     <div class="modal-content" style="background: white; max-width: 620px; width: 92%; border-radius: 12px; padding: 20px; position: relative; color: #111827; text-align: left;">
         <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="window.closeEditReqModal()">✕</span>
@@ -258,7 +255,6 @@ include "includes/header.php";
     </div>
 </div>
 
-<!-- Chef New Product Modal -->
 <div id="chefNewProductModal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
     <div class="modal-content" style="background: white; max-width: 440px; width: 90%; border-radius: 12px; padding: 25px; color: #111827; text-align: left;">
         <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="window.closeChefNewProductModal()">✕</span>
