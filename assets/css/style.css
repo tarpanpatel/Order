@@ -11,6 +11,16 @@
     --radius: 12px;
 }
 
+/* ==========================================================================
+   🔒 GLOBAL VIEWPORT LOCKS (PREVENTS HORIZONTAL OVERFLOW ACROSS ENTIRE SITE)
+   ========================================================================== */
+html, body {
+    max-width: 100vw !important;
+    width: 100% !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+}
+
 * { 
     box-sizing: border-box; 
     margin: 0; 
@@ -26,32 +36,96 @@ body {
 }
 
 /* ==========================================================================
-   STRUCTURAL FLEX GRID ENGINE (NO THIRD-PARTY ENGINE DEPENDENCY)
+   🖥️ DESKTOP-SPECIFIC TEMPLATE GRID ARCHITECTURE (>= 1024px VIEWPORTS)
    ========================================================================== */
-.app-container {
-    display: grid;
-    grid-template-columns: 260px 1fr; /* Reserves exact column space for desktop sidebar */
-    min-height: 100vh;
-    width: 100%;
+@media (min-width: 1024px) {
+    .app-container {
+        display: flex !important;
+        flex-direction: row !important;
+        width: 100% !important;
+        max-width: 100vw !important;
+    }
+
+    .sidebar { 
+        width: 280px !important;
+        min-width: 280px !important;
+        flex: 0 0 280px !important;
+        background: var(--card-bg); 
+        border-right: 1px solid #e2e8f0; 
+        padding: 20px 16px; 
+        height: 100vh;
+        position: fixed !important;
+        top: 0;
+        left: 0;
+        box-sizing: border-box !important;
+    }
+
+    /* 🔑 THE DESKTOP FIX: Keeps panel aligned to the right of your sidebar without window spill */
+    .main-content {
+        flex: 1 !important;
+        margin-left: 285px !important;
+        width: calc(100% - 285px) !important;
+        max-width: calc(100% - 285px) !important;
+        box-sizing: border-box !important;
+        padding: 20px !important;
+    }
+
+    .split-requisition-layout { 
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 20px !important; 
+        width: 100% !important; 
+        max-width: 100% !important;
+        box-sizing: border-box !important; 
+        align-items: start !important;
+    }
+    
+    .materials-main-panel { 
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 24px !important;
+        box-sizing: border-box !important;
+    }
+    
+    .catalog-cards-box { 
+        background: #ffffff !important; 
+        border: 1px solid #e2e8f0 !important; 
+        border-radius: 12px !important; 
+        padding: 20px !important; 
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important; 
+        width: 100% !important; 
+        box-sizing: border-box !important; 
+    }
+    
+    .right-column-stack { 
+        width: 340px !important;
+        min-width: 340px !important;
+        flex: 0 0 340px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 20px !important;
+        position: sticky !important;
+        top: 20px !important;
+        box-sizing: border-box !important;
+    }
+    
+    .requisition-right-sidebar { background: #ffffff !important; border: 1px solid #cbd5e0 !important; border-radius: 12px !important; padding: 15px !important; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05) !important; display: flex !important; flex-direction: column !important; text-align: left !important; width: 100% !important; box-sizing: border-box !important; }
+    .material-item-grid { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)) !important; gap: 10px !important; width: 100% !important; }
+    .material-item-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; background: #fff; text-align: center; display: flex; flex-direction: column; justify-content: space-between; align-items: center; min-height: 165px; box-sizing: border-box; width: 100%; }
+    .material-item-image-box { width: 100%; height: 50px; overflow: hidden; border-radius: 6px; border: 1px solid #edf2f7; background: #f8fafc; margin-bottom: 6px; }
+    .material-item-image-box img { width: 100%; height: 100%; object-fit: cover; }
+    .material-item-name { font-size: 12px; font-weight: 600; color: #111827; margin-bottom: 6px; line-height: 1.3; text-align: center; width: 100%; word-break: break-word; }
+    .material-item-name div { display: block; font-size: 10px; color: #64748b; font-weight: bold; margin-top: 2px; }
+    .btn-tab-styled-add { display: inline-block !important; padding: 4px 10px !important; font-size: 12px !important; font-weight: 600 !important; background: #ffffff !important; color: #475569 !important; border: 1px solid #cbd5e0 !important; border-radius: 6px !important; cursor: pointer !important; transition: all 0.15s ease !important; width: 100% !important; margin: 0 auto !important; box-sizing: border-box; }
+    .sidebar-summary-title { font-size: 14px; font-weight: 700; text-transform: uppercase; color: #111827; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; margin-bottom: 15px; margin-top: 0; }
+    .sidebar-cart-list { max-height: 240px; overflow-y: auto; margin-bottom: 15px; }
+    .past-log-section { background: #ffffff !important; border: 1px solid #cbd5e0 !important; border-radius: 12px !important; padding: 14px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important; text-align: left; width: 100%; box-sizing: border-box; }
 }
 
-.sidebar { 
-    background: var(--card-bg); 
-    border-right: 1px solid #e2e8f0; 
-    padding: 20px 16px; 
-    height: 100%;
-}
-.materials-list-layout {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 12px;
-    width: 100%;
-}
-.main-content {
-    width: 100%;
-}
-
-/* Sidebar Links styled with your native navbar formatting */
+/* --- SYSTEM NAV card LINKS --- */
 .sidebar nav a {
     display: block;
     padding: 12px 16px;
@@ -65,29 +139,12 @@ body {
     border: 1px solid #e2e8f0;
     transition: all 0.2s;
 }
-
-.sidebar nav a:hover,
-.sidebar nav a.active {
-    color: #ffffff;
-    background: var(--primary);
-    border-color: var(--primary);
-}
+.sidebar nav a:hover, .sidebar nav a.active { color: #ffffff; background: var(--primary); border-color: var(--primary); }
 
 /* ==========================================================================
-   CORE ELEMENTS & INTERACTION TARGET STYLING
-   ========================================================================= */
-header {
-    background: #ffffff;
-    padding: 8px 12px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    position: sticky;
-    top: 0;
-    z-index: 101;
-    border-bottom: 1px solid #e2e8f0;
-    min-height: 56px;
-}
+   ⚙️ SHARED SYSTEM CONSTANTS & PRESETS
+   ========================================================================== */
+header { background: #ffffff; padding: 8px 12px; display: flex; justify-content: center; align-items: center; position: sticky; top: 0; z-index: 101; border-bottom: 1px solid #e2e8f0; min-height: 56px; }
 .controls { display: flex; width: 100%; max-width: 600px; justify-content: space-between; gap: 6px; }
 .btn { flex: 1; padding: 10px 4px; border: none; border-radius: 10px; color: white; cursor: pointer; font-weight: 700; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; transition: all 0.2s; }
 .btn-start { background: var(--success); }
@@ -105,7 +162,18 @@ header {
 .category-title { font-size: 14px; font-weight: 700; margin-bottom: 10px; color: var(--text-main); display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
 .category-title::after { content: ''; flex: 1; height: 1px; background: #e2e8f0; }
 
-/* Grid Layouts */
+.catalog-tab-header { display: flex; gap: 6px; flex-wrap: nowrap; margin-bottom: 15px; border-bottom: 1px solid #edf2f7; padding-bottom: 10px; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+.catalog-tab-header::-webkit-scrollbar { display: none; }
+.catalog-tab-btn { padding: 6px 12px; font-size: 12px; font-weight: 600; background: #f7fafc; border: 1px solid #cbd5e0; border-radius: 6px; cursor: pointer; color: #475569; transition: all 0.15s ease; }
+.catalog-tab-btn:hover { background: #e2e8f0; }
+.catalog-tab-btn.active { background: #06b6d4; color: white; border-color: #06b6d4; }
+.btn-quick-search-box { width: 100%; padding: 10px 14px 10px 35px; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 13px; font-weight: 600; color: #1e293b; background: #fff; outline: none; box-sizing: border-box; }
+.search-input-wrapper { position: relative; margin-bottom: 15px; width: 100%; }
+.search-icon-inside { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 14px; pointer-events: none; }
+.sidebar-cart-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; padding: 8px 0; border-bottom: 1px solid #f7fafc; }
+.qty-btn-sm { padding: 2px 8px; font-size: 12px; font-weight: bold; border: 1px solid #cbd5e0; background: #f7fafc; border-radius: 4px; cursor: pointer; }
+
+/* Dashboard elements framework grid */
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
 .card { background: var(--card-bg); border-radius: var(--radius); border: 1px solid #e2e8f0; padding: 12px; text-align: center; position: relative; }
 .card img { width: 44px; height: 44px; object-fit: cover; border-radius: 50%; margin-bottom: 6px; background: #f7fafc; padding: 3px; }
@@ -142,7 +210,6 @@ header {
 
 .prompt-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
 .prompt-box { background: white; padding: 20px; border-radius: var(--radius); width: 85%; max-width: 340px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.15); animation: promptPop 0.2s ease-out; }
-@keyframes promptPop { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .prompt-title { font-size: 15px; font-weight: 700; color: var(--text-main); margin-bottom: 10px; }
 .prompt-desc { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; line-height: 1.4; }
 .prompt-actions { display: flex; gap: 8px; justify-content: center; }
@@ -150,13 +217,53 @@ header {
 .p-btn-confirm { background: var(--primary); color: white; }
 .p-btn-cancel { background: #edf2f7; color: var(--text-muted); }
 
-/* Mobile query drawer view mechanics constraints */
+/* Custom verification buttons selection colors setup */
+.toggle-choice-btn.active-fulfilled { background: #38a169 !important; background-color: #38a169 !important; color: #ffffff !important; box-shadow: 0 1px 2px rgba(0,0,0,0.15) !important; }
+.toggle-choice-btn.active-cancelled { background: #e53e3e !important; background-color: #e53e3e !important; color: #ffffff !important; box-shadow: 0 1px 2px rgba(0,0,0,0.15) !important; }
+
+/* ==========================================================================
+   ⚡ MOBILE DRAWER & PHONE COMPACT INTERACTION FORMAT VIEWPORT CONFIGURATIONS (< 1024px)
+   ========================================================================== */
 @media (max-width: 1023px) {
     .app-container { display: block !important; width: 100% !important; }
+    .main-content { margin-left: 0 !important; width: 100% !important; max-width: 100% !important; padding: 4px !important; }
+    
     .sidebar { position: fixed !important; top: 0; left: 0; height: 100vh; width: 260px; z-index: 9999; transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: 4px 0 25px rgba(0,0,0,0.08); }
     .sidebar.is-drawer-open { transform: translateX(0) !important; }
     .sidebar-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(45, 55, 72, 0.3); backdrop-filter: blur(2px); z-index: 9998; display: none; }
     .sidebar-backdrop.is-active { display: block !important; }
+
+    .split-requisition-layout { display: block !important; width: 100% !important; padding-bottom: 140px !important; margin-top: 5px !important; box-sizing: border-box !important; }
+    .materials-main-panel { display: block !important; width: 100% !important; box-sizing: border-box !important; }
+    .catalog-cards-box { background: #ffffff !important; border: 1px solid #e2e8f0 !important; padding: 10px !important; border-radius: 8px !important; width: 100% !important; box-sizing: border-box !important; }
+    
+    .category-section { margin-bottom: 6px !important; padding: 0 4px !important; }
+    .category-section h2 { font-size: 13px !important; font-weight: 700 !important; color: #374151 !important; }
+    .category-block h4 { font-size: 11px !important; margin-bottom: 4px !important; padding-left: 4px; }
+
+    .material-item-grid { display: flex !important; flex-direction: column !important; gap: 5px !important; width: 100% !important; box-sizing: border-box !important; }
+    .material-item-card { border: 1px solid #e5e7eb !important; border-radius: 6px !important; padding: 4px 10px !important; background: #fff !important; min-height: auto !important; height: 44px !important; display: flex !important; flex-direction: row !important; justify-content: space-between !important; align-items: center !important; width: 100% !important; box-sizing: border-box !important; }
+    .material-item-image-box { display: none !important; }
+    
+    .material-item-name { text-align: left !important; font-size: 12px !important; margin-bottom: 0px !important; line-height: 1.2 !important; flex: 1 !important; padding-right: 8px !important; }
+    .material-item-name strong { font-weight: 600 !important; color: #111827 !important; }
+    .material-item-name div { display: inline-block !important; margin-top: 0px !important; margin-left: 4px !important; font-size: 11px !important; color: #64748b !important; }
+    
+    .btn-tab-styled-add { width: auto !important; max-width: 65px !important; padding: 4px 10px !important; font-size: 11px !important; margin: 0 !important; border: 1px solid #cbd5e0 !important; border-radius: 6px !important; cursor: pointer !important; font-weight: 600 !important; background: #fff !important; color: #475569 !important; }
+
+    .right-column-stack { position: fixed !important; bottom: 0 !important; left: 0 !important; width: 100% !important; height: auto !important; top: auto !important; z-index: 9999 !important; gap: 0 !important; pointer-events: none; }
+    .past-log-section { display: none !important; }
+    .requisition-right-sidebar { border-radius: 20px 20px 0 0 !important; border: none !important; border-top: 2px solid #cbd5e0 !important; box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.12) !important; padding: 10px 14px !important; background: #ffffff !important; pointer-events: auto; width: 100% !important; box-sizing: border-box !important; }
+    
+    .sidebar-summary-title { margin-bottom: 4px !important; padding-bottom: 2px !important; font-size: 11px !important; }
+    .sidebar-summary-title::after { font-size: 10px !important; content: "▲ Expand Drawer" !important; }
+    .sidebar-cart-list { max-height: 0px !important; }
+    .requisition-right-sidebar.drawer-open-state .sidebar-cart-list { max-height: 180px !important; margin-bottom: 8px !important; }
+    
+    .btn-quick-search-box { padding: 8px 12px 8px 32px !important; font-size: 12px !important; }
+    .catalog-tab-header { margin-bottom: 10px !important; padding-bottom: 6px !important; margin-left: 2px !important; }
+    .catalog-tab-btn { padding: 4px 8px !important; font-size: 11px !important; }
+    .btn-bill { padding: 10px !important; font-size: 12px !important; }
 }
 
 @media (max-width: 600px) {
@@ -167,21 +274,4 @@ header {
     .card-details { display: flex; flex-direction: column; min-width: 0; }
     .card-name { font-size: 12px; height: auto; margin-bottom: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
     .card-price { font-size: 11px; margin-top: 1px; margin-bottom: 0; }
-}
-
-/* ==========================================================================
-   HIGH-SPECIFICITY INJECTOR OVERRIDES FOR LOG ACTIVE ACTION SELECTIONS
-   ========================================================================== */
-.toggle-choice-btn.active-fulfilled {
-    background: #38a169 !important;
-    background-color: #38a169 !important;
-    color: #ffffff !important;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.15) !important;
-}
-
-.toggle-choice-btn.active-cancelled {
-    background: #e53e3e !important;
-    background-color: #e53e3e !important;
-    color: #ffffff !important;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.15) !important;
 }
