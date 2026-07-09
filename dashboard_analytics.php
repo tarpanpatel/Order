@@ -84,7 +84,7 @@ $is_ajax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HT
 if (!$is_ajax) { include 'includes/header.php'; }
 ?>
 
-<div class="main-content" style="padding: 12px; width: 100%; max-width: 100%; box-sizing: border-box; overflow-x: hidden; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
+<div class=" " style="padding: 12px; width: 100%; max-width: 100%; box-sizing: border-box; overflow-x: hidden; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
     
     <style>
         .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
