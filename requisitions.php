@@ -182,10 +182,9 @@ include "includes/header.php";
                     <p style="color: #a0aec0; text-align: center; font-size: 12px; margin-top: 30px; font-style: italic;">No items added to this request list yet.</p>
                 </div>
                 <div>
-                   
-                    <div class="sidebar-total-row-wrapper" style="display: flex !important; justify-content: space-between !important; align-items: center !important; font-weight: 700; font-size: 14px; margin-bottom: 12px; color: #111827; width: 100%;">
-                        <span class="total-types-label" style="font-weight: 700; color: #111827;">Total Item Types:</span>
-                        <span id="sidebarTotalCount" class="total-types-value" style="font-weight: 800; color: #111827;">0</span>
+                    <div class="sidebar-total-row-wrapper">
+                        <span class="total-types-label">Total Item Types:</span>
+                        <span id="sidebarTotalCount" class="total-types-value">0</span>
                     </div>
                     <button type="button" class="btn btn-bill" style="width: 100%; padding: 12px; font-size: 13px; font-weight: bold; border-radius: 8px;" onclick="window.submitSidebarRequisition(event)">Submit Requisition</button>
                 </div>
@@ -436,8 +435,6 @@ window.openEditRequisitionModal = function(reqId, element) {
             const initialStatus = i.item_status || 'Pending';
             const unitType = i.unit_type || 'Count';
             const currentLabel = i.chosen_unit_label || i.unit_label || 'Pcs';
-            const pSize = parseFloat(i.pack_size) || 1;
-            const pUnit = i.pack_unit || 'Pcs';
             
             let rowStateClass = '';
            
