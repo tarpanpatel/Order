@@ -125,7 +125,7 @@ body {
     .past-log-section { background: #ffffff !important; border: 1px solid #cbd5e0 !important; border-radius: 12px !important; padding: 14px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important; text-align: left; width: 100%; box-sizing: border-box; }
 }
 
-/* --- SYSTEM NAV card LINKS --- */
+/* --- SYSTEM NAV CARD LINKS --- */
 .sidebar nav a {
     display: block;
     padding: 12px 16px;
@@ -224,7 +224,6 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     padding: 10px 6px !important;
 }
 
-/* Base button properties for Action Triggers */
 .btn-action-trigger {
     display: block !important;
     width: 100% !important;
@@ -240,7 +239,6 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     transition: all 0.15s ease-in-out !important;
 }
 
-/* 🟠 Pending Status Badge - Warm Orange Theme */
 .btn-status-pending {
     background: #fff7ed !important;
     color: #c2410c !important;
@@ -252,7 +250,6 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     border-color: #f97316 !important;
 }
 
-/* 🟢 Fulfilled Status Badge - Clean Green Theme */
 .btn-status-fulfilled {
     background: #f0fdf4 !important;
     color: #15803d !important;
@@ -264,7 +261,6 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     border-color: #22c55e !important;
 }
 
-/* Label span formatting inside the action buttons */
 .btn-action-trigger span {
     display: block !important;
     font-size: 9px !important;
@@ -297,140 +293,7 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
 }
 
 /* ==========================================================================
-   🛠️ 🌟 MODAL ACTION POPUP LAYOUT AND VERIFICATION SWITCHES
-   ========================================================================== */
-.audit-history-subtitle {
-    font-size: 11px !important;
-    color: #64748b !important;
-    font-weight: 600 !important;
-    display: block !important;
-    margin-top: 3px !important;
-    font-family: monospace !important;
-}
-
-/* Interactive custom toggle button groupings */
-.binary-toggle-container {
-    display: flex !important;
-    gap: 4px !important;
-    background: #f1f5f9 !important;
-    padding: 3px !important;
-    border-radius: 8px !important;
-    border: 1px solid #cbd5e0 !important;
-    align-items: center !important;
-}
-
-/* Individual choice target components inside the binary wrapper */
-.toggle-choice-btn {
-    padding: 6px 12px !important;
-    font-size: 11px !important;
-    font-weight: 700 !important;
-    border: 1px solid transparent !important;
-    border-radius: 6px !important;
-    color: #475569 !important;
-    background: transparent !important;
-    cursor: pointer !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.3px !important;
-    transition: all 0.15s ease !important;
-}
-
-/* High-specificity selection active maps logged by script rules */
-.toggle-choice-btn.btn-block-fulfilled:disabled,
-.row-state-green-highlight #toggleBtn_F_ {
-    background: #10b981 !important;
-    color: #ffffff !important;
-    border-color: #059669 !important;
-    box-shadow: 0 1px 3px rgba(16,185,129,0.2) !important;
-    opacity: 1 !important;
-    cursor: default !important;
-}
-
-.toggle-choice-btn.btn-block-remove:disabled,
-.row-state-greyed-out #toggleBtn_C_ {
-    background: #ef4444 !important;
-    color: #ffffff !important;
-    border-color: #dc2626 !important;
-    box-shadow: 0 1px 3px rgba(239,68,68,0.2) !important;
-    opacity: 1 !important;
-    cursor: default !important;
-}
-
-/* Row wrapper highlight adjustments based on tracking updates */
-.row-state-green-highlight {
-    background: #f0fdf4 !important;
-    border-left: 4px solid #10b981 !important;
-}
-.row-state-green-highlight .item-text-title {
-    color: #15803d !important;
-    font-weight: 800 !important;
-}
-
-.row-state-greyed-out {
-    background: #f8fafc !important;
-    border-left: 4px solid #94a3b8 !important;
-    opacity: 0.75;
-}
-.row-state-greyed-out .item-text-title {
-    color: #94a3b8 !important;
-    text-decoration: line-through !important;
-}
-
-/* ==========================================================================
-   ⚡ MOBILE DRAWER & PHONE COMPACT INTERACTION FORMAT VIEWPORT CONFIGURATIONS (< 1024px)
-   ========================================================================== */
-@media (max-width: 1023px) {
-    .app-container { display: block !important; width: 100% !important; }
-    .main-content { margin-left: 0 !important; width: 100% !important; max-width: 100% !important; padding: 4px !important; }
-    
-    .sidebar { position: fixed !important; top: 0; left: 0; height: 100vh; width: 260px; z-index: 9999; transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: 4px 0 25px rgba(0,0,0,0.08); }
-    .sidebar.is-drawer-open { transform: translateX(0) !important; }
-    .sidebar-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(45, 55, 72, 0.3); backdrop-filter: blur(2px); z-index: 9998; display: none; }
-    .sidebar-backdrop.is-active { display: block !important; }
-
-    .split-requisition-layout { display: block !important; width: 100% !important; padding-bottom: 140px !important; margin-top: 5px !important; box-sizing: border-box !important; }
-    .materials-main-panel { display: block !important; width: 100% !important; box-sizing: border-box !important; }
-    .catalog-cards-box { background: #ffffff !important; border: 1px solid #e2e8f0 !important; padding: 10px !important; border-radius: 8px !important; width: 100% !important; box-sizing: border-box !important; }
-    
-    .category-section { margin-bottom: 6px !important; padding: 0 4px !important; }
-    .category-section h2 { font-size: 13px !important; font-weight: 700 !important; color: #374151 !important; }
-    .category-block h4 { font-size: 11px !important; margin-bottom: 4px !important; padding-left: 4px; }
-
-    .material-item-grid { display: flex !important; flex-direction: column !important; gap: 5px !important; width: 100% !important; box-sizing: border-box !important; }
-    .material-item-card { border: 1px solid #e5e7eb !important; border-radius: 6px !important; padding: 4px 10px !important; background: #fff !important; min-height: auto !important; height: 44px !important; display: flex !important; flex-direction: row !important; justify-content: space-between !important; align-items: center !important; width: 100% !important; box-sizing: border-box !important; }
-    .material-item-image-box { display: none !important; }
-    
-    .material-item-name { text-align: left !important; font-size: 12px !important; margin-bottom: 0px !important; line-height: 1.2 !important; flex: 1 !important; padding-right: 8px !important; }
-    .material-item-name strong { font-weight: 600 !important; color: #111827 !important; }
-    .material-item-name div { display: inline-block !important; margin-top: 0px !important; margin-left: 4px !important; font-size: 11px !important; color: #64748b !important; }
-    
-    .btn-tab-styled-add { width: auto !important; max-width: 65px !important; padding: 4px 10px !important; font-size: 11px !important; margin: 0 !important; border: 1px solid #cbd5e0 !important; border-radius: 6px !important; cursor: pointer !important; font-weight: 600 !important; background: #fff !important; color: #475569 !important; }
-
-    .right-column-stack { position: fixed !important; bottom: 0 !important; left: 0 !important; width: 100% !important; height: auto !important; top: auto !important; z-index: 9999 !important; gap: 0 !important; pointer-events: none; }
-    .past-log-section { display: none !important; }
-    .requisition-right-sidebar { border-radius: 20px 20px 0 0 !important; border: none !important; border-top: 2px solid #cbd5e0 !important; box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.12) !important; padding: 10px 14px !important; background: #ffffff !important; pointer-events: auto; width: 100% !important; box-sizing: border-box !important; }
-    
-    .sidebar-summary-title { margin-bottom: 4px !important; padding-bottom: 2px !important; font-size: 11px !important; }
-    .sidebar-summary-title::after { font-size: 10px !important; content: "▲ Expand Drawer" !important; }
-    .sidebar-cart-list { max-height: 0px !important; }
-    .requisition-right-sidebar.drawer-open-state .sidebar-cart-list { max-height: 180px !important; margin-bottom: 8px !important; }
-    
-    .btn-quick-search-box { padding: 8px 12px 8px 32px !important; font-size: 12px !important; }
-    .catalog-tab-header { margin-bottom: 10px !important; padding-bottom: 6px !important; margin-left: 2px !important; }
-    .catalog-tab-btn { padding: 4px 8px !important; font-size: 11px !important; }
-    .btn-bill { padding: 10px !important; font-size: 12px !important; }
-}
-
-@media (max-width: 600px) {
-    .grid { display: flex; flex-direction: column; gap: 5px; }
-    .card { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-radius: 8px; text-align: left; }
-    .card img { width: 28px; height: 28px; margin-bottom: 0; border-radius: 4px; }
-    .card-left-group { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
-    .card-details { display: flex; flex-direction: column; min-width: 0; }
-    .card-name { font-size: 12px; height: auto; margin-bottom: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
-    .card-price { font-size: 11px; margin-top: 1px; margin-bottom: 0; }
-}
-/* ==========================================================================
-   🛠️ MODAL CONTROL LAYOUT & SLICK POPUP ELEMENT STYLING
+   🛠️ 🌟 GLOBAL MODAL LAYOUT & INDEPENDENT ACTION BUTTONS (WORKS FOR ALL PAGES)
    ========================================================================== */
 .verification-item-row-wrapper {
     display: flex !important;
@@ -446,7 +309,6 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     box-sizing: border-box !important;
 }
 
-/* Quantity Box Input Framework Controls */
 .modal-qty-container {
     display: inline-flex !important;
     align-items: center !important;
@@ -491,7 +353,6 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
 .modal-input-qty::-webkit-outer-spin-button,
 .modal-input-qty::-webkit-inner-spin-button { -webkit-appearance: none !important; margin: 0 !important; }
 
-/* 🔑 THE INDEPENDENT FIX: Converts choices to separate standalone button targets */
 .binary-toggle-container {
     display: flex !important;
     gap: 8px !important;
@@ -515,7 +376,6 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     transition: all 0.15s ease-in-out !important;
 }
 
-/* 🟢 Fulfilled Button - Independent Styling Rules */
 .toggle-choice-btn.btn-block-fulfilled {
     color: #10b981 !important;
     border-color: #a7f3d0 !important;
@@ -527,7 +387,6 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     border-color: #10b981 !important;
 }
 
-/* 🔴 Remove Button - Independent Styling Rules */
 .toggle-choice-btn.btn-block-remove {
     color: #ef4444 !important;
     border-color: #fca5a5 !important;
@@ -539,7 +398,6 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     border-color: #ef4444 !important;
 }
 
-/* Active State Memory Classes injected by Javascript */
 .row-state-green-highlight #toggleBtn_F_ {
     background: #10b981 !important;
     color: #ffffff !important;
@@ -552,113 +410,72 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     border-color: #ef4444 !important;
     box-shadow: 0 2px 4px rgba(239,68,68,0.2) !important;
 }
-/* ==========================================================================
-   🛠️ GLOBAL MODAL LAYOUT & INDEPENDENT ACTION BUTTONS (WORKS FOR ALL PAGES)
-   ========================================================================== */
-.verification-item-row-wrapper {
-    display: flex !important;
-    justify-content: space-between !important;
-    align-items: center !important;
-    padding: 12px 14px !important;
-    border: 1px solid #e2e8f0 !important;
-    background: #ffffff !important;
-    margin-bottom: 10px !important;
-    border-radius: 10px !important;
-    gap: 15px !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-}
-
-.modal-qty-container {
-    display: inline-flex !important;
-    align-items: center !important;
-    border: 1px solid #cbd5e0 !important;
-    border-radius: 6px !important;
-    overflow: hidden !important;
-    background: #ffffff !important;
-    height: 34px !important;
-}
-
-.modal-qty-btn {
-    width: 32px !important;
-    height: 100% !important;
-    background: #f8fafc !important;
-    border: none !important;
-    color: #475569 !important;
-    font-weight: bold !important;
-    font-size: 15px !important;
-    cursor: pointer !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    transition: background 0.15s ease !important;
-}
-.modal-qty-btn:hover { background: #e2e8f0 !important; color: #0f172a !important; }
-
-.modal-input-qty {
-    width: 50px !important;
-    height: 100% !important;
-    border: none !important;
-    border-left: 1px solid #cbd5e0 !important;
-    border-right: 1px solid #cbd5e0 !important;
-    text-align: center !important;
-    font-size: 14px !important;
-    font-weight: 700 !important;
-    color: #1e293b !important;
-    background: #ffffff !important;
-    padding: 0 !important;
-    outline: none !important;
-    -moz-appearance: textfield !important;
-}
-
-.binary-toggle-container {
-    display: flex !important;
-    gap: 8px !important;
-    background: transparent !important;
-    padding: 0 !important;
-    border: none !important;
-    align-items: center !important;
-}
-
-.toggle-choice-btn {
-    padding: 8px 14px !important;
-    font-size: 11px !important;
-    font-weight: 700 !important;
-    border: 1px solid #cbd5e0 !important;
-    border-radius: 6px !important;
-    cursor: pointer !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.5px !important;
-    background: #ffffff !important;
-    color: #475569 !important;
-    transition: all 0.15s ease-in-out !important;
-}
-
-.toggle-choice-btn.btn-block-fulfilled {
-    color: #10b981 !important;
-    border-color: #a7f3d0 !important;
-    background: #f0fdf4 !important;
-}
-.toggle-choice-btn.btn-block-fulfilled:hover { background: #10b981 !important; color: #ffffff !important; }
-
-.toggle-choice-btn.btn-block-remove {
-    color: #ef4444 !important;
-    border-color: #fca5a5 !important;
-    background: #fdf2f2 !important;
-}
-.toggle-choice-btn.btn-block-remove:hover { background: #ef4444 !important; color: #ffffff !important; }
-
-/* Active State Memory Styles */
-.row-state-green-highlight #toggleBtn_F_ {
-    background: #10b981 !important;
-    color: #ffffff !important;
-    border-color: #10b981 !important;
-}
-.row-state-greyed-out #toggleBtn_C_ {
-    background: #ef4444 !important;
-    color: #ffffff !important;
-    border-color: #ef4444 !important;
-}
 
 .row-state-green-highlight { background: #f0fdf4 !important; border-left: 4px solid #10b981 !important; }
 .row-state-greyed-out { background: #f8fafc !important; border-left: 4px solid #94a3b8 !important; opacity: 0.75; }
+
+/* ==========================================================================
+   ⚡ MOBILE DRAWER & PHONE COMPACT VIEWPORTS OVERRIDES (< 1024px)
+   ========================================================================== */
+@media (max-width: 1023px) {
+    .app-container { display: block !important; width: 100% !important; }
+    .main-content { margin-left: 0 !important; width: 100% !important; max-width: 100% !important; padding: 4px !important; }
+    
+    .sidebar { position: fixed !important; top: 0; left: 0; height: 100vh; width: 260px; z-index: 9999; transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: 4px 0 25px rgba(0,0,0,0.08); }
+    .sidebar.is-drawer-open { transform: translateX(0) !important; }
+    .sidebar-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(45, 55, 72, 0.3); backdrop-filter: blur(2px); z-index: 9998; display: none; }
+    .sidebar-backdrop.is-active { display: block !important; }
+
+    .split-requisition-layout { display: block !important; width: 100% !important; padding-bottom: 140px !important; margin-top: 5px !important; box-sizing: border-box !important; }
+    .materials-main-panel { display: block !important; width: 100% !important; box-sizing: border-box !important; }
+    .catalog-cards-box { background: #ffffff !important; border: 1px solid #e2e8f0 !important; padding: 10px !important; border-radius: 8px !important; width: 100% !important; box-sizing: border-box !important; }
+    
+    .category-section { margin-bottom: 6px !important; padding: 0 4px !important; }
+    .category-section h2 { font-size: 13px !important; font-weight: 700 !important; color: #374151 !important; }
+    .category-block h4 { font-size: 11px !important; margin-bottom: 4px !important; padding-left: 4px; }
+
+    .material-item-grid { display: flex !important; flex-direction: column !important; gap: 5px !important; width: 100% !important; box-sizing: border-box !important; }
+    .material-item-card { border: 1px solid #e5e7eb !important; border-radius: 6px !important; padding: 4px 10px !important; background: #fff !important; min-height: auto !important; height: 44px !important; display: flex !important; flex-direction: row !important; justify-content: space-between !important; align-items: center !important; width: 100% !important; box-sizing: border-box !important; }
+    .material-item-image-box { display: none !important; }
+    
+    .material-item-name { text-align: left !important; font-size: 12px !important; margin-bottom: 0px !important; line-height: 1.2 !important; flex: 1 !important; padding-right: 8px !important; }
+    .material-item-name strong { font-weight: 600 !important; color: #111827 !important; }
+    .material-item-name div { display: inline-block !important; margin-top: 0px !important; margin-left: 4px !important; font-size: 11px !important; color: #64748b !important; }
+    
+    .btn-tab-styled-add { width: auto !important; max-width: 65px !important; padding: 4px 10px !important; font-size: 11px !important; margin: 0 !important; border: 1px solid #cbd5e0 !important; border-radius: 6px !important; cursor: pointer !important; font-weight: 600 !important; background: #fff !important; color: #475569 !important; }
+
+    .right-column-stack { position: fixed !important; bottom: 0 !important; left: 0 !important; width: 100% !important; height: auto !important; top: auto !important; z-index: 9999 !important; gap: 0 !important; pointer-events: none; }
+    .past-log-section { display: none !important; }
+    .requisition-right-sidebar { border-radius: 20px 20px 0 0 !important; border: none !important; border-top: 2px solid #cbd5e0 !important; box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.12) !important; padding: 10px 14px !important; background: #ffffff !important; pointer-events: auto; width: 100% !important; box-sizing: border-box !important; }
+    
+    .sidebar-summary-title { margin-bottom: 4px !important; padding-bottom: 2px !important; font-size: 11px !important; }
+    .sidebar-summary-title::after { font-size: 10px !important; content: "▲ Expand Drawer" !important; }
+    .sidebar-cart-list { max-height: 0px !important; }
+    .requisition-right-sidebar.drawer-open-state .sidebar-cart-list { max-height: 180px !important; margin-bottom: 8px !important; }
+    
+    .btn-quick-search-box { padding: 8px 12px 8px 32px !important; font-size: 12px !important; }
+    .catalog-tab-header { margin-bottom: 10px !important; padding-bottom: 6px !important; margin-left: 2px !important; }
+    .catalog-tab-btn { padding: 4px 8px !important; font-size: 11px !important; }
+    .btn-bill { padding: 10px !important; font-size: 12px !important; }
+
+    .sidebar-total-row-wrapper {
+        display: flex !important;
+        flex-direction: row !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        width: 100% !important;
+        margin-bottom: 12px !important;
+    }
+    .total-types-label { font-size: 14px !important; font-weight: 700 !important; color: #111827 !important; }
+    .total-types-value { font-size: 14px !important; font-weight: 800 !important; color: #111827 !important; }
+}
+
+@media (max-width: 600px) {
+    .grid { display: flex; flex-direction: column; gap: 5px; }
+    .card { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-radius: 8px; text-align: left; }
+    .card img { width: 28px; height: 28px; margin-bottom: 0; border-radius: 4px; }
+    .card-left-group { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+    .card-details { display: flex; flex-direction: column; min-width: 0; }
+    .card-name { font-size: 12px; height: auto; margin-bottom: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+    .card-price { font-size: 11px; margin-top: 1px; margin-bottom: 0; }
+}
