@@ -182,9 +182,10 @@ include "includes/header.php";
                     <p style="color: #a0aec0; text-align: center; font-size: 12px; margin-top: 30px; font-style: italic;">No items added to this request list yet.</p>
                 </div>
                 <div>
-                    <div class="sidebar-total-row-wrapper">
-                        <span class="total-types-label">Total Item Types:</span>
-                        <span id="sidebarTotalCount" class="total-types-value">0</span>
+                   
+                    <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 14px; margin-bottom: 10px; color: #111827;">
+                        <span>Total Item Types:</span>
+                        <span id="sidebarTotalCount">0</span>
                     </div>
                     <button type="button" class="btn btn-bill" style="width: 100%; padding: 12px; font-size: 13px; font-weight: bold; border-radius: 8px;" onclick="window.submitSidebarRequisition(event)">Submit Requisition</button>
                 </div>
@@ -375,6 +376,7 @@ window.updateSidebarQty = function(id, delta) {
     window.renderSidebarCart();
 };
 
+// 🔑 FIXED: Restored your exact horizontal sliding checkout listing rows cleanly
 window.renderSidebarCart = function() {
     const container = document.getElementById("sidebarCartRowsContainer");
     const totalCountEl = document.getElementById("sidebarTotalCount");
