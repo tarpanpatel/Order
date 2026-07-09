@@ -5,15 +5,19 @@ ob_start(); // Start output buffering: this prevents "headers already sent" by c
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-// Debugging check: Was there any output before this line?
-if (headers_sent($file, $line)) {
-    die("Headers already sent in $file on line $line. There is hidden output in that file!");
+if (session_status() === PHP_SESSION_NONE) {
+    $sessionPath = __DIR__ . '/_sessions';
+    if (!is_dir($sessionPath)) { mkdir($sessionPath, 0755, true); }
+    
+    ini_set('session.save_path', $sessionPath);
+    ini_set('session.gc_maxlifetime', 1209600);
+    ini_set('session.cookie_lifetime', 1209600);
+    ini_set('session.use_only_cookies', 1);
+    
+    // 2. Start the session safely
+    session_start();
 }
 
-$sessionPath = __DIR__ . '/_sessions';
-if (!is_dir($sessionPath)) { mkdir($sessionPath, 0755, true); }
-ini_set('session.save_path', $sessionPath);
-session_start();
 require_once "config/db.php";
 // ... rest of your code
 // 1. FETCH ALL REGISTERED USERS FOR THE SECURE DROPDOWN
