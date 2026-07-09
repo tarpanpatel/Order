@@ -60,30 +60,36 @@ body {
         box-sizing: border-box !important;
     }
 
+    /* 🔑 FIXED: Added min-width: 0 to prevent inner flex child blowouts */
     .main-content {
         flex: 1 !important;
         margin-left: 285px !important;
         width: calc(100% - 285px) !important;
         max-width: calc(100% - 285px) !important;
+        min-width: 0 !important; 
         box-sizing: border-box !important;
         padding: 20px !important;
     }
 
+    /* 🔑 FIXED: Adjusted ratio slightly to ensure safe margins on 1024px screens */
     .split-requisition-layout { 
         display: grid !important; 
-        grid-template-columns: 1fr 380px !important; 
+        grid-template-columns: 1fr 340px !important; 
         gap: 20px !important; 
         width: 100% !important; 
+        max-width: 100% !important;
         align-items: start !important; 
         margin-top: 15px; 
-        box-sizing: border-box; 
+        box-sizing: border-box !important; 
     }
     
+    /* 🔑 FIXED: min-width: 0 strictly forces the scrolling tabs to stay inside the box */
     .materials-main-panel { 
         display: flex !important;
         flex-direction: column !important;
         gap: 24px !important;
         width: 100% !important;
+        min-width: 0 !important; 
         box-sizing: border-box !important;
     }
     
@@ -103,6 +109,8 @@ body {
         gap: 20px !important;
         position: sticky !important;
         top: 20px !important;
+        width: 100% !important;
+        min-width: 0 !important;
         box-sizing: border-box !important;
     }
     
@@ -149,6 +157,7 @@ body {
     margin-bottom: 10px;
     color: #111827;
 }
+
 /* ==========================================================================
    ⚙️ SHARED SYSTEM CONSTANTS & PRESETS
    ========================================================================== */
@@ -225,13 +234,7 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
 .p-btn-confirm { background: var(--primary); color: white; }
 .p-btn-cancel { background: #edf2f7; color: var(--text-muted); }
 
-/* ==========================================================================
-   🎨 🌟 REQUISITIONS LOG STATUS AND ACTION BADGE DECORATORS
-   ========================================================================== */
-.past-table td {
-    padding: 10px 6px !important;
-}
-
+/* Base button properties for Action Triggers */
 .btn-action-trigger {
     display: block !important;
     width: 100% !important;
@@ -389,23 +392,16 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     border-color: #a7f3d0 !important;
     background: #f0fdf4 !important;
 }
-.toggle-choice-btn.btn-block-fulfilled:hover {
-    background: #10b981 !important;
-    color: #ffffff !important;
-    border-color: #10b981 !important;
-}
+.toggle-choice-btn.btn-block-fulfilled:hover { background: #10b981 !important; color: #ffffff !important; }
 
 .toggle-choice-btn.btn-block-remove {
     color: #ef4444 !important;
     border-color: #fca5a5 !important;
     background: #fdf2f2 !important;
 }
-.toggle-choice-btn.btn-block-remove:hover {
-    background: #ef4444 !important;
-    color: #ffffff !important;
-    border-color: #ef4444 !important;
-}
+.toggle-choice-btn.btn-block-remove:hover { background: #ef4444 !important; color: #ffffff !important; }
 
+/* Active State Memory Styles */
 .row-state-green-highlight #toggleBtn_F_ {
     background: #10b981 !important;
     color: #ffffff !important;
@@ -427,7 +423,7 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
    ========================================================================== */
 @media (max-width: 1023px) {
     .app-container { display: block !important; width: 100% !important; }
-    .main-content { margin-left: 0 !important; width: 100% !important; max-width: 100% !important; padding: 4px !important; }
+    .main-content { margin-left: 0 !important; width: 100% !important; max-width: 100% !important; padding: 4px !important; overflow-x: hidden !important; box-sizing: border-box !important; }
     
     .sidebar { position: fixed !important; top: 0; left: 0; height: 100vh; width: 260px; z-index: 9999; transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: 4px 0 25px rgba(0,0,0,0.08); }
     .sidebar.is-drawer-open { transform: translateX(0) !important; }
@@ -459,10 +455,8 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     .material-item-name div { display: inline-block !important; margin-top: 0px !important; margin-left: 4px !important; font-size: 11px !important; color: #64748b !important; }
     
     .btn-tab-styled-add { width: auto !important; max-width: 65px !important; padding: 4px 10px !important; font-size: 11px !important; margin: 0 !important; border: 1px solid #cbd5e0 !important; border-radius: 6px !important; cursor: pointer !important; font-weight: 600 !important; background: #fff !important; color: #475569 !important; }
-span#sidebarTotalCount {
-    margin-left: 10px;
-    font-weight: bold;
-}
+    span#sidebarTotalCount { margin-left: 10px; font-weight: bold; }
+
     .right-column-stack { 
         position: fixed !important; 
         bottom: 0 !important; 
