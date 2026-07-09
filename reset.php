@@ -2,11 +2,11 @@
 require_once 'config/db.php';
 
 // Generate a clean native hash for 'password123'
-$new_password = password_hash('password123', PASSWORD_BCRYPT);
+$new_password = password_hash('3685', PASSWORD_BCRYPT);
 
 try {
     // Force reset the admin user account
-    $stmt = $pdo->prepare("UPDATE users SET password = ? WHERE username = 'admin'");
+    $stmt = $pdo->prepare("UPDATE users SET password = ? WHERE username = 'tarpan'");
     $stmt->execute([$new_password]);
     
     echo "<h3>Success!</h3>";
