@@ -1,5 +1,9 @@
 <?php
-// /home/apartment/artistsfarmjaipur.com/Order/login.php
+session_start();
+echo "DEBUG: User ID in session: " . ($_SESSION['user_id'] ?? 'NONE') . "<br>";
+echo "DEBUG: POST data: "; print_r($_POST);
+// Stop execution so the page doesn't refresh
+die("<br>--- STOPPED HERE TO DEBUG ---");
 ob_start(); // Start output buffering: this prevents "headers already sent" by catching all output
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
