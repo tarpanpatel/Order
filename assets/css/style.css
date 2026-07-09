@@ -34,7 +34,9 @@ body {
     color: var(--text-main); 
     padding-bottom: 150px; 
 }
-
+.category-section h2 {
+    font-size: 12px;
+}
 /* ==========================================================================
    🖥️ DESKTOP-SPECIFIC TEMPLATE GRID ARCHITECTURE (>= 1024px VIEWPORTS)
    ========================================================================== */
