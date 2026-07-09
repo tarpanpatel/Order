@@ -1,25 +1,34 @@
 <?php
 // /home/apartment/artistsfarmjaipur.com/Order/includes/left_menu.php
+if (!isset($pdo)) {
+    require_once __DIR__ . '/../config/db.php';
+}
 
 $current_page = basename($_SERVER['PHP_SELF']);
-$user_role = $_SESSION['role'] ?? 'Staff';
-$is_super_admin = ($user_role === 'Super Admin');
+ 
+// 🔑 FIXED: Initialize variable to NULL to prevent "Undefined" warnings
+$active_guest = null;
 
 // Fetch Dynamic Menus based on Role Access
 if ($is_super_admin) {
-    // Super Admin gets everything
     $menuStmt = $pdo->query("SELECT * FROM sys_menu ORDER BY parent_id ASC, sort_order ASC");
     $allowed_menus = $menuStmt->fetchAll(PDO::FETCH_ASSOC);
 } else {
-    // Other roles check the access mapping table
-    $menuStmt = $pdo->prepare("
+    $stmt = $pdo->prepare("
         SELECT m.* FROM sys_menu m
         JOIN sys_role_menu rm ON m.id = rm.menu_id
         WHERE rm.role_name = ?
         ORDER BY m.parent_id ASC, m.sort_order ASC
     ");
-    $menuStmt->execute([$user_role]);
-    $allowed_menus = $menuStmt->fetchAll(PDO::FETCH_ASSOC);
+    $stmt->execute([$user_role]);
+    $allowed_menus = $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// Attempt to fetch active guest
+try {
+    $active_guest = $pdo->query("SELECT id, guest_name, phone_number FROM guests WHERE status = 'Active' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+    $active_guest = null;
 }
 
 // Organize into Main items and Sub-items
