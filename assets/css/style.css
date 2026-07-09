@@ -452,7 +452,13 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     .catalog-tab-header { margin-bottom: 10px !important; padding-bottom: 6px !important; margin-left: 2px !important; }
     .catalog-tab-btn { padding: 4px 8px !important; font-size: 11px !important; }
     .btn-bill { padding: 10px !important; font-size: 12px !important; }
-
+.material-item-name div {
+        display: inline-block !important;
+        margin-top: 0px !important;
+        margin-left: 4px !important;
+        font-size: 11px !important;
+        color: #64748b !important;
+    }
     /* 🔑 HIGH-SPECIFICITY OVERRIDES TO KILL THE LAYOUT MISALIGNMENTS CAUSED BY CHILD DIVS */
     .requisition-right-sidebar .sidebar-total-row-wrapper {
         display: flex !important;
@@ -493,13 +499,4 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     .card-details { display: flex; flex-direction: column; min-width: 0; }
     .card-name { font-size: 12px; height: auto; margin-bottom: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
     .card-price { font-size: 11px; margin-top: 1px; margin-bottom: 0; }
-}
-@media (max-width: 1023px) {
-    .material-item-name div {
-        display: inline-block !important;
-        margin-top: 0px !important;
-        margin-left: 4px !important;
-        font-size: 11px !important;
-        color: #64748b !important;
-    }
 }
