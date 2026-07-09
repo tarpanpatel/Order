@@ -17,31 +17,35 @@ if (!isset($_SESSION["role"]) || !check_page_access($pdo)) {
 $guest = $pdo->query("SELECT * FROM guests WHERE status = 'Active' LIMIT 1")->fetch();
 // --- HANDLE PENDING ACCOMMODATION PAYMENT ---
 if (isset($_POST['action_collect_pending'])) {
-    $guest_id     = intval($_POST['guest_id']);
-    $amount       = floatval($_POST['amount']);
+    $guest_id = intval($_POST['guest_id']);
+    $amount = floatval($_POST['amount']);
     $collector_id = intval($_POST['collector_id']);
-    $mode         = $_POST['payment_mode']; // Cash or UPI
+    $mode = $_POST['payment_mode'];
 
-    // Get collector name
+    // 1. Get Collector Name
     $collector = $pdo->prepare("SELECT username FROM users WHERE id = ?");
     $collector->execute([$collector_id]);
     $collector_name = $collector->fetchColumn() ?: 'Unknown';
 
     try {
-        $stmt = $pdo->prepare("UPDATE guests SET 
-            pending_amount = 0, 
-            pending_received_by = ?, 
-            payment_mode = ? 
-            WHERE id = ?");
-        $stmt->execute([$collector_name, $mode, $guest_id]);
+        $pdo->beginTransaction();
 
-        // Audit Trail
-        $log = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
-        $log->execute([$_SESSION['user_id'], "Collected pending accommodation ₹$amount (Mode: $mode). Received by: $collector_name"]);
+        // 2. Clear Pending Amount
+        $stmt = $pdo->prepare("UPDATE guests SET pending_amount = 0, pending_received_by = ? WHERE id = ?");
+        $stmt->execute([$collector_name, $guest_id]);
+if (!$stmt->rowCount()) {
+    die("DEBUG: The SQL executed but changed 0 rows. Check if guest_id " . $guest_id . " exists.");
+}
+        // 3. IMPORTANT: Add as an "Adjustment" so it shows on the final bill
+        $adj = $pdo->prepare("INSERT INTO order_adjustments (order_id, reason, amount, type) VALUES (?, ?, ?, 'adjustment')");
+        // Note: You may need to replace 'order_id' with your actual order ID logic
+        $adj->execute([$guest_id, "Pending Accommodation Payment Received ($mode) by $collector_name", $amount]);
 
-        $_SESSION['staff_success'] = "Pending amount of ₹$amount collected.";
+        $pdo->commit();
+        $_SESSION['staff_success'] = "Payment recorded and added to bill adjustments.";
     } catch (Exception $e) {
-        $_SESSION['staff_error'] = "Failed: " . $e->getMessage();
+        $pdo->rollBack();
+        $_SESSION['staff_error'] = "Transaction failed: " . $e->getMessage();
     }
     header("Location: billing.php");
     exit;
