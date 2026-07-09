@@ -1,5 +1,14 @@
 <?php
 // /home/apartment/artistsfarmjaipur.com/Order/login.php
+
+// 🔑 SAFE SESSION INITIALIZATION PRESETS (MUST RUN BEFORE FIRST SESSION_START)
+$sessionPath = __DIR__ . '/_sessions';
+if (!is_dir($sessionPath)) { mkdir($sessionPath, 0700, true); }
+ini_set('session.save_path', $sessionPath);
+ini_set('session.gc_maxlifetime', 1209600);
+ini_set('session.cookie_lifetime', 1209600);
+ini_set('session.use_only_cookies', 1);
+
 session_start();
 require_once "config/db.php";
 
@@ -16,14 +25,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $user_id  = intval($_POST['user_id'] ?? 0);
     $passcode = trim($_POST['passcode'] ?? '');
 
-    // Collect network metadata context environments safely
     $client_ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
     if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
         $client_ip = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0];
     }
     $browser_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown Signature';
 
-    // Parse hardware profile signature maps
     $device = "Desktop Workstation Engine";
     if (preg_match('/(android|bb\d+|meego).+mobile|iphone|ipad|playbook|silk|palm|phone/i', $browser_agent)) {
         $device = "Mobile Handset Device";
@@ -36,8 +43,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
 
     if ($user_id > 0 && !empty($passcode)) {
-        // Authenticate passcode credential mapping using fallback presets or registered hashes
-        // Presets fallback match for Super Admin master token configurations
         if ($user_id === 7 && $passcode === "3685") {
             $_SESSION["user_id"] = 7;
             $_SESSION["username"] = "tarpan";
@@ -50,12 +55,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             header("Location: order.php");
             exit;
         } else {
-            // Standard validation lookup for general user profiles matching specific IDs
             $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
             $stmt->execute([$user_id]);
             $user_row = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            // Verifies against master system password mapping layers
             if ($user_row && ($passcode === "3685" || $passcode === "1202" || password_verify($passcode, $user_row['password']))) {
                 $_SESSION["user_id"]   = $user_row['id'];
                 $_SESSION["username"]  = $user_row['username'];
@@ -65,7 +68,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $log = $pdo->prepare("INSERT INTO security_login_logs (username_entered, passcode_entered, user_id, role_assigned, ip_address, browser_agent, device_type, login_status) VALUES (?, ?, ?, ?, ?, ?, ?, 'Success')");
                 $log->execute([$user_row['username'], $passcode, $user_row['id'], $user_row['role'], $client_ip, $browser_agent, $device]);
 
-                // Redirect gateway route matching assigned user roles
                 if ($user_row['role'] === 'Chef') {
                     header("Location: kitchen.php");
                 } else {
