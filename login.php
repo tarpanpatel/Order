@@ -1,18 +1,18 @@
 <?php
 // /home/apartment/artistsfarmjaipur.com/Order/login.php
+ob_start(); // Start output buffering: this prevents "headers already sent" by catching all output
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
-// 1. Set settings BEFORE any output
+// Debugging check: Was there any output before this line?
+if (headers_sent($file, $line)) {
+    die("Headers already sent in $file on line $line. There is hidden output in that file!");
+}
+
 $sessionPath = __DIR__ . '/_sessions';
 if (!is_dir($sessionPath)) { mkdir($sessionPath, 0755, true); }
 ini_set('session.save_path', $sessionPath);
-ini_set('session.gc_maxlifetime', 1209600);
-ini_set('session.cookie_lifetime', 1209600);
-ini_set('session.use_only_cookies', 1);
-
-// 2. Start session
 session_start();
-
-// 3. Now require your db
 require_once "config/db.php";
 // ... rest of your code
 // 1. FETCH ALL REGISTERED USERS FOR THE SECURE DROPDOWN
