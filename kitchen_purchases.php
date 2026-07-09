@@ -38,7 +38,9 @@ if (!in_array("vendor", $columnCheck)) {
 // --- BACKEND LOGIC: POST INTERCEPTOR FOR RECORDING PROCUREMENT INVENTORY ---
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_add_kitchen_expense"])) {
     $date           = $_POST["expense_date"];
-    $category       = $_POST["item_category"];
+    
+    /* 🔑 HARDCODED FALLBACK: Keeps data structures uniform for future use */
+    $category       = "Rations"; 
     $item_detail    = trim($_POST["item_detail"]);
     
     // FORCED OVERRIDE: Active user records transaction responsibility inside vendor_name mapping column
@@ -143,20 +145,9 @@ include "includes/header.php";
         <form method="POST" action="kitchen_purchases.php">
             <input type="hidden" name="action_add_kitchen_expense" value="1">
             
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom:15px;">
-                <div>
-                    <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">PURCHASE DATE</label>
-                    <input type="date" name="expense_date" required class="form-control" value="<?= date('Y-m-d') ?>" style="width:100%; padding:10px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box;">
-                </div>
-                <div>
-                    <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">CLASSIFICATION PROFILE</label>
-                    <select name="item_category" required style="width:100%; padding:10px; border:1px solid #cbd5e0; border-radius:6px; background:white; font-weight:bold;">
-                        <option value="Rations">Kitchen Provisions / Rations</option>
-                        <option value="Vegetables">Fresh Produce / Vegetables</option>
-                        <option value="Dairy">Dairy Products</option>
-                        <option value="Gas / Fuel">LPG Gas / Generator Fuel</option>
-                    </select>
-                </div>
+            <div style="margin-bottom:15px;">
+                <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">PURCHASE DATE</label>
+                <input type="date" name="expense_date" required class="form-control" value="<?= date('Y-m-d') ?>" style="width:100%; padding:10px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box;">
             </div>
 
             <div style="margin-bottom:15px;">
@@ -178,7 +169,7 @@ include "includes/header.php";
                     <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">UNIT PRICE (₹)</label>
                     <input type="number" step="0.01" name="price_per_unit" required placeholder="0.00" style="width:100%; padding:10px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box;">
                 </div>
-                <div>
+                <div style="grid-column: span 2;">
                     <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">RECORDED BY</label>
                     <input type="text" readonly value="<?= htmlspecialchars($_SESSION['username']) ?>" style="width:100%; padding:10px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box; background:#f1f5f9; color:#64748b; font-weight:bold;">
                 </div>
