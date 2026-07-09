@@ -84,8 +84,8 @@ include "includes/header.php";
                     Basket is empty.<br>Click items to load.
                 </div>
 
-                <form method="POST" action="process_order.php" id="checkoutCartSubmissionForm" style="display:none; margin:0; flex-direction:column; width:100%;">
-                    <input type="hidden" name="guest_id" value="<?= $current_active_guest['id'] ?? 0 ?>">
+                <form onsubmit="window.submitFoodOrder(event)" id="checkoutCartSubmissionForm" style="display:none; margin:0; flex-direction:column; width:100%;">
+    <input type="hidden" name="guest_id" value="<?= $current_active_guest['id'] ?? 0 ?>">
                     
                     <div class="sidebar-cart-list" id="cartItemsContainerRows">
                         </div>
@@ -230,6 +230,46 @@ window.renderCartInterfaceElements = function() {
         placeholder.style.display = "none";
         form.style.display = "flex";
     }
+};
+window.submitFoodOrder = function(event) {
+    event.preventDefault(); // Prevents the form from refreshing the page
+
+    // Convert activeCartStateMap object into an array for the backend
+    const cartItems = [];
+    for (let id in window.activeCartStateMap) {
+        cartItems.push({
+            id: id,
+            qty: window.activeCartStateMap[id].qty,
+            notes: "" // You can add an input for notes here if needed
+        });
+    }
+
+    if (cartItems.length === 0) {
+        alert("Cart is empty.");
+        return;
+    }
+
+    // Send JSON to process_order.php
+    fetch("process_order.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: cartItems })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            alert("✔ Order sent to kitchen successfully!");
+            // Clear cart and update view
+            window.activeCartStateMap = {};
+            window.renderCartInterfaceElements();
+        } else {
+            alert("❌ Order Failed: " + (data.message || "Unknown error"));
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert("❌ Network error: Could not reach process_order.php");
+    });
 };
 </script>
 
