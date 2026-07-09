@@ -42,33 +42,7 @@ foreach ($allowed_menus as $menu) {
     
     <nav style="display: flex; flex-direction: column; gap: 4px; width: 100%; padding-top: 5px;">
         
-        <?php foreach ($main_menus as $menu): ?>
-            
-            <?php if ($menu['title'] === 'Admin Control'): ?>
-                <?php if (!empty($sub_menus[$menu['id']])): ?>
-                    <div class="admin-settings-wrapper" style="margin-top: 6px; border-top: 1px solid #cbd5e0; padding-top: 6px; width: 100%;">
-                        <div onclick="toggleAdminSubMenu()" class="nav-link" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 700; color: #475569; padding: 10px 16px;">
-                            <span><?= htmlspecialchars($menu['icon']) ?> <?= htmlspecialchars($menu['title']) ?></span>
-                            <span id="adminMenuChevron" style="font-size: 10px; transition: transform 0.2s; transform: rotate(0deg);">▶</span>
-                        </div>
-        
-                        <div id="adminSubMenuContent" style="display: none; flex-direction: column; gap: 4px; padding-left: 15px; margin-top: 4px;">
-                            <?php foreach ($sub_menus[$menu['id']] as $sub): ?>
-                                <a href="<?= htmlspecialchars($sub['url']) ?>" class="nav-link <?= ($current_page === $sub['url']) ? 'active' : '' ?>" style="font-size: 12px; padding: 8px 12px;">
-                                    <?= htmlspecialchars($sub['icon']) ?> <?= htmlspecialchars($sub['title']) ?>
-                                </a>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
-                <?php endif; ?>
-
-            <?php else: ?>
-                <a href="<?= htmlspecialchars($menu['url']) ?>" class="nav-link <?= ($current_page === $menu['url']) ? 'active' : '' ?>">
-                    <?= htmlspecialchars($menu['icon']) ?> <?= htmlspecialchars($menu['title']) ?>
-                </a>
-            <?php endif; ?>
-
-            <?php
+        <?php
 // 1. Check if there is an active guest ledger in the database
 $active_guest_check = $pdo->query("SELECT id FROM guests WHERE status = 'Active' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 ?>
@@ -100,9 +74,7 @@ $active_guest_check = $pdo->query("SELECT id FROM guests WHERE status = 'Active'
     <?php endif; ?>
 
  
-        <?php endforeach; ?>
-        
-        <a href="logout.php" class="nav-link" style="margin-top: 20px; color: #e53e3e; text-align: center;">🔒 Sign Out</a>
+ 
     </nav>
 </div>
 
