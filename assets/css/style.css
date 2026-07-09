@@ -37,6 +37,13 @@ body {
 .category-section h2 {
     font-size: 12px;
 }
+div#adminSubMenuContent {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-left: 15px;
+    margin-top: 4px;
+}
 /* ==========================================================================
    🖥️ DESKTOP-SPECIFIC TEMPLATE GRID ARCHITECTURE (>= 1024px VIEWPORTS)
    ========================================================================== */
