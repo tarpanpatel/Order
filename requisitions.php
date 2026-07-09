@@ -237,7 +237,6 @@ include "includes/header.php";
     </div>
 </div>
 
-<!-- Edit Requisition Modal -->
 <div id="editReqModalPopup" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
     <div class="modal-content" style="background: white; max-width: 620px; width: 92%; border-radius: 12px; padding: 20px; position: relative; color: #111827; text-align: left;">
         <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="window.closeEditReqModal()">✕</span>
@@ -255,7 +254,6 @@ include "includes/header.php";
     </div>
 </div>
 
-<!-- Chef New Product Modal -->
 <div id="chefNewProductModal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
     <div class="modal-content" style="background: white; max-width: 440px; width: 90%; border-radius: 12px; padding: 25px; color: #111827; text-align: left;">
         <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="window.closeChefNewProductModal()">✕</span>
@@ -377,7 +375,6 @@ window.updateSidebarQty = function(id, delta) {
     window.renderSidebarCart();
 };
 
-// 🔑 FIXED: Transformed into a clean horizontal grid list generator to replicate original image format
 window.renderSidebarCart = function() {
     const container = document.getElementById("sidebarCartRowsContainer");
     const totalCountEl = document.getElementById("sidebarTotalCount");
@@ -390,7 +387,6 @@ window.renderSidebarCart = function() {
     
     totalCountEl.innerText = window.reqCart.length;
     
-    // Generates a compact fluid row layout wrapping title descriptors and counter toggles side-by-side
     container.innerHTML = window.reqCart.map(item => `
         <div class="sidebar-cart-row" style="display: flex !important; justify-content: space-between !important; align-items: center !important; font-size: 13px !important; padding: 6px 0 !important; border-bottom: 1px solid #edf2f7 !important; gap: 10px !important; width: 100% !important; box-sizing: border-box !important;">
             <div class="sidebar-cart-item-name" style="font-weight: 700 !important; color: #111827 !important; flex: 1 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; text-align: left !important;">${item.name}</div>

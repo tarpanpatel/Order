@@ -60,6 +60,7 @@ body {
         box-sizing: border-box !important;
     }
 
+    /* 🔑 THE DESKTOP FIX: Keeps panel aligned to the right of your sidebar without window spill */
     .main-content {
         flex: 1 !important;
         margin-left: 285px !important;
@@ -124,7 +125,7 @@ body {
     .past-log-section { background: #ffffff !important; border: 1px solid #cbd5e0 !important; border-radius: 12px !important; padding: 14px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important; text-align: left; width: 100%; box-sizing: border-box; }
 }
 
-/* --- SYSTEM NAV LINKS --- */
+/* --- SYSTEM NAV CARD LINKS --- */
 .sidebar nav a {
     display: block;
     padding: 12px 16px;
@@ -292,7 +293,7 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
 }
 
 /* ==========================================================================
-   🛠️ 🌟 GLOBAL MODAL LAYOUT & INDEPENDENT ACTION BUTTONS
+   🛠️ 🌟 GLOBAL MODAL LAYOUT & INDEPENDENT ACTION BUTTONS (WORKS FOR ALL PAGES)
    ========================================================================== */
 .verification-item-row-wrapper {
     display: flex !important;
@@ -452,42 +453,28 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     .catalog-tab-header { margin-bottom: 10px !important; padding-bottom: 6px !important; margin-left: 2px !important; }
     .catalog-tab-btn { padding: 4px 8px !important; font-size: 11px !important; }
     .btn-bill { padding: 10px !important; font-size: 12px !important; }
-.material-item-name div {
-        display: inline-block !important;
-        margin-top: 0px !important;
-        margin-left: 4px !important;
-        font-size: 11px !important;
-        color: #64748b !important;
-    }
-    /* 🔑 HIGH-SPECIFICITY OVERRIDES TO KILL THE LAYOUT MISALIGNMENTS CAUSED BY CHILD DIVS */
-    .requisition-right-sidebar .sidebar-total-row-wrapper {
-        display: flex !important;
-        flex-direction: row !important;
-        justify-content: space-between !important;
-        align-items: center !important;
+
+    /* 🔑 EXPLICIT MOB-BAR ALIGNMENT SETTINGS */
+    .sidebar-total-row-wrapper {
+        display: block !important;
         width: 100% !important;
-        max-width: 100% !important;
         margin-bottom: 12px !important;
         background: transparent !important;
         border: none !important;
         padding: 0 !important;
+        clear: both !important;
     }
-    .requisition-right-sidebar .sidebar-total-row-wrapper .total-types-label { 
+    .total-types-label { 
         font-size: 14px !important; 
         font-weight: 700 !important; 
         color: #111827 !important; 
-        width: auto !important;
-        margin: 0 !important;
-        display: inline-block !important;
+        float: left !important;
     }
-    .requisition-right-sidebar .sidebar-total-row-wrapper .total-types-value { 
+    .total-types-value { 
         font-size: 14px !important; 
         font-weight: 800 !important; 
         color: #111827 !important; 
-        width: auto !important;
-        margin: 0 !important;
-        display: inline-block !important;
-        text-align: right !important;
+        float: right !important;
     }
 }
 
