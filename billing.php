@@ -14,70 +14,56 @@ if (!isset($_SESSION["role"]) || !check_page_access($pdo)) {
     die("Access Denied: You do not have permission to access this area.");
 }
 
+function resolveLedgerUserName($pdo, $value) {
+    $value = trim((string)$value);
+    if ($value === '') {
+        return 'Unnamed';
+    }
+
+    if (ctype_digit($value)) {
+        $stmt = $pdo->prepare("SELECT username FROM users WHERE id = ?");
+        $stmt->execute([intval($value)]);
+        return $stmt->fetchColumn() ?: $value;
+    }
+
+    return $value;
+}
+
+function isUnassignedCollector($collectorName) {
+    $normalized = strtolower(trim((string)$collectorName));
+    return $normalized === '' || $normalized === 'unnamed' || $normalized === 'system ledger';
+}
+
 $guest = $pdo->query("SELECT * FROM guests WHERE status = 'Active' LIMIT 1")->fetch();
+
 // --- HANDLE PENDING ACCOMMODATION PAYMENT ---
-if (isset($_POST['action_collect_pending'])) {
+if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['action_collect_pending'])) {
     $guest_id = intval($_POST['guest_id']);
     $amount = floatval($_POST['amount']);
     $collector_id = intval($_POST['collector_id']);
-    $mode = $_POST['payment_mode'];
+    $mode = trim($_POST['payment_mode'] ?? 'Cash');
 
-    // 1. Get Collector Name
     $collector = $pdo->prepare("SELECT username FROM users WHERE id = ?");
     $collector->execute([$collector_id]);
-    $collector_name = $collector->fetchColumn() ?: 'Unknown';
+    $collector_name = $collector->fetchColumn();
 
-    try {
-        $pdo->beginTransaction();
-
-        // 2. Clear Pending Amount
-        $stmt = $pdo->prepare("UPDATE guests SET pending_amount = 0, pending_received_by = ? WHERE id = ?");
-        $stmt->execute([$collector_name, $guest_id]);
-// --- HANDLE PENDING ACCOMMODATION PAYMENT ---
-if (isset($_POST['action_collect_pending'])) {
-    $guest_id = intval($_POST['guest_id']);
-    $amount = floatval($_POST['amount']);
-    $collector_id = intval($_POST['collector_id']); // Dropdown ID
-    $mode = $_POST['payment_mode'];                 // Cash or UPI
-
-    // Get Collector Name from users table
-    $collector = $pdo->prepare("SELECT username FROM users WHERE id = ?");
-    $collector->execute([$collector_id]);
-    $collector_name = $collector->fetchColumn() ?: 'Unknown';
-
-    try {
-        $pdo->beginTransaction();
-        // Update both the amount to 0 and the person who collected it
-        $stmt = $pdo->prepare("UPDATE guests SET 
-            pending_amount = 0, 
-            pending_received_by = ?, 
-            payment_status = 'Settled' 
-            WHERE id = ?");
-        $stmt->execute([$collector_name, $guest_id]);
-
-        // Audit Trail
-        $log = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
-        $log->execute([$_SESSION['user_id'], "Collected pending accommodation ₹$amount (Mode: $mode). Received by: $collector_name"]);
-
-        $pdo->commit();
-        $_SESSION['staff_success'] = "Payment recorded successfully.";
-    } catch (Exception $e) {
-        $pdo->rollBack();
-        $_SESSION['staff_error'] = "Transaction failed: " . $e->getMessage();
+    if (!$collector_name || $guest_id !== intval($guest['id']) || $amount <= 0) {
+        $_SESSION['staff_error'] = "Please select a valid staff member before recording the pending accommodation payment.";
+        header("Location: billing.php");
+        exit;
     }
-    header("Location: billing.php");
-    exit;
-}
-if (!$stmt->rowCount()) {
-    die("DEBUG: The SQL executed but changed 0 rows. Check if guest_id " . $guest_id . " exists.");
-}
-        // 3. IMPORTANT: Add as an "Adjustment" so it shows on the final bill
-        $adj = $pdo->prepare("INSERT INTO order_adjustments (order_id, reason, amount, type) VALUES (?, ?, ?, 'adjustment')");
-        // Note: You may need to replace 'order_id' with your actual order ID logic
-        $adj->execute([$guest_id, "Pending Accommodation Payment Received ($mode) by $collector_name", $amount]);
+
+    try {
+        $pdo->beginTransaction();
+
+        $stmt = $pdo->prepare("UPDATE guests SET pending_received_by = ?, payment_status = 'Settled' WHERE id = ? AND status = 'Active'");
+        $stmt->execute([$collector_name, $guest_id]);
+
+        $log = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
+        $log->execute([$_SESSION['user_id'] ?? null, "Collected pending accommodation Rs. " . number_format($amount, 2) . " (Mode: $mode). Received by: $collector_name"]);
 
         $pdo->commit();
-        $_SESSION['staff_success'] = "Payment recorded and added to bill adjustments.";
+        $_SESSION['staff_success'] = "Pending accommodation payment recorded successfully.";
     } catch (Exception $e) {
         $pdo->rollBack();
         $_SESSION['staff_error'] = "Transaction failed: " . $e->getMessage();
@@ -151,10 +137,19 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_remo
 if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_finalize_checkout"])) {
     $guest_id = $guest['id'];
     $food_bill_total = floatval($_POST["post_food_bill_total"]);
-    $accommodation_pending = floatval($_POST["post_accommodation_pending"]);
+    $stored_pending = floatval($guest["pending_amount"] ?? 0);
+    $calculated_pending = max(0, floatval($guest["base_room_rent"] ?? 0) - floatval($guest["advance_paid"] ?? 0));
+    $accommodation_pending = $stored_pending > 0 ? $stored_pending : $calculated_pending;
     
-    $accommodation_collected_by = !empty($guest['advance_received_by']) ? $guest['advance_received_by'] : 'System Ledger';
+    $advance_collected_by = resolveLedgerUserName($pdo, $guest['advance_received_by'] ?? 'Unnamed');
+    $pending_collected_by = resolveLedgerUserName($pdo, $guest['pending_received_by'] ?? 'Unnamed');
     $food_collected_by          = trim($_POST["food_received_by_staff"]);
+
+    if ($accommodation_pending > 0 && isUnassignedCollector($pending_collected_by)) {
+        $_SESSION['staff_error'] = "Please record the pending accommodation payment collector before generating the final bill.";
+        header("Location: billing.php");
+        exit;
+    }
     
     $itemsQuery = $pdo->prepare("
         SELECT oi.*, mi.name, mi.price 
@@ -180,16 +175,19 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_fina
             total_food = ?,
             food_received_by = ?
         WHERE id = ?
-    ")->execute([$accommodation_pending, $accommodation_collected_by, $food_bill_total, $food_collected_by, $guest_id]);
+    ")->execute([$accommodation_pending, $pending_collected_by, $food_bill_total, $food_collected_by, $guest_id]);
 
-    $pdo->prepare("
-        INSERT INTO farm_bookings (booking_source, contact_no, no_of_guests, check_in_date, check_out_date, per_night_charges, advance_paid, advance_received_by, pending_amount, pending_received_by, total_food_bill, food_received_by, remarks)
-        VALUES (?, ?, ?, ?, CURRENT_DATE(), ?, ?, ?, ?, ?, ?, ?, 'Checked out from Dual Collector POS')
-    ")->execute([
-        $guest['booking_source'], $guest['phone_number'], $guest['no_of_guests'], $guest['checkin_date'],
-        $guest['per_night_charges'], $guest['advance_paid'], $accommodation_collected_by,
-        $accommodation_pending, $accommodation_collected_by, $food_bill_total, $food_collected_by
-    ]);
+    $farmBookingsTable = $pdo->query("SHOW TABLES LIKE 'farm_bookings'")->fetchColumn();
+    if ($farmBookingsTable) {
+        $pdo->prepare("
+            INSERT INTO farm_bookings (booking_source, contact_no, no_of_guests, check_in_date, check_out_date, per_night_charges, advance_paid, advance_received_by, pending_amount, pending_received_by, total_food_bill, food_received_by, remarks)
+            VALUES (?, ?, ?, ?, CURRENT_DATE(), ?, ?, ?, ?, ?, ?, ?, 'Checked out from Dual Collector POS')
+        ")->execute([
+            $guest['booking_source'], $guest['phone_number'], $guest['no_of_guests'], $guest['checkin_date'],
+            $guest['per_night_charges'], $guest['advance_paid'], $advance_collected_by,
+            $accommodation_pending, $pending_collected_by, $food_bill_total, $food_collected_by
+        ]);
+    }
 
     // --- AUDIT TRAIL LOGGING ---
     $audit_stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
@@ -204,9 +202,9 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_fina
 
     $tg_msg .= "🏠 <b>ACCOMMODATION BILLING</b>\n";
     $tg_msg .= "• Total Tariff: ₹" . number_format($guest['base_room_rent'], 2) . "\n";
-    $tg_msg .= "• Advance Paid: ₹" . number_format($guest['advance_paid'], 2) . "\n";
+    $tg_msg .= "• Advance Paid: ₹" . number_format($guest['advance_paid'], 2) . " (" . htmlspecialchars($advance_collected_by) . ")\n";
     $tg_msg .= "• Pending Due Taken: <b>₹" . number_format($accommodation_pending, 2) . "</b>\n";
-    $tg_msg .= "💼 <i>Collected By: " . htmlspecialchars($accommodation_collected_by) . "</i>\n\n";
+    $tg_msg .= "💼 <i>Pending Collected By: " . htmlspecialchars($pending_collected_by) . "</i>\n\n";
 
     $tg_msg .= "🍽️ <b>RESTAURANT & KITCHEN BILL</b>\n";
     if (!empty($items_list)) {
@@ -252,6 +250,18 @@ include "includes/header.php";
 </style>
 
 <div class="app-body" style="max-width:100%; width:100%;">
+    <?php if (!empty($_SESSION['staff_success'])): ?>
+        <div style="padding:12px 16px; background:#ecfdf5; border:1px solid #a7f3d0; color:#065f46; border-radius:8px; margin-bottom:15px; font-size:14px; font-weight:700;">
+            <?= htmlspecialchars($_SESSION['staff_success']) ?>
+        </div>
+        <?php unset($_SESSION['staff_success']); ?>
+    <?php endif; ?>
+    <?php if (!empty($_SESSION['staff_error'])): ?>
+        <div style="padding:12px 16px; background:#fef2f2; border:1px solid #fecaca; color:#991b1b; border-radius:8px; margin-bottom:15px; font-size:14px; font-weight:700;">
+            <?= htmlspecialchars($_SESSION['staff_error']) ?>
+        </div>
+        <?php unset($_SESSION['staff_error']); ?>
+    <?php endif; ?>
     <?php if (!$guest): ?>
         <div style="padding:40px; background:#fff; border:1px solid #e2e8f0; text-align:center; border-radius:12px; font-style:italic; color:#94a3b8;">
             📭 There are no active operational guest billing accounts found running on the farm property today.
@@ -292,8 +302,13 @@ include "includes/header.php";
         $total_incidentals_bill = max(0, $food_subtotal + $adjustments_sum);
         $base_rent = floatval($guest['base_room_rent'] ?? 0);
         $advance_paid = floatval($guest['advance_paid'] ?? 0);
-        $accommodation_pending = max(0, $base_rent - $advance_paid);
-        $auto_accommodation_staff = !empty($guest['advance_received_by']) ? $guest['advance_received_by'] : 'System Ledger';
+        $stored_pending = floatval($guest['pending_amount'] ?? 0);
+        $calculated_pending = max(0, $base_rent - $advance_paid);
+        $accommodation_pending = $stored_pending > 0 ? $stored_pending : $calculated_pending;
+        $advance_collector = resolveLedgerUserName($pdo, $guest['advance_received_by'] ?? 'Unnamed');
+        $pending_collector = resolveLedgerUserName($pdo, $guest['pending_received_by'] ?? 'Unnamed');
+        $pending_payment_collected = $accommodation_pending <= 0 || !isUnassignedCollector($pending_collector);
+        $staff_list = $pdo->query("SELECT id, username FROM users ORDER BY username ASC")->fetchAll(PDO::FETCH_ASSOC);
     ?>
 
     <div class="billing-grid-split">
@@ -306,46 +321,44 @@ include "includes/header.php";
                 </div>
                 <div class="data-display-row">
                     <span>Advance Payment Received (Accommodation Credit):</span>
-                    <strong style="color: #38a169;">+ ₹<?= number_format($advance_paid, 2) ?></strong>
+                    <strong style="color: #38a169;">+ ₹<?= number_format($advance_paid, 2) ?> by <?= htmlspecialchars($advance_collector) ?></strong>
                 </div>
-              
-                 <?php 
-// Ensure we have staff list for the dropdown
-// Add this with your other data queries
-$staff_list = $pdo->query("SELECT id, username FROM users ORDER BY username ASC")->fetchAll(PDO::FETCH_ASSOC);
+                <div class="data-display-row">
+                    <span>Pending Accommodation Balance:</span>
+                    <strong style="color: #c53030;">₹<?= number_format($accommodation_pending, 2) ?></strong>
+                </div>
 
-if ($guest && $guest['pending_amount'] > 0): ?>
-    <div style="background: #fff7ed; border: 1px solid #f97316; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
-        <h3 style="margin-top:0; color:#9a3412;">⚠️ Pending Accommodation: ₹<?= number_format($guest['pending_amount'], 2) ?></h3>
-        
-        <form method="POST" action="billing.php" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;">
-            <input type="hidden" name="action_collect_pending" value="1">
-            <input type="hidden" name="guest_id" value="<?= $guest['id'] ?>">
-            <input type="hidden" name="amount" value="<?= $guest['pending_amount'] ?>">
-            
-            <div style="flex: 1; min-width: 150px;">
-                <label style="font-size: 11px; font-weight:700;">Collected By</label>
-                <select name="collector_id" required style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0;">
-                    <option value="">-- Select Staff --</option>
-                    <?php foreach ($staff_list as $s): ?>
-                        <option value="<?= $s['id'] ?>"><?= htmlspecialchars($s['username']) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            
-            <div style="flex: 1; min-width: 150px;">
-                <label style="font-size: 11px; font-weight:700;">Payment Mode</label>
-                <select name="payment_mode" required style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0;">
-                    <option value="Cash">Cash</option>
-                    <option value="UPI">UPI</option>
-                </select>
-            </div>
-            
-            <button type="submit" style="padding:8px 20px; background:#f97316; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Mark as Received</button>
-        </form>
-    </div>
-<?php endif; ?>
-              
+                <?php if ($accommodation_pending > 0 && !$pending_payment_collected): ?>
+                    <div style="background: #fff7ed; border: 1px solid #f97316; padding: 20px; border-radius: 12px; margin-top: 15px;">
+                        <h3 style="margin-top:0; color:#9a3412; font-size:15px;">Pending accommodation payment must be recorded before final bill</h3>
+                        <form method="POST" action="billing.php" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;">
+                            <input type="hidden" name="action_collect_pending" value="1">
+                            <input type="hidden" name="guest_id" value="<?= $guest['id'] ?>">
+                            <input type="hidden" name="amount" value="<?= $accommodation_pending ?>">
+                            <div style="flex: 1; min-width: 150px;">
+                                <label style="font-size: 11px; font-weight:700;">Collected By</label>
+                                <select name="collector_id" required style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0;">
+                                    <option value="">-- Select Staff --</option>
+                                    <?php foreach ($staff_list as $s): ?>
+                                        <option value="<?= $s['id'] ?>"><?= htmlspecialchars($s['username']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div style="flex: 1; min-width: 150px;">
+                                <label style="font-size: 11px; font-weight:700;">Payment Mode</label>
+                                <select name="payment_mode" required style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0;">
+                                    <option value="Cash">Cash</option>
+                                    <option value="UPI">UPI</option>
+                                </select>
+                            </div>
+                            <button type="submit" style="padding:8px 20px; background:#f97316; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Mark as Received</button>
+                        </form>
+                    </div>
+                <?php elseif ($accommodation_pending > 0): ?>
+                    <div style="background:#ecfdf5; border:1px solid #a7f3d0; color:#065f46; padding:12px; border-radius:8px; margin-top:15px; font-size:13px; font-weight:700;">
+                        Pending accommodation collected by <?= htmlspecialchars($pending_collector) ?>.
+                    </div>
+                <?php endif; ?>
             </div>
 
             <div class="billing-card">
@@ -450,31 +463,32 @@ if ($guest && $guest['pending_amount'] > 0): ?>
                     </div>
 
                     <div style="margin-bottom:15px; background:#f1f5f9; padding:8px 12px; border-radius:6px; border:1px dashed #cbd5e0; font-size:12px; color:#475569;">
-                        💼 <strong>Accommodation Collector:</strong> <span style="float:right; font-weight:bold; color:#1e293b"><?= htmlspecialchars($auto_accommodation_staff) ?></span>
-                        <input type="hidden" name="accommodation_received_by_staff" value="<?= htmlspecialchars($auto_accommodation_staff) ?>">
+                        <div style="display:flex; justify-content:space-between; gap:8px; margin-bottom:4px;">
+                            <strong>Advance Collector:</strong>
+                            <span style="font-weight:bold; color:#1e293b"><?= htmlspecialchars($advance_collector) ?></span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; gap:8px;">
+                            <strong>Pending Collector:</strong>
+                            <span style="font-weight:bold; color:<?= $pending_payment_collected ? '#065f46' : '#c53030' ?>"><?= $pending_payment_collected ? htmlspecialchars($pending_collector) : 'Not recorded' ?></span>
+                        </div>
                     </div>
 
                     <div style="margin-bottom:20px;">
                         <label style="font-size:11px; font-weight:700; display:block; color:#475569;">👤 Food & Incidentals Collected By:</label>
                         <select name="food_received_by_staff" required class="staff-selector">
                             <option value="">-- Choose Collector --</option>
-                            <option value="Tarpan bhaiya">Tarpan bhaiya</option>
-                            <option value="Kamlesh">Kamlesh</option>
-                            <option value="Abhijit">Abhijit</option>
-                            <option value="Kinkar">Kinkar</option>
-                            <option value="Subrata">Subrata</option>
-                            <option value="Rohit">Rohit</option>
-                            <option value="Vikas">Vikas</option>
-                            <option value="Raju">Raju</option>
+                            <?php foreach ($staff_list as $s): ?>
+                                <option value="<?= htmlspecialchars($s['username']) ?>"><?= htmlspecialchars($s['username']) ?></option>
+                            <?php endforeach; ?>
                         </select>
                     </div>
 
-                    <button type="button" class="btn btn-log" style="width:100%; padding:10px; margin-bottom:10px; font-weight:700; background:#f1f5f9; color:#475569; border:1px solid #cbd5e0; border-radius:6px;" onclick="window.openCleanBillPopup()">
-                        🖨️ View Print-Friendly Receipt
+                    <button type="button" class="btn btn-log" style="width:100%; padding:10px; margin-bottom:10px; font-weight:700; background:#f1f5f9; color:#475569; border:1px solid #cbd5e0; border-radius:6px;" onclick="window.openCleanBillPopup()" <?= $pending_payment_collected ? '' : 'disabled' ?>>
+                        <?= $pending_payment_collected ? 'View Print-Friendly Receipt' : 'Record Pending Accommodation First' ?>
                     </button>
 
-                    <button type="submit" class="btn btn-bill" style="width:100%; padding:12px; border-radius:8px; font-size:14px; font-weight:800; background:#06b6d4; border-color:#06b6d4;">
-                        Complete Checkout & Archive Bill
+                    <button type="submit" class="btn btn-bill" style="width:100%; padding:12px; border-radius:8px; font-size:14px; font-weight:800; background:<?= $pending_payment_collected ? '#06b6d4' : '#94a3b8' ?>; border-color:<?= $pending_payment_collected ? '#06b6d4' : '#94a3b8' ?>;" <?= $pending_payment_collected ? '' : 'disabled' ?>>
+                        <?= $pending_payment_collected ? 'Complete Checkout & Archive Bill' : 'Record Pending Accommodation First' ?>
                     </button>
                 </form>
             </div>
@@ -504,10 +518,20 @@ if ($guest && $guest['pending_amount'] > 0): ?>
             <span>[-] Advance Received:</span>
             <span>₹<?= number_format($advance_paid, 2) ?></span>
         </div>
+        <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px; color:#444;">
+            <span>Advance Collected By:</span>
+            <span><?= htmlspecialchars($advance_collector) ?></span>
+        </div>
         <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:bold; margin-bottom:15px; border-bottom:1px dashed #000; padding-bottom:6px;">
             <span>Stay Balance Due:</span>
             <span>₹<?= number_format($accommodation_pending, 2) ?></span>
         </div>
+        <?php if ($accommodation_pending > 0): ?>
+            <div style="display:flex; justify-content:space-between; font-size:11px; margin-top:-10px; margin-bottom:15px; color:#444;">
+                <span>Pending Collected By:</span>
+                <span><?= $pending_payment_collected ? htmlspecialchars($pending_collector) : 'Not recorded' ?></span>
+            </div>
+        <?php endif; ?>
 
         <div style="font-size:12px; font-weight:bold; text-transform:uppercase; margin-bottom:6px; border-bottom:1px solid #000;">KOT Food & Incidentals</div>
         <div id="popupReceiptItems" style="border-bottom:2px dashed #000; padding-bottom:8px; margin-bottom:12px;"></div>
