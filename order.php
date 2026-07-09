@@ -166,19 +166,19 @@ window.filterMenuCatalog = function(catId, btn) {
     });
 };
 
-window.addItemToCheckoutCart = function(id, name, price) {
+function addItemToCheckoutCart(id, name, price) {
     <?php if (!$current_active_guest): ?>
-        alert("Please choose and activate an active guest profile ledger session inside the sidebar dropdown configuration list before recording orders.");
+        alert("Please choose and activate an active guest profile...");
         return;
     <?php endif; ?>
 
-    if (window.activeCartStateMap[id]) {
-        window.activeCartStateMap[id].qty++;
+    if (activeCartStateMap[id]) {
+        activeCartStateMap[id].qty++;
     } else {
-        window.activeCartStateMap[id] = { name: name, price: price, qty: 1 };
+        activeCartStateMap[id] = { name: name, price: price, qty: 1 };
     }
-    window.renderCartInterfaceElements();
-};
+    renderCartInterfaceElements();
+}
 
 window.updateCartRowQtyChange = function(id, delta) {
     if (!window.activeCartStateMap[id]) return;
@@ -231,32 +231,7 @@ window.renderCartInterfaceElements = function() {
         form.style.display = "flex";
     }
 };
-window.submitFoodOrder = function(event) {
-    event.preventDefault();
 
-    const cartItems = [];
-    for (let id in window.activeCartStateMap) {
-        cartItems.push({
-            id: id,
-            qty: window.activeCartStateMap[id].qty,
-            notes: ""
-        });
-    }
-
-    // --- ADD THIS LINE TO DEBUG ---
-    console.log("Submitting these items:", cartItems);
-
-    if (cartItems.length === 0) {
-        alert("Cart is empty.");
-        return;
-    }
-
-    fetch("process_order.php", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: cartItems })
-    })
-  
 </script>
 
 <?php include "includes/footer.php"; ?>
