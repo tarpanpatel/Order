@@ -1,40 +1,20 @@
 <?php
 // /home/apartment/artistsfarmjaipur.com/Order/login.php
-// Force error reporting to screen
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
 
-echo "DEBUG: Session Path is: " . __DIR__ . '/_sessions' . "<br>";
-echo "DEBUG: Is directory writable? " . (is_writable(__DIR__ . '/_sessions') ? 'YES' : 'NO') . "<br>";
-
+// 1. Set settings BEFORE any output
 $sessionPath = __DIR__ . '/_sessions';
-if (!is_dir($sessionPath)) { 
-    if (!mkdir($sessionPath, 0755, true)) {
-        echo "DEBUG: Failed to create session directory!<br>";
-    }
-}
-
-ini_set('session.save_path', $sessionPath);
-session_start();
-
-echo "DEBUG: Session ID is: " . session_id() . "<br>";
-echo "DEBUG: SESSION array: "; var_dump($_SESSION);
-$sessionPath = __DIR__ . '/_sessions';
-// Use explicit permission handling
-if (!is_dir($sessionPath)) { 
-    mkdir($sessionPath, 0755, true); 
-}
+if (!is_dir($sessionPath)) { mkdir($sessionPath, 0755, true); }
 ini_set('session.save_path', $sessionPath);
 ini_set('session.gc_maxlifetime', 1209600);
 ini_set('session.cookie_lifetime', 1209600);
 ini_set('session.use_only_cookies', 1);
 
-// Debugging Session Startup
-if (!session_start()) {
-    die("CRITICAL ERROR: Session could not be started. Check permissions on " . $sessionPath);
-}
+// 2. Start session
+session_start();
+
+// 3. Now require your db
 require_once "config/db.php";
+// ... rest of your code
 // 1. FETCH ALL REGISTERED USERS FOR THE SECURE DROPDOWN
 try {
     $db_users = $pdo->query("SELECT id, username, role FROM users ORDER BY username ASC")->fetchAll(PDO::FETCH_ASSOC);
