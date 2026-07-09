@@ -239,7 +239,18 @@ include "includes/header.php";
                 $food_subtotal += ($net_qty * $item['price']);
             }
         }
+$adjustments = $pdo->prepare("SELECT * FROM order_adjustments WHERE order_id = ?");
+$adjustments->execute([$guest['id']]);
+$adjustments = $adjustments->fetchAll(PDO::FETCH_ASSOC);
 
+// --- NEW LOGIC: Inject Pending Payment into the Bill if it exists ---
+if (!empty($guest['pending_received_by'])) {
+    $adjustments[] = [
+        'reason' => 'Pending Payment Received via ' . ($guest['payment_mode'] ?? 'Cash') . ' (By: ' . $guest['pending_received_by'] . ')',
+        'amount' => $guest['pending_amount'], // You might need to adjust this if you track original pending amount
+        'type'   => 'payment' // Use a type that isn't 'charge' so it shows as a credit
+    ];
+}
         $adjustments = [];
         if (!empty($guest['food_remark'])) {
             $adjustments = json_decode($guest['food_remark'], true) ?: [];
@@ -514,10 +525,19 @@ window.openCleanBillPopup = function() {
         }
     });
     
-    const adjustments = <?php echo json_encode($adjustments ?? []); ?>;
+ const adjustments = <?php echo json_encode($adjustments ?? []); ?>;
     adjustments.forEach(item => {
-        const sign = item.type === "charge" ? "+" : "-";
-        itemsContainer.innerHTML += `<div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px; color: #444; font-style: italic;"><span>↳ ${item.reason}</span><span>${sign}₹${parseFloat(item.amount).toFixed(2)}</span></div>`;
+        // Logic: Charges are "+", Payments/Adjustments are "-"
+        const sign = (item.type === "charge") ? "+" : "-";
+        
+        // Visual Styling: Green for payments/credits, default for charges
+        const color = (item.type === "payment") ? "#059669" : "#444";
+        
+        itemsContainer.innerHTML += `
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px; color: ${color}; font-style: italic;">
+                <span>↳ ${item.reason}</span>
+                <span>${sign}₹${parseFloat(item.amount).toFixed(2)}</span>
+            </div>`;
     });
     
     document.getElementById("cleanPrintFriendlyModal").style.display = "flex";
