@@ -2,7 +2,11 @@
 // /home/apartment/artistsfarmjaipur.com/Order/activity_logs.php
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once "config/db.php";
- 
+ // Report all PHP errors
+error_reporting(E_ALL);
+
+// Force errors to be displayed on the screen
+ini_set('display_errors', '1');
 
 // Fetch up to 150 entries to keep historical data accessible via 'Load More'
 $query_string = "
