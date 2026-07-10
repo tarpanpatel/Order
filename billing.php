@@ -82,7 +82,6 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["adjust_acti
         $pdo->prepare("UPDATE order_items SET returned_qty = returned_qty + ? WHERE id = ?")->execute([$qty, $id]); 
     }
 
-    // --- AUDIT TRAIL LOGGING ---
     $audit_stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
     $audit_stmt->execute([$_SESSION['user_id'], "User [" . $_SESSION['username'] . "] triggered " . $type . " operation on Order Item ID #" . $id . " with quantity context: " . $qty]);
 
@@ -109,7 +108,6 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_add_
         $updated_json = json_encode($current_adjustments);
         $pdo->prepare("UPDATE guests SET food_remark = ? WHERE id = ?")->execute([$updated_json, $guest['id']]);
 
-        // --- AUDIT TRAIL LOGGING ---
         $audit_stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
         $audit_stmt->execute([$_SESSION['user_id'], "User [" . $_SESSION['username'] . "] appended custom incidental adjustment [" . $reason . "] totaling ₹" . $amount . " on Guest ID #" . $guest['id']]);
     }
@@ -126,7 +124,6 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_remo
         });
         $pdo->prepare("UPDATE guests SET food_remark = ? WHERE id = ?")->execute([json_encode(array_values($filtered)), $guest['id']]);
 
-        // --- AUDIT TRAIL LOGGING ---
         $audit_stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
         $audit_stmt->execute([$_SESSION['user_id'], "User [" . $_SESSION['username'] . "] revoked an incidental adjustment from active Profile ID #" . $guest['id']]);
     }
@@ -191,11 +188,9 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_fina
         ]);
     }
 
-    // --- AUDIT TRAIL LOGGING ---
     $audit_stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
     $audit_stmt->execute([$_SESSION['user_id'], "User [" . $_SESSION['username'] . "] executed final room checkout settlement for Guest [" . $guest['guest_name'] . "] (Total Room Rent Pending Collected: ₹" . $accommodation_pending . " | Total Kitchen Incidentals Settle Collected: ₹" . $food_bill_total . ")"]);
 
-    // Telegram Summary Dispatch Logic Hook
     $tg_msg  = "🔔 <b>FARM CHECKOUT SETTLEMENT REPORT</b>\n";
     $tg_msg .= "━━━━━━━━━━━━━━━━━━\n";
     $tg_msg .= "👤 <b>Guest:</b> " . htmlspecialchars($guest['guest_name'] ?: 'Walk-In') . "\n";
@@ -229,7 +224,7 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_fina
     $tg_msg .= "• Total Kitchen Settlement: <b>₹" . number_format($food_bill_total, 2) . "</b>\n";
     $tg_msg .= "👤 <i>Collected By: " . htmlspecialchars($food_collected_by) . "</i>\n";
     $tg_msg .= "━━━━━━━━━━━━━━━━━━\n";
-    $tg_msg .= "💰 <b>TOTAL OUTSTANDING PAYABLE: ₹" . number_format($checkout_total_due, 2) . "</b>\n";
+    $tg_msg .= "<b>TOTAL OUTSTANDING PAYABLE: ₹" . number_format($checkout_total_due, 2) . "</b>\n";
 
     if (function_exists('sendAdminTelegramMessage')) {
         sendAdminTelegramMessage($tg_msg); 
@@ -242,30 +237,21 @@ if ($guest && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_fina
 include "includes/header.php";
 ?>
 
-<style>
-.billing-grid-split { display: grid; grid-template-columns: 1fr 400px; gap: 20px; text-align: left; align-items: start; }
-.billing-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 20px; }
-.billing-section-title { font-size: 14px; font-weight: 700; text-transform: uppercase; color: #1e293b; border-bottom: 1px dashed #cbd5e0; padding-bottom: 8px; margin-top: 0; margin-bottom: 15px; letter-spacing: 0.5px; }
-.alert-highlight-pending { background: #fff5f5; border: 1px solid #feb2b2; padding: 12px; border-radius: 8px; color: #c53030; font-weight: bold; font-size: 15px; display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
-.data-display-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; padding: 8px 0; border-bottom: 1px solid #f1f5f9; }
-.staff-selector { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e0; background: #fff; font-size: 13px; font-weight: 600; color: #334155; margin-top: 4px; }
-</style>
-
-<div class="app-body" style="max-width:100%; width:100%;">
+<div class="app-body">
     <?php if (!empty($_SESSION['staff_success'])): ?>
-        <div style="padding:12px 16px; background:#ecfdf5; border:1px solid #a7f3d0; color:#065f46; border-radius:8px; margin-bottom:15px; font-size:14px; font-weight:700;">
+        <div class="billing-banner-success">
             <?= htmlspecialchars($_SESSION['staff_success']) ?>
         </div>
         <?php unset($_SESSION['staff_success']); ?>
     <?php endif; ?>
     <?php if (!empty($_SESSION['staff_error'])): ?>
-        <div style="padding:12px 16px; background:#fef2f2; border:1px solid #fecaca; color:#991b1b; border-radius:8px; margin-bottom:15px; font-size:14px; font-weight:700;">
+        <div class="billing-banner-error">
             <?= htmlspecialchars($_SESSION['staff_error']) ?>
         </div>
         <?php unset($_SESSION['staff_error']); ?>
     <?php endif; ?>
     <?php if (!$guest): ?>
-        <div style="padding:40px; background:#fff; border:1px solid #e2e8f0; text-align:center; border-radius:12px; font-style:italic; color:#94a3b8;">
+        <div class="billing-empty-state">
             📭 There are no active operational guest billing accounts found running on the farm property today.
         </div>
     <?php else: 
@@ -321,45 +307,45 @@ include "includes/header.php";
                 <div class="billing-section-title">🏡 Accommodation Invoice Breakdown</div>
                 <div class="data-display-row">
                     <span>Base Lodging Charges (Total Stay Contract):</span>
-                    <strong style="color: #334155;">₹<?= number_format($base_rent, 2) ?></strong>
+                    <strong class="text-slate-dark">₹<?= number_format($base_rent, 2) ?></strong>
                 </div>
                 <div class="data-display-row">
                     <span>Advance Payment Received (Accommodation Credit):</span>
-                    <strong style="color: #38a169;">+ ₹<?= number_format($advance_paid, 2) ?> by <?= htmlspecialchars($advance_collector) ?></strong>
+                    <strong class="text-green-success">+ ₹<?= number_format($advance_paid, 2) ?> by <?= htmlspecialchars($advance_collector) ?></strong>
                 </div>
                 <div class="data-display-row">
                     <span>Pending Accommodation Balance:</span>
-                    <strong style="color: #c53030;">₹<?= number_format($accommodation_pending, 2) ?></strong>
+                    <strong class="text-red-danger">₹<?= number_format($accommodation_pending, 2) ?></strong>
                 </div>
 
                 <?php if ($accommodation_pending > 0 && !$pending_payment_collected): ?>
-                    <div style="background: #fff7ed; border: 1px solid #f97316; padding: 20px; border-radius: 12px; margin-top: 15px;">
-                        <h3 style="margin-top:0; color:#9a3412; font-size:15px;">Pending accommodation payment must be recorded before final bill</h3>
-                        <form method="POST" action="billing.php" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;">
+                    <div class="billing-alert-pending-box">
+                        <h3 class="billing-alert-pending-heading">Pending accommodation payment must be recorded before final bill</h3>
+                        <form method="POST" action="billing.php" class="billing-flex-form-row">
                             <input type="hidden" name="action_collect_pending" value="1">
                             <input type="hidden" name="guest_id" value="<?= $guest['id'] ?>">
                             <input type="hidden" name="amount" value="<?= $accommodation_pending ?>">
-                            <div style="flex: 1; min-width: 150px;">
-                                <label style="font-size: 11px; font-weight:700;">Collected By</label>
-                                <select name="collector_id" required style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0;">
+                            <div class="billing-flex-form-field">
+                                <label class="billing-field-label">Collected By</label>
+                                <select name="collector_id" required class="billing-field-select">
                                     <option value="">-- Select Staff --</option>
                                     <?php foreach ($staff_list as $s): ?>
                                         <option value="<?= $s['id'] ?>"><?= htmlspecialchars($s['username']) ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
-                            <div style="flex: 1; min-width: 150px;">
-                                <label style="font-size: 11px; font-weight:700;">Payment Mode</label>
-                                <select name="payment_mode" required style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0;">
+                            <div class="billing-flex-form-field">
+                                <label class="billing-field-label">Payment Mode</label>
+                                <select name="payment_mode" required class="billing-field-select">
                                     <option value="Cash">Cash</option>
                                     <option value="UPI">UPI</option>
                                 </select>
                             </div>
-                            <button type="submit" style="padding:8px 20px; background:#f97316; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Mark as Received</button>
+                            <button type="submit" class="billing-btn-mark-received">Mark as Received</button>
                         </form>
                     </div>
                 <?php elseif ($accommodation_pending > 0): ?>
-                    <div style="background:#ecfdf5; border:1px solid #a7f3d0; color:#065f46; padding:12px; border-radius:8px; margin-top:15px; font-size:13px; font-weight:700;">
+                    <div class="billing-alert-collected-msg">
                         Pending accommodation collected by <?= htmlspecialchars($pending_collector) ?>.
                     </div>
                 <?php endif; ?>
@@ -367,13 +353,13 @@ include "includes/header.php";
 
             <div class="billing-card">
                 <div class="billing-section-title">🍽️ Food Orders & Combined Incidentals Log</div>
-                <table style="width:100%; border-collapse:collapse; font-size:13px; margin-bottom:15px;">
+                <table class="billing-log-table">
                     <thead>
-                        <tr style="background:#f8fafc; border-bottom:1px solid #cbd5e0; color:#475569; text-align:left;">
-                            <th style="padding:8px;">Description Line Item</th>
-                            <th style="padding:8px; text-align:center;">Qty</th>
-                            <th style="padding:8px; text-align:right;">Rate</th>
-                            <th style="padding:8px; text-align:right;">Total</th>
+                        <tr class="billing-table-thead-row">
+                            <th class="p-8">Description Line Item</th>
+                            <th class="p-8-center">Qty</th>
+                            <th class="p-8-right">Rate</th>
+                            <th class="p-8-right">Total</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -382,39 +368,39 @@ include "includes/header.php";
                             if ($net_qty <= 0) continue;
                             $line_total = $net_qty * $item['price'];
                         ?>
-                            <tr style="border-bottom:1px solid #f1f5f9;">
-                                <td style="padding:8px; font-weight:600;"><?= htmlspecialchars($item['name']) ?></td>
-                                <td style="padding:8px; text-align:center;"><?= $net_qty ?></td>
-                                <td style="padding:8px; text-align:right;">₹<?= number_format($item['price'], 2) ?></td>
-                                <td style="padding:8px; text-align:right; font-weight:700;">₹<?= number_format($line_total, 2) ?></td>
+                            <tr class="billing-table-tbody-row">
+                                <td class="p-8-weight-600"><?= htmlspecialchars($item['name']) ?></td>
+                                <td class="p-8-center"><?= $net_qty ?></td>
+                                <td class="p-8-right">₹<?= number_format($item['price'], 2) ?></td>
+                                <td class="p-8-right-weight-700">₹<?= number_format($line_total, 2) ?></td>
                             </tr>
                         <?php endforeach; else: ?>
-                            <tr><td colspan="4" style="text-align:center; color:#94a3b8; padding:15px; font-style:italic;">No restaurant orders recorded.</td></tr>
+                            <tr><td colspan="4" class="billing-table-empty-td">No restaurant orders recorded.</td></tr>
                         <?php endif; ?>
                     </tbody>
                 </table>
 
                 <?php if (!empty($adjustments)): ?>
-                    <div style="margin-top:15px; background:#f8fafc; border-radius:6px; padding:10px; border:1px solid #cbd5e0;">
-                        <span style="font-size:11px; font-weight:700; text-transform:uppercase; color:#64748b; display:block; margin-bottom:5px;">Manual Dynamic Adjustments</span>
+                    <div class="billing-adjustments-summary-box">
+                        <span class="billing-adjustments-summary-heading">Manual Dynamic Adjustments</span>
                         <?php foreach ($adjustments as $adj): ?>
-                            <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:4px 0;">
-                                <div style="flex:1;">↳ <?= htmlspecialchars($adj['reason']) ?> (<?= $adj['type'] === 'charge' ? 'Extra' : 'Discount' ?>)</div>
-                                <div style="font-weight:700; margin-right:15px; color:<?= $adj['type'] === 'charge' ? '#e53e3e' : '#38a169' ?>;">
+                            <div class="billing-adjustment-summary-item">
+                                <div class="flex-1">↳ <?= htmlspecialchars($adj['reason']) ?> (<?= $adj['type'] === 'charge' ? 'Extra' : 'Discount' ?>)</div>
+                                <div class="p-8-right-weight-700 <?= $adj['type'] === 'charge' ? 'text-red-danger' : 'text-green-success' ?>">
                                     <?= $adj['type'] === 'charge' ? '+' : '-' ?>₹<?= number_format($adj['amount'], 2) ?>
                                 </div>
-                                <form method="POST" style="margin:0;">
+                                <form method="POST" class="m-0">
                                     <input type="hidden" name="action_remove_adjustment" value="1">
                                     <input type="hidden" name="adj_id" value="<?= $adj['id'] ?>">
-                                    <button type="submit" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:11px;">✕</button>
+                                    <button type="submit" class="billing-btn-remove-adj">✕</button>
                                 </form>
                             </div>
                         <?php endforeach; ?>
                     </div>
                 <?php endif; ?>
 
-                <div style="display:flex; justify-content:flex-end; margin-top:15px; font-size:14px;">
-                    <span>Food & Extras Bill Subtotal: &nbsp;<strong style="color:#0284c7;">₹<?= number_format($total_incidentals_bill, 2) ?></strong></span>
+                <div class="billing-subtotal-row">
+                    <span>Food & Extras Bill Subtotal: &nbsp;<strong class="text-sky-blue">₹<?= number_format($total_incidentals_bill, 2) ?></strong></span>
                 </div>
             </div>
         </div>
@@ -422,67 +408,67 @@ include "includes/header.php";
         <div class="sidebar-panel-stack">
             <div class="billing-card">
                 <div class="billing-section-title">➕ Add Custom Adjustments</div>
-                <form method="POST" style="margin:0;" id="adjustmentEntryForm">
+                <form method="POST" class="m-0" id="adjustmentEntryForm">
                     <input type="hidden" name="action_add_adjustment" value="1">
-                    <div style="margin-bottom:10px;">
-                        <label style="font-size:11px; font-weight:700; display:block; margin-bottom:4px;">Adjustment Strategy Type</label>
-                        <select name="adj_type" id="adjTypeSelector" onchange="toggleLabelRequirement()" style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px;">
+                    <div class="mb-10">
+                        <label class="field-label-sm">Adjustment Strategy Type</label>
+                        <select name="adj_type" id="adjTypeSelector" onchange="toggleLabelRequirement()" class="field-select-full">
                             <option value="charge">Extra Charge (+)</option>
                             <option value="discount">Discount / Rebate (-)</option>
                         </select>
                     </div>
-                    <div style="margin-bottom:10px;">
-                        <label style="font-size:11px; font-weight:700; display:block; margin-bottom:4px;">Adjustment Label Detail</label>
-                        <input type="text" name="adj_reason" id="adjReasonInput" placeholder="Optional for discounts..." style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box;">
+                    <div class="mb-10">
+                        <label class="field-label-sm">Adjustment Label Detail</label>
+                        <input type="text" name="adj_reason" id="adjReasonInput" placeholder="Optional for discounts..." class="field-input-full">
                     </div>
-                    <div style="margin-bottom:15px;">
-                        <label style="font-size:11px; font-weight:700; display:block; margin-bottom:4px;">Amount (₹)</label>
-                        <input type="number" name="adj_amount" step="0.01" required style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box;">
+                    <div class="mb-15">
+                        <label class="field-label-sm">Amount (₹)</label>
+                        <input type="number" name="adj_amount" step="0.01" required class="field-input-num-full">
                     </div>
-                    <button type="submit" class="btn btn-start" style="width:100%; padding:10px; border-radius:6px; font-weight:700;">Apply Adjustment</button>
+                    <button type="submit" class="btn btn-start btn-apply-adj">Apply Adjustment</button>
                 </form>
             </div>
 
-            <div class="billing-card" style="border:2px solid #06b6d4; background:#fafdfd;">
-                <div class="billing-section-title" style="color:#0891b2; border-color:#0891b2;">🏁 Final Checkout Settlement</div>
+            <div class="billing-card billing-card-checkout-highlight">
+                <div class="billing-section-title billing-section-title-checkout">🏁 Final Checkout Settlement</div>
                 
-                <form method="POST" style="margin:0;">
+                <form method="POST" class="m-0">
                     <input type="hidden" name="action_finalize_checkout" value="1">
                     <input type="hidden" name="post_food_bill_total" value="<?= $total_incidentals_bill ?>">
                     <input type="hidden" name="post_accommodation_pending" value="<?= $accommodation_pending ?>">
                     
-                    <div style="padding:10px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:15px; font-size:12px; line-height:1.5;">
-                        <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                    <div class="checkout-breakdown-box">
+                        <div class="checkout-breakdown-row">
                             <span>Accommodation Pending Collected:</span>
-                            <span style="font-weight:700; color:#065f46;">₹<?= number_format($pending_payment_collected ? $accommodation_pending : 0, 2) ?></span>
+                            <span class="text-green-dark-bold">₹<?= number_format($pending_payment_collected ? $accommodation_pending : 0, 2) ?></span>
                         </div>
-                        <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                        <div class="checkout-breakdown-row">
                             <span>Accommodation Still Due:</span>
-                            <span style="font-weight:700; color:<?= $accommodation_due_now > 0 ? '#c53030' : '#065f46' ?>;">₹<?= number_format($accommodation_due_now, 2) ?></span>
+                            <span class="text-green-dark-bold <?= $accommodation_due_now > 0 ? 'text-red-danger' : 'text-green-dark-bold' ?>">₹<?= number_format($accommodation_due_now, 2) ?></span>
                         </div>
-                        <div style="display:flex; justify-content:space-between; border-bottom:1px dashed #cbd5e0; padding-bottom:6px; margin-bottom:6px;">
+                        <div class="checkout-breakdown-row mb-10">
                             <span>Food & Incidentals Total:</span>
-                            <span style="font-weight:700; color:#0284c7;">₹<?= number_format($total_incidentals_bill, 2) ?></span>
+                            <span class="text-green-dark-bold text-sky-blue">₹<?= number_format($total_incidentals_bill, 2) ?></span>
                         </div>
-                        <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:bold;">
+                        <div class="checkout-breakdown-row mb-4">
                             <span>Total Due at Checkout:</span>
-                            <span style="color:#059669;">₹<?= number_format($checkout_total_due, 2) ?></span>
+                            <span class="sidebar-total-label-green">₹<?= number_format($checkout_total_due, 2) ?></span>
                         </div>
                     </div>
 
-                    <div style="margin-bottom:15px; background:#f1f5f9; padding:8px 12px; border-radius:6px; border:1px dashed #cbd5e0; font-size:12px; color:#475569;">
-                        <div style="display:flex; justify-content:space-between; gap:8px; margin-bottom:4px;">
+                    <div class="mb-15">
+                        <div class="checkout-breakdown-row mb-4">
                             <strong>Advance Collector:</strong>
-                            <span style="font-weight:bold; color:#1e293b"><?= htmlspecialchars($advance_collector) ?></span>
+                            <span class="text-green-dark-bold text-slate-dark"><?= htmlspecialchars($advance_collector) ?></span>
                         </div>
-                        <div style="display:flex; justify-content:space-between; gap:8px;">
+                        <div class="checkout-breakdown-row">
                             <strong>Pending Collector:</strong>
-                            <span style="font-weight:bold; color:<?= $pending_payment_collected ? '#065f46' : '#c53030' ?>"><?= $pending_payment_collected ? htmlspecialchars($pending_collector) : 'Not recorded' ?></span>
+                            <span class="text-green-dark-bold <?= $pending_payment_collected ? 'text-green-dark-bold' : 'text-red-danger' ?>"><?= $pending_payment_collected ? htmlspecialchars($pending_collector) : 'Not recorded' ?></span>
                         </div>
                     </div>
 
-                    <div style="margin-bottom:20px;">
-                        <label style="font-size:11px; font-weight:700; display:block; color:#475569;">👤 Food & Incidentals Collected By:</label>
+                    <div class="mb-20">
+                        <label class="field-label-grey-bold">👤 Food & Incidentals Collected By:</label>
                         <select name="food_received_by_staff" required class="staff-selector">
                             <option value="">-- Choose Collector --</option>
                             <?php foreach ($staff_list as $s): ?>
@@ -491,11 +477,11 @@ include "includes/header.php";
                         </select>
                     </div>
 
-                    <button type="button" class="btn btn-log" style="width:100%; padding:10px; margin-bottom:10px; font-weight:700; background:#f1f5f9; color:#475569; border:1px solid #cbd5e0; border-radius:6px;" onclick="window.openCleanBillPopup()" <?= $pending_payment_collected ? '' : 'disabled' ?>>
+                    <button type="button" class="btn btn-log btn-view-receipt" onclick="window.openCleanBillPopup()" <?= $pending_payment_collected ? '' : 'disabled' ?>>
                         <?= $pending_payment_collected ? 'View Print-Friendly Receipt' : 'Record Pending Accommodation First' ?>
                     </button>
 
-                    <button type="submit" class="btn btn-bill" style="width:100%; padding:12px; border-radius:8px; font-size:14px; font-weight:800; background:<?= $pending_payment_collected ? '#06b6d4' : '#94a3b8' ?>; border-color:<?= $pending_payment_collected ? '#06b6d4' : '#94a3b8' ?>;" <?= $pending_payment_collected ? '' : 'disabled' ?>>
+                    <button type="submit" class="btn btn-bill btn-complete-checkout" onclick="return confirm('Archive this statement?')" <?= $pending_payment_collected ? '' : 'disabled' ?>>
                         <?= $pending_payment_collected ? 'Complete Checkout & Archive Bill' : 'Record Pending Accommodation First' ?>
                     </button>
                 </form>
@@ -505,56 +491,56 @@ include "includes/header.php";
     <?php endif; ?>
 </div>
 
-<div id="cleanPrintFriendlyModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); z-index:999999; justify-content:center; align-items:center; backdrop-filter:blur(2px);">
-    <div style="background:#ffffff; max-width:420px; width:90%; border-radius:8px; padding:25px; box-shadow:0 10px 25px rgba(0,0,0,0.15); text-align:left; color:#000000; font-family:monospace;">
-        <div style="text-align:center; margin-bottom:15px; border-bottom:2px dashed #000;">
-            <h3 style="margin:0 0 5px 0; font-size:16px; text-transform:uppercase; letter-spacing:1px;">ARTISTS FARM JAIPUR</h3>
-            <span style="font-size:11px; color:#555;">Official Bill Invoice Copy</span>
-            <div style="margin:10px 0; font-size:12px; text-align:left;">
+<div id="cleanPrintFriendlyModal" class="print-modal-overlay">
+    <div class="print-modal-box">
+        <div class="print-modal-header">
+            <h3 class="print-modal-company-title">ARTISTS FARM JAIPUR</h3>
+            <span class="print-modal-subtitle">Official Bill Invoice Copy</span>
+            <div class="print-modal-guest-meta">
                 <div><b>Guest:</b> <span id="pGuestName"><?= htmlspecialchars($guest['guest_name'] ?? '') ?></span></div>
                 <div><b>Phone:</b> <span id="pGuestPhone"><?= htmlspecialchars($guest['phone_number'] ?? '') ?></span></div>
                 <div><b>Date:</b> <span><?= date('d M Y, h:i A') ?></span></div>
             </div>
         </div>
 
-        <div style="font-size:12px; font-weight:bold; text-transform:uppercase; margin-bottom:6px; border-bottom:1px solid #000;">Stay Logistics</div>
-        <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
+        <div class="print-modal-section-title">Stay Logistics</div>
+        <div class="print-modal-row">
             <span>Room Tariff (Contract Base):</span>
             <span>₹<?= number_format($base_rent, 2) ?></span>
         </div>
-        <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; color:#2f855a;">
+        <div class="print-modal-row-green">
             <span>[-] Advance Received:</span>
             <span>₹<?= number_format($advance_paid, 2) ?></span>
         </div>
-        <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px; color:#444;">
+        <div class="print-modal-row-muted">
             <span>Advance Collected By:</span>
             <span><?= htmlspecialchars($advance_collector) ?></span>
         </div>
-        <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:bold; margin-bottom:15px; border-bottom:1px dashed #000; padding-bottom:6px;">
+        <div class="print-modal-row-total-dashed">
             <span>Pending Accommodation Collected:</span>
             <span>₹<?= number_format($pending_payment_collected ? $accommodation_pending : 0, 2) ?></span>
         </div>
         <?php if ($accommodation_pending > 0): ?>
-            <div style="display:flex; justify-content:space-between; font-size:11px; margin-top:-10px; margin-bottom:15px; color:#444;">
+            <div class="print-modal-row-collector-line">
                 <span>Pending Collected By:</span>
                 <span><?= $pending_payment_collected ? htmlspecialchars($pending_collector) : 'Not recorded' ?></span>
             </div>
         <?php endif; ?>
-        <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:bold; margin-bottom:15px; border-bottom:1px dashed #000; padding-bottom:6px;">
+        <div class="print-modal-row-total-dashed">
             <span>Stay Balance Still Due:</span>
             <span>₹<?= number_format($accommodation_due_now, 2) ?></span>
         </div>
 
-        <div style="font-size:12px; font-weight:bold; text-transform:uppercase; margin-bottom:6px; border-bottom:1px solid #000;">KOT Food & Incidentals</div>
-        <div id="popupReceiptItems" style="border-bottom:2px dashed #000; padding-bottom:8px; margin-bottom:12px;"></div>
+        <div class="print-modal-section-title">KOT Food & Incidentals</div>
+        <div id="popupReceiptItems" class="print-modal-items-container"></div>
 
-        <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:bold; text-transform:uppercase;">
+        <div class="print-modal-grand-total-row">
             <span>Total Outstanding Payable:</span>
-            <span style="font-size:15px; border-bottom:4px double #000;">₹<?= number_format($checkout_total_due, 2) ?></span>
+            <span class="print-modal-grand-total-val">₹<?= number_format($checkout_total_due, 2) ?></span>
         </div>
-        <div style="margin-top: 20px; display: flex; gap: 8px; justify-content: flex-end;">
-            <button class="btn" style="background: #4a5568; max-width: 80px; color: white; padding:6px 12px; font-size:12px; cursor:pointer;" onclick="window.print()">Print</button>
-            <button class="btn" style="background: #e2e8f0; max-width: 80px; color: #111827; padding:6px 14px; border:none; cursor:pointer; font-size:12px;" onclick="closeEditInvoiceModal()">Close</button>
+        <div class="print-modal-actions-container">
+            <button class="btn print-modal-btn-print" onclick="window.print()">Print</button>
+            <button class="btn print-modal-btn-close" onclick="closeEditInvoiceModal()">Close</button>
         </div>
     </div>
 </div>
@@ -582,20 +568,17 @@ window.openCleanBillPopup = function() {
     cleanItems.forEach(item => { 
         let net = item.quantity - item.returned_qty;
         if(net > 0) {
-            itemsContainer.innerHTML += `<div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px;"><span>${item.name} x${net}</span><span>` + "₹" + (net * item.price).toFixed(2) + `</span></div>`; 
+            itemsContainer.innerHTML += `<div class="receipt-item-line"><span>${item.name} x${net}</span><span>₹${(net * item.price).toFixed(2)}</span></div>`; 
         }
     });
     
- const adjustments = <?php echo json_encode($adjustments ?? []); ?>;
+    const adjustments = <?php echo json_encode($adjustments ?? []); ?>;
     adjustments.forEach(item => {
-        // Logic: Charges are "+", Payments/Adjustments are "-"
         const sign = (item.type === "charge") ? "+" : "-";
-        
-        // Visual Styling: Green for payments/credits, default for charges
-        const color = (item.type === "payment") ? "#059669" : "#444";
+        const colorClass = (item.type === "payment") ? "text-green-success" : "";
         
         itemsContainer.innerHTML += `
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px; color: ${color}; font-style: italic;">
+            <div class="receipt-adjustment-line ${colorClass}">
                 <span>↳ ${item.reason}</span>
                 <span>${sign}₹${parseFloat(item.amount).toFixed(2)}</span>
             </div>`;
@@ -610,5 +593,5 @@ function closeEditInvoiceModal() {
 
 document.addEventListener("DOMContentLoaded", toggleLabelRequirement);
 </script>
-<?php include "includes/error_logging.php"; ?>
+
 <?php include "includes/footer.php"; ?>

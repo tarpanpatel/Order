@@ -46,7 +46,6 @@ if (isset($_POST["complete_order_id"])) {
             $readyMsg .= "\n--------------------------------------\n";
             $readyMsg .= "🏃‍♂️ _Staff, please collect the order from the kitchen immediately._";
 
-            // FIXED: Using sendAdminTelegramMessage (used across rest of app)
             if (function_exists('sendAdminTelegramMessage')) {
                 sendAdminTelegramMessage($readyMsg);
             } else {
@@ -54,7 +53,6 @@ if (isset($_POST["complete_order_id"])) {
             }
 
         } catch (Exception $tgEx) {
-            // Safe catch block prevents connection errors
             error_log("Telegram Error: " . $tgEx->getMessage());
         }
 
@@ -66,7 +64,6 @@ if (isset($_POST["complete_order_id"])) {
         $audit_stmt->execute([$_SESSION['user_id'] ?? 0, "User [" . ($_SESSION['username'] ?? 'System') . "] marked Kitchen Ticket #" . $order_id . " as Completed/Ready to Serve."]);
 
     } catch (Exception $e) {
-        // FIXED: This catch block prevents the 500 error!
         error_log("Database Error in Kitchen: " . $e->getMessage());
     }
 
@@ -93,35 +90,35 @@ include "includes/header.php";
 
 <div class="app-body">
     <div class="category-section">
-        <h2 class="category-title" style="text-transform: none;">🍳 Kitchen Orders</h2>
+        <h2 class="category-title kitchen-title-no-transform">🍳 Kitchen Orders</h2>
     </div>
 
-    <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">
+    <div class="grid kitchen-orders-grid">
         <?php foreach($pending as $order): 
             $items = $pdo->query("SELECT oi.*, mi.name, mi.category_id, mi.image_path FROM order_items oi JOIN menu_items mi ON oi.menu_item_id = mi.id WHERE oi.order_id = ".$order["id"])->fetchAll();
         ?>
-            <div class="card" style="text-align: left; display: flex; flex-direction: column; justify-content: space-between; min-height: 220px; border-top: 3px solid var(--primary) !important;">
+            <div class="card kitchen-order-card">
                 <div>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 6px;">
-                        <span style="font-weight: 700; font-size: 14px; color: var(--text-main);">Order #<?= $order["id"] ?></span>
-                        <span style="font-size: 11px; padding: 2px 8px; background: var(--primary-bg); color: var(--primary); font-weight: 700; border-radius: 12px;"><?= htmlspecialchars($order["guest_name"]) ?></span>
+                    <div class="kitchen-card-header">
+                        <span class="kitchen-order-number">Order #<?= $order["id"] ?></span>
+                        <span class="kitchen-guest-badge"><?= htmlspecialchars($order["guest_name"]) ?></span>
                     </div>
                     
-                    <div style="margin-bottom: 15px;">
+                    <div class="kitchen-items-container">
                         <?php foreach($items as $i): ?>
-                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; font-weight: 600;">
+                            <div class="kitchen-item-row">
                                 🍟 <span><strong><?= $i["quantity"] ?>x</strong> <?= htmlspecialchars($i["name"]) ?></span>
                                 <?php if(!empty($i["special_instructions"])): ?>
-                                    <div style="color: var(--danger); font-size: 11px; font-weight: 700; margin-left: auto;">⚠️ <?= htmlspecialchars($i["special_instructions"]) ?></div>
+                                    <div class="kitchen-special-instructions">⚠️ <?= htmlspecialchars($i["special_instructions"]) ?></div>
                                 <?php endif; ?>
                             </div>
                         <?php endforeach; ?>
                     </div>
                 </div>
                 
-                <form method="POST" id="form_kitchen_<?= $order["id"] ?>" style="margin: 0;">
+                <form method="POST" id="form_kitchen_<?= $order["id"] ?>" class="kitchen-form-wrapper">
                     <input type="hidden" name="complete_order_id" value="<?= $order["id"] ?>">
-                    <button type="button" class="btn btn-start" style="width: 100%; padding: 10px; font-size: 12px;" onclick="confirmKitchenDispatch(<?= $order["id"] ?>)">Ready</button>
+                    <button type="button" class="btn btn-start kitchen-btn-ready" onclick="confirmKitchenDispatch(<?= $order["id"] ?>)">Ready</button>
                 </form>
             </div>
         <?php endforeach; ?>
@@ -147,7 +144,7 @@ function confirmKitchenDispatch(orderId) {
     document.getElementById("kitchenConfirmBtn").onclick = function() {
         if(activeFormId) {
             document.getElementById("kitchenInteractiveContent").innerHTML = `
-                <div class="prompt-title" style="color: var(--success); margin-bottom: 0;">
+                <div class="prompt-title kitchen-success-prompt-title">
                     ✔ Ticket marked complete! Dispatching...
                 </div>
             `;

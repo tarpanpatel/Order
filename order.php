@@ -2,7 +2,6 @@
 // /home/apartment/artistsfarmjaipur.com/Order/order.php
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once "config/db.php";
- 
 
 // Fetching menu categories and configurations directly from the verified database mapping
 $categories = $pdo->query("SELECT * FROM menu_categories ORDER BY sort_order ASC")->fetchAll(PDO::FETCH_ASSOC);
@@ -17,13 +16,13 @@ include "includes/header.php";
 <div class="app-body">
 
     <div class="category-section">
-        <h2 style="margin-bottom: 4px;">🍽️ Food Order Entry</h2>
-        <p style="margin:0; font-size:12px; color:#64748b; font-weight:600;">
+        <h2 class="mb-4">🍽️ Food Order Entry</h2>
+        <p class="active-ticket-context-wrapper">
             Active Ticket Context: 
             <?php if ($current_active_guest): ?>
-                <strong style="color: #0891b2;">📱 Guest (<?= htmlspecialchars($current_active_guest['guest_name']) ?> - <?= substr($current_active_guest['phone_number'], -4) ?>)</strong>
+                <strong class="active-ticket-guest-highlight">📱 Guest (<?= htmlspecialchars($current_active_guest['guest_name']) ?> - <?= substr($current_active_guest['phone_number'], -4) ?>)</strong>
             <?php else: ?>
-                <span style="color:#ef4444; font-weight: bold;">No Active Guest Selected in Sidebar</span>
+                <span class="active-ticket-no-guest">No Active Guest Selected in Sidebar</span>
             <?php endif; ?>
         </p>
     </div>
@@ -48,8 +47,8 @@ include "includes/header.php";
                         $cat_items = array_filter($menu_items, function($m) use ($cat) { return $m['category_id'] == $cat['id']; });
                         if (empty($cat_items)) continue;
                     ?>
-                        <div class="category-block" id="cat_<?= $cat['id'] ?>" style="margin-bottom: 15px;">
-                            <h4 class="category-block-title" style="font-size: 12px; text-transform: uppercase; color: #4b5563; text-align: left; margin-bottom: 8px; font-weight: 700;">
+                        <div class="category-block mb-15" id="cat_<?= $cat['id'] ?>">
+                            <h4 class="category-block-title category-title-custom">
                                 <?= htmlspecialchars($cat['name']) ?>
                             </h4>
                             <div class="material-item-grid">
@@ -80,22 +79,21 @@ include "includes/header.php";
             <div class="requisition-right-sidebar" id="mobileSummaryStickyWrapper" onclick="window.handleMobileDrawerCollapseToggle(event)">
                 <h3 class="sidebar-summary-title">📝 Active Order Ticket</h3>
                 
-                <div id="cartEmptyPlaceholder" style="color: #a0aec0; text-align: center; font-size: 12px; margin-top: 30px; font-style: italic;">
+                <div id="cartEmptyPlaceholder" class="sidebar-placeholder-msg">
                     Basket is empty.<br>Click items to load.
                 </div>
 
-                <form id="checkoutCartSubmissionForm" onsubmit="window.submitFoodOrder(event)" style="display:none; margin:0; flex-direction:column; width:100%;">
+                <form id="checkoutCartSubmissionForm" onsubmit="window.submitFoodOrder(event)" class="checkout-cart-form">
                     <input type="hidden" name="guest_id" value="<?= $current_active_guest['id'] ?? 0 ?>">
                     
-                    <div class="sidebar-cart-list" id="cartItemsContainerRows">
-                        </div>
+                    <div class="sidebar-cart-list" id="cartItemsContainerRows"></div>
                     
                     <div>
                         <div class="sidebar-total-row-wrapper">
-                            <span class="total-types-label" style="color:#059669;">TICKET TOTAL:</span>
-                            <span class="total-types-value" style="color:#059669;">₹<span id="labelCartTotalGross">0.00</span></span>
+                            <span class="total-types-label sidebar-total-label-green">TICKET TOTAL:</span>
+                            <span class="total-types-value sidebar-total-label-green">₹<span id="labelCartTotalGross">0.00</span></span>
                         </div>
-                        <button type="submit" <?php echo !$current_active_guest ? 'disabled' : ''; ?> class="btn btn-bill" style="width: 100%; padding: 12px; font-size: 13px; font-weight: bold; border-radius: 8px; background: #059669; border-color:#059669;">
+                        <button type="submit" <?php echo !$current_active_guest ? 'disabled' : ''; ?> class="btn btn-bill btn-send-kitchen">
                             <?php echo $current_active_guest ? 'Send Order to Kitchen' : 'Select Guest to Send'; ?>
                         </button>
                     </div>
@@ -109,7 +107,6 @@ include "includes/header.php";
 window.activeCartStateMap = {};
 let activeFilteredTabId = 'all';
 
-// Matches requisitions.php collapsible mobile mechanics
 window.handleMobileDrawerCollapseToggle = function(event) {
     if (window.innerWidth >= 1024) return; 
     const sidebar = document.getElementById("mobileSummaryStickyWrapper");
@@ -206,14 +203,14 @@ window.renderCartInterfaceElements = function() {
         totalGrossSum += rowCost;
 
         container.innerHTML += `
-            <div class="sidebar-cart-row" style="display: flex !important; justify-content: space-between !important; align-items: center !important; font-size: 13px !important; padding: 6px 0 !important; border-bottom: 1px solid #edf2f7 !important; gap: 10px !important; width: 100% !important; box-sizing: border-box !important;">
-                <div class="sidebar-cart-item-name" style="font-weight: 700 !important; color: #111827 !important; flex: 1 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; text-align: left !important;">
-                    ${row.name} <span style="font-size:10px; color:#64748b; font-weight:bold;">(₹${row.price})</span>
+            <div class="sidebar-cart-row-node">
+                <div class="sidebar-cart-item-name-node">
+                    ${row.name} <span class="sidebar-cart-item-price-tag">(₹${row.price})</span>
                 </div>
-                <div class="sidebar-cart-qty-controls" style="display: flex !important; align-items: center !important; border: 1px solid #cbd5e0 !important; border-radius: 6px !important; overflow: hidden !important; background: #ffffff !important; height: 28px !important; flex-shrink: 0 !important;">
-                    <button type="button" class="qty-btn-sm" style="width: 26px !important; height: 100% !important; background: #f8fafc !important; border: none !important; font-weight: bold !important; cursor: pointer !important; padding: 0 !important; display: flex !important; align-items: center !important; justify-content: center !important;" onclick="window.updateCartRowQtyChange(${id}, -1)">-</button>
-                    <span style="font-weight: 800 !important; font-size: 12px !important; width: 30px !important; text-align: center !important; display: inline-block !important; color: #1e293b !important;">${row.qty}</span>
-                    <button type="button" class="qty-btn-sm" style="width: 26px !important; height: 100% !important; background: #f8fafc !important; border: none !important; font-weight: bold !important; cursor: pointer !important; padding: 0 !important; display: flex !important; align-items: center !important; justify-content: center !important;" onclick="window.updateCartRowQtyChange(${id}, 1)">+</button>
+                <div class="sidebar-cart-qty-controls-node">
+                    <button type="button" class="qty-btn-sm-node" onclick="window.updateCartRowQtyChange(${id}, -1)">-</button>
+                    <span class="qty-val-display-node">${row.qty}</span>
+                    <button type="button" class="qty-btn-sm-node" onclick="window.updateCartRowQtyChange(${id}, 1)">+</button>
                 </div>
                 <input type="hidden" name="cart_items[${id}][qty]" value="${row.qty}">
             </div>
