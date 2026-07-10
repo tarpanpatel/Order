@@ -206,14 +206,14 @@ window.renderCartInterfaceElements = function() {
         totalGrossSum += rowCost;
 
         container.innerHTML += `
-            <div class="cart-item-row">
-                <div class="cart-item-name">
-                    ${row.name} <span class="cart-item-price-tag">(₹${row.price})</span>
+            <div class="sidebar-cart-row" style="display: flex !important; justify-content: space-between !important; align-items: center !important; font-size: 13px !important; padding: 6px 0 !important; border-bottom: 1px solid #edf2f7 !important; gap: 10px !important; width: 100% !important; box-sizing: border-box !important;">
+                <div class="sidebar-cart-item-name" style="font-weight: 700 !important; color: #111827 !important; flex: 1 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; text-align: left !important;">
+                    ${row.name} <span style="font-size:10px; color:#64748b; font-weight:bold;">(₹${row.price})</span>
                 </div>
-                <div class="cart-qty-controls">
-                    <button type="button" class="cart-qty-btn" onclick="window.updateCartRowQtyChange(${id}, -1)">-</button>
-                    <span class="cart-qty-val">${row.qty}</span>
-                    <button type="button" class="cart-qty-btn" onclick="window.updateCartRowQtyChange(${id}, 1)">+</button>
+                <div class="sidebar-cart-qty-controls" style="display: flex !important; align-items: center !important; border: 1px solid #cbd5e0 !important; border-radius: 6px !important; overflow: hidden !important; background: #ffffff !important; height: 28px !important; flex-shrink: 0 !important;">
+                    <button type="button" class="qty-btn-sm" style="width: 26px !important; height: 100% !important; background: #f8fafc !important; border: none !important; font-weight: bold !important; cursor: pointer !important; padding: 0 !important; display: flex !important; align-items: center !important; justify-content: center !important;" onclick="window.updateCartRowQtyChange(${id}, -1)">-</button>
+                    <span style="font-weight: 800 !important; font-size: 12px !important; width: 30px !important; text-align: center !important; display: inline-block !important; color: #1e293b !important;">${row.qty}</span>
+                    <button type="button" class="qty-btn-sm" style="width: 26px !important; height: 100% !important; background: #f8fafc !important; border: none !important; font-weight: bold !important; cursor: pointer !important; padding: 0 !important; display: flex !important; align-items: center !important; justify-content: center !important;" onclick="window.updateCartRowQtyChange(${id}, 1)">+</button>
                 </div>
                 <input type="hidden" name="cart_items[${id}][qty]" value="${row.qty}">
             </div>
