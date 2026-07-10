@@ -78,120 +78,12 @@ $deficient_items = $pdo->query("SELECT d.*, rc.item_name
 include "includes/header.php";
 ?>
 
-<style>
-/* ==========================================================================
-   DASHBOARD WIDGET MATRIX GRID SYSTEM LAYOUTS
-   ========================================================================== */
-.dashboard-grid-matrix {
-    display: grid !important;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important;
-    gap: 20px !important;
-    width: 100% !important;
-    margin-top: 15px;
-}
 
-.widget-card {
-    background: #ffffff !important;
-    border: 1px solid #e2e8f0 !important;
-    border-radius: 12px !important;
-    padding: 20px !important;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    text-align: left;
-}
-
-.widget-title {
-    font-size: 14px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: #4b5563;
-    border-bottom: 1px dashed #e2e8f0;
-    padding-bottom: 10px;
-    margin-bottom: 15px;
-    margin-top: 0;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.widget-data-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    flex-grow: 1;
-}
-
-.widget-data-item {
-    padding: 12px 0;
-    border-bottom: 1px solid #f3f4f6;
-    font-size: 13px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 15px;
-}
-
-.widget-data-item:last-child {
-    border-bottom: none;
-}
-
-.widget-btn-action {
-    display: block;
-    text-align: center;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    color: #4b5563;
-    padding: 8px;
-    border-radius: 6px;
-    font-size: 12px;
-    font-weight: 700;
-    text-decoration: none;
-    margin-top: 15px;
-    transition: all 0.2s ease;
-}
-
-.widget-btn-action:hover {
-    background: #edf2f7;
-    color: #1a202c;
-}
-
-.status-badge-tag {
-    font-size: 10px;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-weight: 700;
-    white-space: nowrap;
-}
-
-.badge-pending { background: #fef3c7; color: #d97706; }
-.badge-completed { background: #d1fae5; color: #059669; }
-
-.guest-profile-table {
-    width: 100%;
-    font-size: 13px;
-    border-collapse: collapse;
-}
-
-.guest-profile-table th {
-    font-weight: 600;
-    color: #6b7280;
-    padding: 6px 0;
-    width: 130px;
-}
-
-.guest-profile-table td {
-    color: #111827;
-    padding: 6px 0;
-}
-</style>
 
 <div class="app-body">
     <div class="category-section" style="margin-bottom: 5px;">
         <h2 class="category-title" style="text-transform: none;">📊 Operational Environment</h2>
-        <p style="color: var(--text-muted); margin-bottom: 1.5rem; font-size: 13px;">The Artists Farm Admin Panel Hub</p>
+       
     </div>
 
     <?php if (!empty($stock_alerts)): ?>
