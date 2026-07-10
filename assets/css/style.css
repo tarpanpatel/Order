@@ -699,3 +699,43 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     /* width: 200px; */
     max-width: 200px;
 }
+/* ==========================================================================
+   📦 REQUISITIONS & INVENTORY SYSTEM (requisitions.php)
+   ========================================================================== */
+
+/* Header & Controls */
+.req-header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.req-header-title { margin: 0; }
+.btn-request-new { padding: 8px 16px; font-size: 12px; font-weight: bold; border-radius: 6px; }
+
+/* Chef New Product Modal */
+.chef-modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); z-index: 999999; justify-content: center; align-items: center; }
+.chef-modal-card { width: 100%; max-width: 400px; padding: 25px; background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+.chef-modal-title { margin-top: 0; margin-bottom: 15px; color: #1e293b; }
+.chef-form-group { margin-bottom: 12px; text-align: left; }
+.chef-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; text-align: left; }
+.chef-form-label { font-size: 11px; font-weight: 700; color: #475569; display: block; margin-bottom: 4px; }
+.chef-form-input { width: 100%; padding: 10px; border: 1px solid #cbd5e0; border-radius: 6px; box-sizing: border-box; }
+.chef-form-select { width: 100%; padding: 10px; border: 1px solid #cbd5e0; border-radius: 6px; background: #fff; box-sizing: border-box; }
+.chef-modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.btn-discard { background: #e2e8f0; color: #475569; border: none; }
+.btn-submit-request { background: #00b0ff; border-color: #00b0ff; padding: 10px 20px; color: #fff; }
+
+/* Catalog Categories & Items */
+.req-category-block { margin-bottom: 25px; }
+.req-category-title { font-size: 11px; text-transform: uppercase; color: #475569; letter-spacing: 0.5px; font-weight: 700; margin-bottom: 10px; border-left: 3px solid #00b0ff; padding-left: 8px; }
+.req-item-pack-info { font-size: 11px; color: #64748b; margin-top: 2px; }
+
+/* Sidebar Requisition Cart */
+.req-cart-empty-msg { color: #94a3b8; text-align: center; font-size: 12px; margin-top: 40px; font-style: italic; }
+.req-cart-form { display: none; margin: 0; flex-direction: column; width: 100%; }
+.req-cart-submit-wrapper { margin-top: 15px; }
+.btn-dispatch-req { width: 100%; padding: 12px; font-weight: bold; font-size: 13px; background: #00b0ff; border-color: #00b0ff; border-radius: 8px; color: #fff; }
+
+/* Sidebar Cart Rows (Generated via JS) */
+.req-cart-item-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #edf2f7; gap: 10px; }
+.req-cart-item-name { font-weight: 700; color: #1e293b; flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.req-cart-item-unit { font-size: 10px; color: #94a3b8; font-weight: bold; }
+.req-cart-qty-controls { display: flex; align-items: center; border: 1px solid #cbd5e0; border-radius: 6px; overflow: hidden; height: 28px; }
+.req-qty-btn { width: 26px; height: 100%; border: none; background: #f8fafc; font-weight: bold; cursor: pointer; color: #1e293b; }
+.req-qty-val { width: 30px; text-align: center; font-weight: 800; font-size: 12px; color: #1e293b; line-height: 28px; }

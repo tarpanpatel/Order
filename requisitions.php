@@ -37,38 +37,38 @@ include "includes/header.php";
 ?>
 
 <div class="app-body">
-    <div class="category-section" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h2 style="margin: 0;">📦 Material Requisition Request</h2>
-        <button type="button" class="btn btn-start" onclick="window.openChefNewProductModal()" style="padding: 8px 16px; font-size: 12px; font-weight: bold; border-radius: 6px;">+ Request New Product</button>
+    <div class="category-section req-header-flex">
+        <h2 class="req-header-title">📦 Material Requisition Request</h2>
+        <button type="button" class="btn btn-start btn-request-new" onclick="window.openChefNewProductModal()">+ Request New Product</button>
     </div>
 
-    <div id="chefNewProductModal" class="prompt-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); z-index: 999999; justify-content: center; align-items: center;">
-        <div class="card" style="width: 100%; max-width: 400px; padding: 25px; background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);">
-            <h3 style="margin-top: 0; margin-bottom: 15px; color: #1e293b;">Suggest Unlisted Product</h3>
+    <div id="chefNewProductModal" class="chef-modal-overlay">
+        <div class="card chef-modal-card">
+            <h3 class="chef-modal-title">Suggest Unlisted Product</h3>
             <form method="POST" action="requisitions.php">
                 <input type="hidden" name="action_create_chef_product" value="1">
                 
-                <div style="margin-bottom: 12px; text-align: left;">
-                    <label style="font-size: 11px; font-weight: 700; color: #475569; display: block; margin-bottom: 4px;">Item Description Title</label>
-                    <input type="text" name="chef_prod_name" required placeholder="e.g., Mother Dairy Fresh Cream" style="width: 100%; padding: 10px; border: 1px solid #cbd5e0; border-radius: 6px;">
+                <div class="chef-form-group">
+                    <label class="chef-form-label">Item Description Title</label>
+                    <input type="text" name="chef_prod_name" required placeholder="e.g., Mother Dairy Fresh Cream" class="chef-form-input">
                 </div>
 
-                <div style="margin-bottom: 12px; text-align: left;">
-                    <label style="font-size: 11px; font-weight: 700; color: #475569; display: block; margin-bottom: 4px;">Storage Classification Category</label>
-                    <select name="chef_prod_category" required style="width: 100%; padding: 10px; border: 1px solid #cbd5e0; border-radius: 6px; background: #fff;">
+                <div class="chef-form-group">
+                    <label class="chef-form-label">Storage Classification Category</label>
+                    <select name="chef_prod_category" required class="chef-form-select">
                         <option value="">-- Choose Category --</option>
                         <?php foreach($categories as $c): ?><option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['name']) ?></option><?php endforeach; ?>
                     </select>
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; text-align: left;">
+                <div class="chef-form-grid">
                     <div>
-                        <label style="font-size: 11px; font-weight: 700; color: #475569; display: block; margin-bottom: 4px;">Pack Size Size Spec</label>
-                        <input type="number" step="0.01" name="chef_pack_size" value="1" required style="width: 100%; padding: 10px; border: 1px solid #cbd5e0; border-radius: 6px;">
+                        <label class="chef-form-label">Pack Size Spec</label>
+                        <input type="number" step="0.01" name="chef_pack_size" value="1" required class="chef-form-input">
                     </div>
                     <div>
-                        <label style="font-size: 11px; font-weight: 700; color: #475569; display: block; margin-bottom: 4px;">Packaging UOM Unit</label>
-                        <select name="chef_pack_unit" style="width: 100%; padding: 10px; border: 1px solid #cbd5e0; border-radius: 6px; background: #fff;">
+                        <label class="chef-form-label">Packaging UOM Unit</label>
+                        <select name="chef_pack_unit" class="chef-form-select">
                             <option value="kg">kg (Kilograms)</option>
                             <option value="Litre">Litre (L)</option>
                             <option value="Packet">Packet (Pkt)</option>
@@ -78,9 +78,9 @@ include "includes/header.php";
                     </div>
                 </div>
 
-                <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                    <button type="button" class="btn" style="background:#e2e8f0; color:#475569;" onclick="window.closeChefNewProductModal()">Discard</button>
-                    <button type="submit" class="btn btn-bill" style="background:#00b0ff; border-color:#00b0ff; padding: 10px 20px;">Submit Request</button>
+                <div class="chef-modal-actions">
+                    <button type="button" class="btn btn-discard" onclick="window.closeChefNewProductModal()">Discard</button>
+                    <button type="submit" class="btn btn-submit-request">Submit Request</button>
                 </div>
             </form>
         </div>
@@ -106,8 +106,8 @@ include "includes/header.php";
                         $cat_items = array_filter($catalog_items, function($m) use ($cat) { return $m['category_id'] == $cat['id']; });
                         if (empty($cat_items)) continue;
                     ?>
-                        <div class="category-block" id="cat_<?= $cat['id'] ?>" style="margin-bottom: 25px;">
-                            <h4 class="category-block-title" style="font-size: 11px; text-transform: uppercase; color: #475569; letter-spacing: 0.5px; font-weight: 700; margin-bottom: 10px; border-left: 3px solid #00b0ff; padding-left: 8px;">
+                        <div class="category-block req-category-block" id="cat_<?= $cat['id'] ?>">
+                            <h4 class="req-category-title">
                                 <?= htmlspecialchars($cat['name']) ?>
                             </h4>
                             <div class="material-item-grid">
@@ -118,7 +118,7 @@ include "includes/header.php";
                                         </div>
                                         <div class="material-item-name">
                                             <strong><?= htmlspecialchars($item['item_name']) ?></strong>
-                                            <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Pack: <?= floatval($item['pack_size']) ?> <?= htmlspecialchars($item['pack_unit']) ?></div>
+                                            <div class="req-item-pack-info">Pack: <?= floatval($item['pack_size']) ?> <?= htmlspecialchars($item['pack_unit']) ?></div>
                                         </div>
                                         <button type="button" class="btn-tab-styled-add" onclick="window.addMaterialToSidebar(this, <?= $item['id'] ?>, '<?= htmlspecialchars(addslashes($item['item_name'])) ?>', '<?= htmlspecialchars($item['pack_unit']) ?>')">+ Add</button>
                                     </div>
@@ -133,14 +133,14 @@ include "includes/header.php";
         <div class="right-column-stack">
             <div class="requisition-right-sidebar" id="mobileSummaryStickyWrapper" onclick="window.handleMobileDrawerCollapseToggle(event)">
                 <h3 class="sidebar-summary-title">📋 Supply Order Basket</h3>
-                <div id="cartEmptyPlaceholder" style="color: #94a3b8; text-align: center; font-size: 12px; margin-top: 40px; font-style: italic;">
+                <div id="cartEmptyPlaceholder" class="req-cart-empty-msg">
                     No materials loaded.<br>Click catalog items to compile.
                 </div>
 
-                <form id="checkoutCartSubmissionForm" onsubmit="window.submitMaterialRequisitionRequest(event)" style="display:none; margin:0; flex-direction:column; width:100%;">
+                <form id="checkoutCartSubmissionForm" onsubmit="window.submitMaterialRequisitionRequest(event)" class="req-cart-form">
                     <div class="sidebar-cart-list" id="cartItemsContainerRows"></div>
-                    <div style="margin-top: 15px;">
-                        <button type="submit" class="btn btn-bill" style="width: 100%; padding: 12px; font-weight: bold; font-size: 13px; background: #00b0ff; border-color: #00b0ff; border-radius: 8px;">Dispatch Requirement</button>
+                    <div class="req-cart-submit-wrapper">
+                        <button type="submit" class="btn btn-dispatch-req">Dispatch Requirement</button>
                     </div>
                 </form>
             </div>
@@ -245,15 +245,17 @@ include "includes/header.php";
         for (let id in window.activeRequisitionCartMap) {
             rowCounter++;
             let row = window.activeRequisitionCartMap[id];
+            
+            // Generate DOM using semantic classes extracted to style.css
             container.innerHTML += `
-                <div class="cart-item-row" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #edf2f7; gap: 10px;">
-                    <div class="cart-item-name" style="font-weight: 700; color: #1e293b; flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                        ${row.name} <span style="font-size:10px; color:#94a3b8; font-weight:bold;">(${row.unit})</span>
+                <div class="req-cart-item-row">
+                    <div class="req-cart-item-name">
+                        ${row.name} <span class="req-cart-item-unit">(${row.unit})</span>
                     </div>
-                    <div class="cart-qty-controls" style="display: flex; align-items: center; border: 1px solid #cbd5e0; border-radius: 6px; overflow: hidden; height: 28px;">
-                        <button type="button" class="cart-qty-btn" style="width:26px; border:none; background:#f8fafc; font-weight:bold; cursor:pointer;" onclick="window.modifyCartRowQtyIndex(${id}, -1)">-</button>
-                        <span class="cart-qty-val" style="width:30px; text-align:center; font-weight:800; font-size:12px;">${row.qty}</span>
-                        <button type="button" class="cart-qty-btn" style="width:26px; border:none; background:#f8fafc; font-weight:bold; cursor:pointer;" onclick="window.modifyCartRowQtyIndex(${id}, 1)">+</button>
+                    <div class="req-cart-qty-controls">
+                        <button type="button" class="req-qty-btn" onclick="window.modifyCartRowQtyIndex(${id}, -1)">-</button>
+                        <span class="req-qty-val">${row.qty}</span>
+                        <button type="button" class="req-qty-btn" onclick="window.modifyCartRowQtyIndex(${id}, 1)">+</button>
                     </div>
                 </div>
             `;
