@@ -48,14 +48,7 @@ function turnActionIntoHumanLanguage($action_text) {
 }
 ?>
 
-<style>
-.form-input-container { width:100%; padding:10px; border:1px solid #cbd5e0; border-radius:8px; box-sizing:border-box; font-size:14px; font-weight:600; color:#1e293b; background:#fff; }
-.form-label-header { font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:5px; text-transform:uppercase; }
-.log-row-node { transition: background 0.1s ease; }
-.log-row-node:hover { background: #f8fafc; }
-.btn-load-more { display: block; width: 200px; margin: 20px auto 10px auto; padding: 10px 16px; font-size: 13px; font-weight: bold; color: #fff; background: #06b6d4; border: none; border-radius: 8px; cursor: pointer; text-align: center; box-shadow: 0 2px 4px rgba(6,182,212,0.15); transition: background 0.2s; }
-.btn-load-more:hover { background: #0891b2; }
-</style>
+
 
 <div class="app-body" style="padding: 20px; font-family: sans-serif; text-align: left;">
     <div style="background: #fff; border: 1px solid #cbd5e0; border-radius: 12px; padding: 25px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
