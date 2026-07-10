@@ -62,9 +62,49 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
             .sidebar.is-drawer-open { transform: translateX(0) !important; }
         }
     </style>
+    
 </head>
 <body>
+<div id="globalSystemLoaderScreen" style="
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(4px);
+    z-index: 999999;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    transition: opacity 0.2s ease-in-out;
+    pointer-events: all;
+">
+    <div style="
+        width: 50px;
+        height: 50px;
+        border: 5px solid #edf2f7;
+        border-top: 5px solid #00b0ff;
+        border-radius: 50%;
+        animation: spinSystemLoader 0.8s linear infinite;
+    "></div>
+    <p style="
+        margin-top: 15px;
+        font-family: sans-serif;
+        font-size: 14px;
+        font-weight: 700;
+        color: #2d3748;
+        letter-spacing: 0.5px;
+    ">Processing Request...</p>
+</div>
 
+<style>
+@keyframes spinSystemLoader {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+</style>
 <div class="mobile-header-strip">
     <button type="button" class="hamburger-btn" onclick="toggleLeftMenu(true)">☰</button>
     <strong style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">POS Dashboard</strong>

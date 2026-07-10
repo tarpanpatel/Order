@@ -1,5 +1,51 @@
 </div> </div> <div class="sidebar-backdrop" id="menuOverlayMask" onclick="toggleLeftMenu(false)"></div>
+<script>
+(function() {
+    const loader = document.getElementById('globalSystemLoaderScreen');
+    if (!loader) return;
 
+    // 1. Hide loader immediately when the page has fully parsed and rendered
+    window.addEventListener('DOMContentLoaded', () => {
+        loader.style.opacity = '0';
+        setTimeout(() => { loader.style.display = 'none'; }, 200);
+    });
+
+    // 2. Catch native page transitions (clicking links, refreshing, changing pages)
+    window.addEventListener('beforeunload', () => {
+        loader.style.display = 'flex';
+        loader.style.opacity = '1';
+    });
+
+    // 3. Catch standard HTML Form Submissions (POST/GET)
+    document.addEventListener('submit', (e) => {
+        // Skip async fetch forms as they are handled below
+        if (e.target.hasAttribute('onsubmit') && e.target.getAttribute('onsubmit').includes('preventDefault')) {
+            return; 
+        }
+        loader.style.display = 'flex';
+        loader.style.opacity = '1';
+    });
+
+    // 4. GLOBAL INTERCEPTOR FOR BACKGROUND AJAX OPERATIONS (fetch api)
+    const originalFetch = window.fetch;
+    window.fetch = async function(...args) {
+        // Show loader when a fetch request is initialized (e.g., sending orders)
+        loader.style.display = 'flex';
+        loader.style.opacity = '1';
+
+        try {
+            const response = await originalFetch(...args);
+            return response;
+        } catch (error) {
+            throw error;
+        } finally {
+            // Hide loader as soon as the backend responds or fails
+            loader.style.opacity = '0';
+            setTimeout(() => { loader.style.display = 'none'; }, 200);
+        }
+    };
+})();
+</script>
 <script>
 // ==========================================================================
 // 1. MOBILE RESPONSIVE DRAWER MECHANICS
