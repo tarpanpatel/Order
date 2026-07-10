@@ -610,5 +610,5 @@ function closeEditInvoiceModal() {
 
 document.addEventListener("DOMContentLoaded", toggleLabelRequirement);
 </script>
-
+<?php include "includes/error_logging.php"; ?>
 <?php include "includes/footer.php"; ?>
