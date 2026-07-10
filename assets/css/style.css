@@ -541,3 +541,16 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
     .card-name { font-size: 12px; height: auto; margin-bottom: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
     .card-price { font-size: 11px; margin-top: 1px; margin-bottom: 0; }
 }
+/* Central operational click-feedback button states */
+.btn-tab-styled-add {
+    background-color: #ffffff !important;
+    color: #1e293b !important;
+    border: 1px solid #cbd5e0 !important;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-tab-styled-add.is-clicked-active {
+    background-color: #10b981 !important; /* Emerald Green */
+    color: #ffffff !important;
+    border-color: #10b981 !important;
+}

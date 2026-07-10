@@ -6,7 +6,10 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once "config/db.php";
 require_once "config/telegram.php"; 
 include_once __DIR__ . '/config/local_db_bridge.php';
- 
+
+// Disable visible execution errors to block raw framework tracking anomalies in production
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
 
 // --- CHEF NEW PRODUCT GENERATOR INTERCEPTOR ---
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_create_chef_product"])) {
@@ -20,109 +23,67 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_create_chef_pr
         $stmt->execute([$item_name, $category_id, $pack_size, $pack_unit]);
 
         $audit_stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
-        $audit_stmt->execute([$_SESSION['user_id'], "User [" . $_SESSION['username'] . "] registered a new custom product catalog item: [" . $item_name . "]"]);
-
-        $_SESSION['requisition_saved_toast'] = "Product requested with packing specifications!";
+        $audit_stmt->execute([$_SESSION['user_id'] ?? 0, "Chef registered a new pending custom inventory placeholder item: [" . $item_name . "]"]);
     }
     header("Location: requisitions.php");
     exit;
 }
 
-// --- MASTER SAVING BATCH SUBMISSION BLOCK ---
-if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_requisition"])) {
-    $req_id = intval($_POST["update_req_id"]);
-    $quantities = $_POST["req_item_qty"] ?? [];
-    $item_statuses = $_POST["req_item_status"] ?? [];
+// Fetch master components
+$categories = $pdo->query("SELECT * FROM material_categories ORDER BY id ASC")->fetchAll(PDO::FETCH_ASSOC);
+$catalog_items = $pdo->query("SELECT * FROM req_catalog WHERE is_verified = 1 ORDER BY item_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
-    $pdo->beginTransaction();
-    try {
-        $getOriginalQty = $pdo->prepare("SELECT quantity FROM requisition_items WHERE requisition_id = ? AND catalog_id = ?");
-        $logDeficiency  = $pdo->prepare("INSERT INTO deficient_stock_logs (requisition_id, catalog_id, ordered_qty, delivered_qty, deficit_qty) VALUES (?, ?, ?, ?, ?)");
-        $updateItem     = $pdo->prepare("UPDATE requisition_items SET quantity = ?, item_status = ? WHERE requisition_id = ? AND catalog_id = ?");
-        $deleteItem     = $pdo->prepare("DELETE FROM requisition_items WHERE requisition_id = ? AND catalog_id = ?");
-
-        $all_fulfilled = true;
-        
-        foreach ($quantities as $cat_id => $qty) {
-            $cat_id = intval($cat_id);
-            $new_qty = floatval($qty); 
-            $allocated_status = isset($item_statuses[$cat_id]) ? trim($item_statuses[$cat_id]) : 'Pending';
-
-            if ($new_qty <= 0 || $allocated_status === 'Cancelled') {
-                $deleteItem->execute([$req_id, $cat_id]);
-                continue;
-            }
-
-            if ($allocated_status !== 'Fulfilled') {
-                $all_fulfilled = false;
-            }
-
-            $getOriginalQty->execute([$req_id, $cat_id]);
-            $original_qty = floatval($getOriginalQty->fetchColumn() ?: 0);
-
-            if ($new_qty < $original_qty && $allocated_status === 'Fulfilled') {
-                $deficit = $original_qty - $new_qty;
-                $logDeficiency->execute([$req_id, $cat_id, $original_qty, $new_qty, $deficit]);
-            }
-
-            $updateItem->execute([$new_qty, $allocated_status, $req_id, $cat_id]);
-        }
-
-        $countRemaining = $pdo->prepare("SELECT COUNT(*) FROM requisition_items WHERE requisition_id = ?");
-        $countRemaining->execute([$req_id]);
-        $remainingItems = intval($countRemaining->fetchColumn() ?: 0);
-
-        if ($remainingItems === 0) {
-            $deleteParent = $pdo->prepare("DELETE FROM requisitions WHERE id = ?");
-            $deleteParent->execute([$req_id]);
-            
-            $audit_stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
-            $audit_stmt->execute([$_SESSION['user_id'], "User [" . $_SESSION['username'] . "] entirely cleared and removed Requisition Ticket Sheet #" . $req_id]);
-
-            $_SESSION['requisition_saved_toast'] = "Stock order entirely cleared and removed!";
-        } else {
-            $final_global_status = $all_fulfilled ? 'Fulfilled' : 'Pending';
-            $stmt = $pdo->prepare("UPDATE requisitions SET status = ? WHERE id = ?");
-            $stmt->execute([$final_global_status, $req_id]);
-
-            $audit_stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
-            $audit_stmt->execute([$_SESSION['user_id'], "User [" . $_SESSION['username'] . "] updated items/quantities on open Requisition Sheet #" . $req_id . " (Global status set to: " . $final_global_status . ")"]);
-
-            $_SESSION['requisition_saved_toast'] = "Notification Saved successfully!";
-        }
-
-        $pdo->commit();
-        header("Location: requisitions.php");
-        exit;
-    } catch (Exception $e) {
-        $pdo->rollBack();
-    }
-}
-
-$categories = $pdo->query("SELECT * FROM material_categories ORDER BY sort_order ASC")->fetchAll(PDO::FETCH_ASSOC);
-$materials  = $pdo->query("SELECT id, item_name as name, category_id, unit_type, unit_label, pack_size, pack_unit, image_path FROM req_catalog WHERE is_verified = 1 ORDER BY item_name ASC")->fetchAll(PDO::FETCH_ASSOC);
-
-$past_requisitions = $pdo->query("SELECT r.id, r.requested_at, r.status,
-                                  (SELECT GROUP_CONCAT(CONCAT(rc.item_name, ' (', CAST(rc.pack_size AS CHAR), ' ', rc.pack_unit, ') x', ri.quantity, ' ', COALESCE(ri.chosen_unit_label, rc.unit_label)) SEPARATOR ', ')
-                                   FROM requisition_items ri
-                                   JOIN req_catalog rc ON ri.catalog_id = rc.id
-                                   WHERE ri.requisition_id = r.id) as item_summary
-                                  FROM requisitions r
-                                  ORDER BY r.id DESC LIMIT 10")->fetchAll(PDO::FETCH_ASSOC);
-                                  
 include "includes/header.php";
 ?>
 
 <div class="app-body">
-    
-    <?php if (isset($_SESSION['requisition_saved_toast'])): ?>
-        <div class="global-toast-notification">
-            📢 <strong><?= htmlspecialchars($_SESSION['requisition_saved_toast']) ?></strong>
-        </div>
-    <?php unset($_SESSION['requisition_saved_toast']); endif; ?>
+    <div class="category-section" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="margin: 0;">📦 Material Requisition Request</h2>
+        <button type="button" class="btn btn-start" onclick="window.openChefNewProductModal()" style="padding: 8px 16px; font-size: 12px; font-weight: bold; border-radius: 6px;">+ Request New Product</button>
+    </div>
 
-    <div class="category-section">
-        <h2>📦 Material Requests</h2>
+    <div id="chefNewProductModal" class="prompt-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); z-index: 999999; justify-content: center; align-items: center;">
+        <div class="card" style="width: 100%; max-width: 400px; padding: 25px; background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);">
+            <h3 style="margin-top: 0; margin-bottom: 15px; color: #1e293b;">Suggest Unlisted Product</h3>
+            <form method="POST" action="requisitions.php">
+                <input type="hidden" name="action_create_chef_product" value="1">
+                
+                <div style="margin-bottom: 12px; text-align: left;">
+                    <label style="font-size: 11px; font-weight: 700; color: #475569; display: block; margin-bottom: 4px;">Item Description Title</label>
+                    <input type="text" name="chef_prod_name" required placeholder="e.g., Mother Dairy Fresh Cream" style="width: 100%; padding: 10px; border: 1px solid #cbd5e0; border-radius: 6px;">
+                </div>
+
+                <div style="margin-bottom: 12px; text-align: left;">
+                    <label style="font-size: 11px; font-weight: 700; color: #475569; display: block; margin-bottom: 4px;">Storage Classification Category</label>
+                    <select name="chef_prod_category" required style="width: 100%; padding: 10px; border: 1px solid #cbd5e0; border-radius: 6px; background: #fff;">
+                        <option value="">-- Choose Category --</option>
+                        <?php foreach($categories as $c): ?><option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['name']) ?></option><?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; text-align: left;">
+                    <div>
+                        <label style="font-size: 11px; font-weight: 700; color: #475569; display: block; margin-bottom: 4px;">Pack Size Size Spec</label>
+                        <input type="number" step="0.01" name="chef_pack_size" value="1" required style="width: 100%; padding: 10px; border: 1px solid #cbd5e0; border-radius: 6px;">
+                    </div>
+                    <div>
+                        <label style="font-size: 11px; font-weight: 700; color: #475569; display: block; margin-bottom: 4px;">Packaging UOM Unit</label>
+                        <select name="chef_pack_unit" style="width: 100%; padding: 10px; border: 1px solid #cbd5e0; border-radius: 6px; background: #fff;">
+                            <option value="kg">kg (Kilograms)</option>
+                            <option value="Litre">Litre (L)</option>
+                            <option value="Packet">Packet (Pkt)</option>
+                            <option value="Box">Box (Bx)</option>
+                            <option value="Piece">Piece (Pc)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button type="button" class="btn" style="background:#e2e8f0; color:#475569;" onclick="window.closeChefNewProductModal()">Discard</button>
+                    <button type="submit" class="btn btn-bill" style="background:#00b0ff; border-color:#00b0ff; padding: 10px 20px;">Submit Request</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <div class="split-requisition-layout">
@@ -130,37 +91,36 @@ include "includes/header.php";
             <div class="catalog-cards-box">
                 <div class="search-input-wrapper">
                     <span class="search-icon-inside">🔍</span>
-                    <input type="text" id="catalogQuickSearchInput" class="btn-quick-search-box" placeholder="Quick search materials registry on the fly..." onkeyup="window.quickSearchCatalogRegistry()">
+                    <input type="text" id="catalogQuickSearchInput" class="btn-quick-search-box" placeholder="Quick search catalog metrics..." onkeyup="window.searchCatalogDatabaseStream()">
                 </div>
 
                 <div class="catalog-tab-header">
-                    <button type="button" id="globalAllTabBtn" class="catalog-tab-btn active" onclick="window.filterMaterialCatalog('all', this)">All Items</button>
+                    <button type="button" id="globalAllTabBtn" class="catalog-tab-btn active" onclick="window.filterCatalogCategoryView('all', this)">All Items</button>
                     <?php foreach ($categories as $cat): ?>
-                        <button type="button" class="catalog-tab-btn" onclick="window.filterMaterialCatalog('cat_<?= $cat['id'] ?>', this)"><?= htmlspecialchars($cat['name']) ?></button>
+                        <button type="button" class="catalog-tab-btn" onclick="window.filterCatalogCategoryView('cat_<?= $cat['id'] ?>', this)"><?= htmlspecialchars($cat['name']) ?></button>
                     <?php endforeach; ?>
-                    <button type="button" class="catalog-tab-btn" style="background:#fffbeb; color:#d97706; border: 1px dashed #f59e0b; margin-left: auto;" onclick="window.openChefNewProductModal()">➕ New Product</button>
                 </div>
 
                 <div id="materialCatalogContainer">
-                    <?php foreach ($categories as $cat):
-                        $catItems = array_filter($materials, function($x) use ($cat) {
-                            return (intval($x['category_id']) === intval($cat['id']));
-                        });
-                        if (empty($catItems)) continue;
+                    <?php foreach ($categories as $cat): 
+                        $cat_items = array_filter($catalog_items, function($m) use ($cat) { return $m['category_id'] == $cat['id']; });
+                        if (empty($cat_items)) continue;
                     ?>
-                        <div class="category-block" id="cat_<?= $cat['id'] ?>" style="margin-bottom: 15px;">
-                            <h4 class="category-block-title" style="font-size: 12px; text-transform: uppercase; color: #4b5563; text-align: left; margin-bottom: 8px; font-weight: 700;"><?= htmlspecialchars($cat['name']) ?></h4>
+                        <div class="category-block" id="cat_<?= $cat['id'] ?>" style="margin-bottom: 25px;">
+                            <h4 class="category-block-title" style="font-size: 11px; text-transform: uppercase; color: #475569; letter-spacing: 0.5px; font-weight: 700; margin-bottom: 10px; border-left: 3px solid #00b0ff; padding-left: 8px;">
+                                <?= htmlspecialchars($cat['name']) ?>
+                            </h4>
                             <div class="material-item-grid">
-                                <?php foreach ($catItems as $item): ?>
-                                    <div class="material-item-card" data-search-name="<?= strtolower(htmlspecialchars($item['name'])) ?>">
+                                <?php foreach ($cat_items as $item): ?>
+                                    <div class="material-item-card" data-search-name="<?= strtolower(htmlspecialchars($item['item_name'])) ?>">
                                         <div class="material-item-image-box">
-                                            <img src="<?= !empty($item['image_path']) ? htmlspecialchars($item['image_path']) : 'https://placehold.co/150x100?text=No+Image'; ?>" alt="" onerror="this.src='https://placehold.co/150x100?text=No+Image';">
+                                            <img src="<?= htmlspecialchars($item['image_path'] ?: 'https://placehold.co/150x100?text=No+Image') ?>" alt="">
                                         </div>
                                         <div class="material-item-name">
-                                            <strong><?= htmlspecialchars($item['name']) ?></strong>
-                                            <div>Size: <?= floatval($item['pack_size']) ?> <?= htmlspecialchars($item['pack_unit']) ?></div>
+                                            <strong><?= htmlspecialchars($item['item_name']) ?></strong>
+                                            <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Pack: <?= floatval($item['pack_size']) ?> <?= htmlspecialchars($item['pack_unit']) ?></div>
                                         </div>
-                                        <button type="button" class="btn-tab-styled-add" onclick="window.addMaterialToSidebar(<?= $item['id'] ?>, '<?= htmlspecialchars(addslashes($item['name'])) ?>')">+ Add</button>
+                                        <button type="button" class="btn-tab-styled-add" onclick="window.addMaterialToSidebar(this, <?= $item['id'] ?>, '<?= htmlspecialchars(addslashes($item['item_name'])) ?>', '<?= htmlspecialchars($item['pack_unit']) ?>')">+ Add</button>
                                     </div>
                                 <?php endforeach; ?>
                             </div>
@@ -171,393 +131,172 @@ include "includes/header.php";
         </div>
 
         <div class="right-column-stack">
-           
             <div class="requisition-right-sidebar" id="mobileSummaryStickyWrapper" onclick="window.handleMobileDrawerCollapseToggle(event)">
-                <h3 class="sidebar-summary-title">📝 Requisition Summary</h3>
-                <div class="sidebar-cart-list" id="sidebarCartRowsContainer">
-                    <p style="color: #a0aec0; text-align: center; font-size: 12px; margin-top: 30px; font-style: italic;">No items added to this request list yet.</p>
+                <h3 class="sidebar-summary-title">📋 Supply Order Basket</h3>
+                <div id="cartEmptyPlaceholder" style="color: #94a3b8; text-align: center; font-size: 12px; margin-top: 40px; font-style: italic;">
+                    No materials loaded.<br>Click catalog items to compile.
                 </div>
-                <div>
-                    <div class="sidebar-total-row-wrapper">
-                        <span class="total-types-label">Total Item Types:</span>
-                        <span id="sidebarTotalCount">0</span>
+
+                <form id="checkoutCartSubmissionForm" onsubmit="window.submitMaterialRequisitionRequest(event)" style="display:none; margin:0; flex-direction:column; width:100%;">
+                    <div class="sidebar-cart-list" id="cartItemsContainerRows"></div>
+                    <div style="margin-top: 15px;">
+                        <button type="submit" class="btn btn-bill" style="width: 100%; padding: 12px; font-weight: bold; font-size: 13px; background: #00b0ff; border-color: #00b0ff; border-radius: 8px;">Dispatch Requirement</button>
                     </div>
-                    <button type="button" class="btn btn-bill" style="width: 100%; padding: 12px; font-size: 13px; font-weight: bold; border-radius: 8px;" onclick="window.submitSidebarRequisition(event)">Submit Requisition</button>
-                </div>
-            </div>
-
-            <div class="past-log-section">
-                <h3 style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #111827; margin-bottom: 12px; border-bottom: 1px dashed #cbd5e0; padding-bottom: 6px; letter-spacing: 0.5px;">📋 Recent Requisitions Log</h3>
-                <div style="overflow-x: auto;">
-                    <table class="past-table">
-                        <thead>
-                            <tr>
-                                <th style="width: 65px;">Date &amp; Time</th>
-                                <th>Summary Details</th>
-                                <th style="text-align: center; width: 80px;">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php if (!empty($past_requisitions)): foreach ($past_requisitions as $pRow):
-                                $summary_clean = !empty($pRow['item_summary']) ? $pRow['item_summary'] : 'No items';
-                                $is_fulfilled = ($pRow['status'] === 'Fulfilled');
-                                $status_style = $is_fulfilled ? 'btn-status-fulfilled' : 'btn-status-pending';
-                                $status_label = empty($pRow['status']) ? 'Pending' : $pRow['status'];
-
-                                $lines = $pdo->prepare("SELECT ri.quantity, rc.unit_type, rc.unit_label, ri.chosen_unit_label, COALESCE(ri.item_status, 'Pending') as item_status, rc.item_name as name, ri.catalog_id, rc.pack_size, rc.pack_unit, rc.image_path FROM requisition_items ri JOIN req_catalog rc ON ri.catalog_id = rc.id WHERE ri.requisition_id = ?");
-                                $lines->execute([$pRow['id']]);
-                                $serializedItems = json_encode($lines->fetchAll(PDO::FETCH_ASSOC));
-                            ?>
-                                <tr>
-                                    <td style="color: #475569; font-weight: 600; font-family: monospace; font-size: 11px; line-height: 1.2;">
-                                        <?= date('d/m/y', strtotime($pRow['requested_at'])) ?><br>
-                                        <span style="color: #94a3b8; font-size: 10px;"><?= date('H:i', strtotime($pRow['requested_at'])) ?></span>
-                                    </td>
-                                    <td style="max-width: 140px; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; font-size: 11px; padding-right: 4px;" title="<?= htmlspecialchars($summary_clean) ?>"><?= $summary_clean ?></td>
-                                    <td style="text-align: center;">
-                                        <button type="button" class="btn-action-trigger <?= $status_style ?>" data-items='<?= htmlspecialchars($serializedItems, ENT_QUOTES, 'UTF-8') ?>' onclick="window.openEditRequisitionModal(<?= $pRow['id'] ?>, this)">
-                                            <span>(<?= strtolower($status_label) ?>)</span>
-                                            Take Action
-                                        </button>
-                                    </td>
-                                </tr>
-                            <?php endforeach; else: ?>
-                                <tr><td colspan="3" style="text-align: center; color: #a0aec0; padding: 15px;">No requests found.</td></tr>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
-                <a href="requisitions_log.php" class="btn-sidebar-past-link">📂 See Past Requests archives</a>
+                </form>
             </div>
         </div>
-    </div>
-</div>
-
-<div id="editReqModalPopup" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
-    <div class="modal-content" style="background: white; max-width: 620px; width: 92%; border-radius: 12px; padding: 20px; position: relative; color: #111827; text-align: left;">
-        <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="window.closeEditReqModal()">✕</span>
-        <h3 style="font-size: 13px; font-weight: 700; text-transform: uppercase; margin-bottom: 12px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px;">Modify Stock Order</h3>
-        
-        <form method="POST" action="requisitions.php" style="margin: 0;">
-            <input type="hidden" name="action_update_requisition" value="1">
-            <input type="hidden" name="update_req_id" id="mdlUpdateId">
-            <div id="mdlItemsContainer" style="max-height: 340px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin-bottom: 20px; background: #fafafa;"></div>
-            <div style="display: flex; gap: 10px; justify-content: flex-end; align-items: center;">
-                <button type="button" class="btn btn-log" style="padding: 10px 18px;" onclick="window.closeEditReqModal()">Cancel</button>
-                <button type="submit" class="btn btn-start" style="padding: 10px 24px; font-weight: 800;">Save</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<div id="chefNewProductModal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
-    <div class="modal-content" style="background: white; max-width: 440px; width: 90%; border-radius: 12px; padding: 25px; color: #111827; text-align: left;">
-        <span style="position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #a0aec0;" onclick="window.closeChefNewProductModal()">✕</span>
-        <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; color: #d97706;">Request Unlisted Product</h3>
-        <form method="POST" action="requisitions.php" style="margin: 0;">
-            <input type="hidden" name="action_create_chef_product" value="1">
-            <div style="margin-bottom: 12px;">
-                <label style="font-size: 11px; font-weight: 700; color: #4b5563; display: block; margin-bottom: 4px;">Product Name Description</label>
-                <input type="text" name="chef_prod_name" required style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0; font-size:13px;" placeholder="e.g. Fresh Milk Packets">
-            </div>
-            <div style="margin-bottom: 12px;">
-                <label style="font-size: 11px; font-weight: 700; color: #4b5563; display: block; margin-bottom: 4px;">Allocation Category</label>
-                <select name="chef_prod_category" required style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0; font-size:13px;">
-                    <option value="">-- Choose Category --</option>
-                    <?php foreach ($categories as $cat): ?>
-                        <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            
-            <div style="margin-bottom: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <div>
-                    <label style="font-size: 11px; font-weight: 700; color: #4b5563; display: block; margin-bottom: 4px;">Packaging Value Size</label>
-                    <input type="number" name="chef_pack_size" required step="0.1" value="1" style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0; font-size:13px;">
-                </div>
-                <div>
-                    <label style="font-size: 11px; font-weight: 700; color: #4b5563; display: block; margin-bottom: 4px;">Capacity Metric</label>
-                    <select name="chef_pack_unit" style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0; font-size:13px;">
-                        <option value="kg">kg</option>
-                        <option value="gms">gms</option>
-                        <option value="Ltr">Ltr</option>
-                        <option value="ml">ml</option>
-                        <option value="Pcs">Pcs</option>
-                    </select>
-                </div>
-            </div>
-
-            <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                <button type="button" class="btn btn-log" style="padding: 8px 16px;" onclick="window.closeChefNewProductModal()">Cancel</button>
-                <button type="submit" class="btn btn-bill" style="padding: 8px 20px; font-weight: 800; background:#d97706; border-color:#d97706;">Add To Catalog</button>
-            </div>
-        </form>
     </div>
 </div>
 
 <script>
-window.reqCart = [];
-let activeFilteredTabId = 'all';
+// Encapsulate structural state variables in a functional block to fix "already declared" namespace crashes
+(function() {
+    window.activeRequisitionCartMap = {};
+    let localActiveFilteredTabId = 'all';
 
-window.handleMobileDrawerCollapseToggle = function(event) {
-    if (window.innerWidth >= 1024) return; 
-    const sidebar = document.getElementById("mobileSummaryStickyWrapper");
-    if (event.target.closest('.sidebar-summary-title')) {
-        sidebar.classList.toggle("drawer-open-state");
-    }
-};
+    window.handleMobileDrawerCollapseToggle = function(event) {
+        if (window.innerWidth >= 1024) return; 
+        const sidebar = document.getElementById("mobileSummaryStickyWrapper");
+        if (event.target.closest('.sidebar-summary-title')) {
+            sidebar.classList.toggle("drawer-open-state");
+        }
+    };
 
-window.quickSearchCatalogRegistry = function() {
-    const inputVal = document.getElementById("catalogQuickSearchInput").value.toLowerCase().trim();
-    const blocks = document.querySelectorAll(".category-block");
-    
-    if (inputVal !== "" && activeFilteredTabId !== 'all') {
-        activeFilteredTabId = 'all';
-        document.querySelectorAll(".catalog-tab-btn").forEach(b => b.classList.remove("active"));
-        document.getElementById("globalAllTabBtn").classList.add("active");
-    }
-
-    blocks.forEach(block => {
-        let parentHasVisibleItem = false;
-        const cards = block.querySelectorAll(".material-item-card");
+    window.searchCatalogDatabaseStream = function() {
+        const query = document.getElementById("catalogQuickSearchInput").value.toLowerCase().trim();
+        const blocks = document.querySelectorAll(".category-block");
         
-        cards.forEach(card => {
-            const searchName = card.getAttribute("data-search-name") || "";
-            const isTabMatch = (activeFilteredTabId === 'all' || block.id === activeFilteredTabId);
-            const isSearchMatch = searchName.includes(inputVal);
+        if (query !== "" && localActiveFilteredTabId !== 'all') {
+            localActiveFilteredTabId = 'all';
+            document.querySelectorAll(".catalog-tab-btn").forEach(b => b.classList.remove("active"));
+            document.getElementById("globalAllTabBtn").classList.add("active");
+        }
 
-            if (isTabMatch && isSearchMatch) {
-                card.style.setProperty("display", "flex", "important");
-                parentHasVisibleItem = true;
+        blocks.forEach(block => {
+            let matchesFound = false;
+            block.querySelectorAll(".material-item-card").forEach(card => {
+                const searchName = card.getAttribute("data-search-name") || "";
+                const matchesTab = (localActiveFilteredTabId === 'all' || block.id === localActiveFilteredTabId);
+                const matchesQuery = searchName.includes(query);
+
+                if (matchesTab && matchesQuery) {
+                    card.style.setProperty("display", "flex", "important");
+                    matchesFound = true;
+                } else {
+                    card.style.setProperty("display", "none", "important");
+                }
+            });
+            block.style.display = matchesFound ? "block" : "none";
+        });
+    };
+
+    window.filterCatalogCategoryView = function(catId, elementButton) {
+        localActiveFilteredTabId = catId;
+        document.getElementById("catalogQuickSearchInput").value = ""; 
+        document.querySelectorAll(".catalog-tab-btn").forEach(b => b.classList.remove("active"));
+        if (elementButton) elementButton.classList.add("active");
+        
+        document.querySelectorAll(".category-block").forEach(block => {
+            if (catId === 'all' || block.id === catId) {
+                block.style.display = "block";
+                block.querySelectorAll(".material-item-card").forEach(c => c.style.setProperty("display", "flex", "important"));
             } else {
-                card.style.setProperty("display", "none", "important");
+                block.style.display = "none";
             }
         });
+    };
 
-        block.style.display = parentHasVisibleItem ? "block" : "none";
-    });
-};
+    window.addMaterialToSidebar = function(buttonElement, id, name, unit) {
+        // Visual green flashing button action logic feedback integration loop
+        if (buttonElement) {
+            buttonElement.classList.add('is-clicked-active');
+            buttonElement.innerText = "✔ Added";
+            setTimeout(() => {
+                buttonElement.classList.remove('is-clicked-active');
+                buttonElement.innerText = "+ Add";
+            }, 400);
+        }
 
-window.filterMaterialCatalog = function(catId, btn) {
-    activeFilteredTabId = catId;
-    document.getElementById("catalogQuickSearchInput").value = ""; 
-
-    document.querySelectorAll(".catalog-tab-btn").forEach(b => b.classList.remove("active"));
-    if (btn) btn.classList.add("active");
-    
-    document.querySelectorAll(".category-block").forEach(block => {
-        if (catId === 'all' || block.id === catId) {
-            block.style.display = "block";
-            block.querySelectorAll(".material-item-card").forEach(c => c.style.setProperty("display", "flex", "important"));
+        if (window.activeRequisitionCartMap[id]) {
+            window.activeRequisitionCartMap[id].qty++;
         } else {
-            block.style.display = "none";
+            window.activeRequisitionCartMap[id] = { name: name, unit: unit, qty: 1 };
         }
-    });
-};
+        window.renderRequisitionInterfaceState();
+    };
 
-window.addMaterialToSidebar = function(id, name) {
-    let existing = window.reqCart.find(x => x.id === id);
-    if (existing) { existing.qty += 1; }
-    else { window.reqCart.push({ id: id, name: name, qty: 1 }); }
-    window.renderSidebarCart();
-};
-
-window.updateSidebarQty = function(id, delta) {
-    let item = window.reqCart.find(x => x.id === id);
-    if (item) {
-        item.qty += delta;
-        if (item.qty <= 0) { window.reqCart = window.reqCart.filter(x => x.id !== id); }
-    }
-    window.renderSidebarCart();
-};
-
-window.renderSidebarCart = function() {
-    const container = document.getElementById("sidebarCartRowsContainer");
-    const totalCountEl = document.getElementById("sidebarTotalCount");
-   
-    if (!container) return;
-    if (window.reqCart.length === 0) {
-        container.innerHTML = '<p style="color: #a0aec0; text-align: center; font-size: 12px; margin-top: 30px; font-style: italic;">No items added to this request list yet.</p>';
-        totalCountEl.innerText = "0"; return;
-    }
-    
-    totalCountEl.innerText = window.reqCart.length;
-    
-    container.innerHTML = window.reqCart.map(item => `
-        <div class="sidebar-cart-row" style="display: flex !important; justify-content: space-between !important; align-items: center !important; font-size: 13px !important; padding: 6px 0 !important; border-bottom: 1px solid #edf2f7 !important; gap: 10px !important; width: 100% !important; box-sizing: border-box !important;">
-            <div class="sidebar-cart-item-name" style="font-weight: 700 !important; color: #111827 !important; flex: 1 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; text-align: left !important;">${item.name}</div>
-            <div class="sidebar-cart-qty-controls" style="display: flex !important; align-items: center !important; border: 1px solid #cbd5e0 !important; border-radius: 6px !important; overflow: hidden !important; background: #ffffff !important; height: 28px !important; flex-shrink: 0 !important;">
-                <button type="button" class="qty-btn-sm" style="width: 26px !important; height: 100% !important; background: #f8fafc !important; border: none !important; font-weight: bold !important; cursor: pointer !important; padding: 0 !important; display: flex !important; align-items: center !important; justify-content: center !important;" onclick="window.updateSidebarQty(${item.id}, -1)">-</button>
-                <span style="font-weight: 800 !important; font-size: 12px !important; width: 30px !important; text-align: center !important; display: inline-block !important; color: #1e293b !important;">${item.qty}</span>
-                <button type="button" class="qty-btn-sm" style="width: 26px !important; height: 100% !important; background: #f8fafc !important; border: none !important; font-weight: bold !important; cursor: pointer !important; padding: 0 !important; display: flex !important; align-items: center !important; justify-content: center !important;" onclick="window.updateSidebarQty(${item.id}, 1)">+</button>
-            </div>
-        </div>
-    `).join('');
-};
-
-window.submitSidebarRequisition = function(event) {
-    if(event) event.stopPropagation(); 
-    if (window.reqCart.length === 0) return alert("Please select material choices first.");
-    if (!confirm("Dispatch this material request list to inventory history logs?")) return;
-
-    fetch("process_requisition.php", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: window.reqCart })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            alert("✔ Requisition request saved successfully!");
-            window.reqCart = [];
-            location.reload();
-        } else {
-            alert("❌ Connection error: " + (data.error || "Unknown validation exception"));
+    window.modifyCartRowQtyIndex = function(id, delta) {
+        if (!window.activeRequisitionCartMap[id]) return;
+        window.activeRequisitionCartMap[id].qty += delta;
+        if (window.activeRequisitionCartMap[id].qty <= 0) {
+            delete window.activeRequisitionCartMap[id];
         }
-    }).catch(err => alert("❌ Network connection failure. Check if process_requisition.php is missing."));
-};
+        window.renderRequisitionInterfaceState();
+    };
 
-window.openEditRequisitionModal = function(reqId, element) {
-    document.getElementById("mdlUpdateId").value = reqId;
-    const container = document.getElementById("mdlItemsContainer");
-    const rawItemsData = element.getAttribute("data-items");
-   
-    try {
-        const items = JSON.parse(rawItemsData);
-        if (!items || items.length === 0) {
-            container.innerHTML = '<p style="text-align:center; color:#ef4444; font-size:12px; padding:15px;">No items loaded.</p>';
-            return;
-        }
-       
-        container.innerHTML = items.map(i => {
-            const initialStatus = i.item_status || 'Pending';
-            const unitType = i.unit_type || 'Count';
-            const currentLabel = i.chosen_unit_label || i.unit_label || 'Pcs';
-            
-            let rowStateClass = '';
-           
-            if (initialStatus === 'Fulfilled') { rowStateClass = 'row-state-green-highlight'; }
-            if (initialStatus === 'Cancelled') { rowStateClass = 'row-state-greyed-out'; }
+    window.renderRequisitionInterfaceState = function() {
+        const container = document.getElementById("cartItemsContainerRows");
+        const form = document.getElementById("checkoutCartSubmissionForm");
+        const placeholder = document.getElementById("cartEmptyPlaceholder");
+        
+        container.innerHTML = "";
+        let rowCounter = 0;
 
-            const computationFactor = (unitType === 'Weight') ? 0.25 : 1;
-
-            return `
-                <div id="itemVerificationRow_${i.catalog_id}" class="verification-item-row-wrapper ${rowStateClass}">
-                    <div style="flex:1; min-width:0; text-align:left;">
-                        <span class="item-text-title" style="font-size:13px; font-weight:700; color:#1e293b; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${i.name}</span>
-                        <span id="qtyAuditSubtitle_${i.catalog_id}" class="audit-history-subtitle" data-original="${i.quantity}">Ordered: ${i.quantity}</span>
+        for (let id in window.activeRequisitionCartMap) {
+            rowCounter++;
+            let row = window.activeRequisitionCartMap[id];
+            container.innerHTML += `
+                <div class="cart-item-row" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #edf2f7; gap: 10px;">
+                    <div class="cart-item-name" style="font-weight: 700; color: #1e293b; flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        ${row.name} <span style="font-size:10px; color:#94a3b8; font-weight:bold;">(${row.unit})</span>
                     </div>
-                   
-                    <div style="display:flex; align-items:center; gap:6px;">
-                        <div class="modal-qty-container">
-                            <button type="button" class="modal-qty-btn" onclick="window.adjustVerificationRowQty(${i.catalog_id}, -${computationFactor})">-</button>
-                            <input type="number" id="mdlQtyInput_${i.catalog_id}" name="req_item_qty[${i.catalog_id}]" value="${i.quantity}" min="0" step="${computationFactor}" class="modal-input-qty" oninput="window.handleQuantityInputChangeDirect(${i.catalog_id})">
-                            <button type="button" class="modal-qty-btn" onclick="window.adjustVerificationRowQty(${i.catalog_id}, ${computationFactor})">+</button>
-                        </div>
-                    </div>
-
-                    <div class="binary-toggle-container">
-                        <input type="hidden" id="mdlStatusHidden_${i.catalog_id}" name="req_item_status[${i.catalog_id}]" value="${initialStatus}">
-                        <button type="button" id="toggleBtn_F_${i.catalog_id}" class="toggle-choice-btn btn-block-fulfilled" onclick="window.triggerMemoryStateUpdate(${i.catalog_id}, 'Fulfilled')">Fulfilled</button>
-                        <button type="button" id="toggleBtn_C_${i.catalog_id}" class="toggle-choice-btn btn-block-remove" onclick="window.triggerMemoryStateUpdate(${i.catalog_id}, 'Cancelled')">Remove</button>
+                    <div class="cart-qty-controls" style="display: flex; align-items: center; border: 1px solid #cbd5e0; border-radius: 6px; overflow: hidden; height: 28px;">
+                        <button type="button" class="cart-qty-btn" style="width:26px; border:none; background:#f8fafc; font-weight:bold; cursor:pointer;" onclick="window.modifyCartRowQtyIndex(${id}, -1)">-</button>
+                        <span class="cart-qty-val" style="width:30px; text-align:center; font-weight:800; font-size:12px;">${row.qty}</span>
+                        <button type="button" class="cart-qty-btn" style="width:26px; border:none; background:#f8fafc; font-weight:bold; cursor:pointer;" onclick="window.modifyCartRowQtyIndex(${id}, 1)">+</button>
                     </div>
                 </div>
             `;
-        }).join('');
-        
-        items.forEach(i => window.syncRowAuditText(i.catalog_id));
-        document.getElementById("editReqModalPopup").style.display = "flex";
-    } catch(err) {
-        container.innerHTML = '<p style="text-align:center; color:#ef4444; font-size:12px; padding:15px;">Failed loading data arrays.</p>';
-    }
-};
-
-window.adjustVerificationRowQty = function(catalogId, stepValue) {
-    const input = document.getElementById(`mdlQtyInput_${catalogId}`);
-    if (input) {
-        let currentVal = parseFloat(input.value) || 0;
-        let finalVal = Math.max(0, currentVal + stepValue);
-        input.value = finalVal % 1 === 0 ? finalVal : finalVal.toFixed(2);
-       
-        window.reactivateActionRowButtons(catalogId, finalVal);
-        window.syncRowAuditText(catalogId);
-    }
-};
-
-window.handleQuantityInputChangeDirect = function(catalogId) {
-    const input = document.getElementById(`mdlQtyInput_${catalogId}`);
-    if (input) {
-        let finalVal = parseFloat(input.value) || 0;
-        if (finalVal < 0) { finalVal = 0; input.value = 0; }
-       
-        window.reactivateActionRowButtons(catalogId, finalVal);
-        window.syncRowAuditText(catalogId);
-    }
-};
-
-window.reactivateActionRowButtons = function(catalogId, activeValue) {
-    const hiddenStatus = document.getElementById(`mdlStatusHidden_${catalogId}`);
-    const rowWrapper   = document.getElementById(`itemVerificationRow_${catalogId}`);
-
-    if (!hiddenStatus || !rowWrapper) return;
-
-    rowWrapper.classList.remove('row-state-greyed-out', 'row-state-green-highlight');
-    hiddenStatus.value = (activeValue > 0) ? 'Pending' : 'Cancelled';
-    
-    if (activeValue === 0) {
-        rowWrapper.classList.add('row-state-greyed-out');
-    }
-    window.syncRowAuditText(catalogId);
-};
-
-window.syncRowAuditText = function(catalogId) {
-    const input = document.getElementById(`mdlQtyInput_${catalogId}`);
-    const subtitle = document.getElementById(`qtyAuditSubtitle_${catalogId}`);
-    if (!input || !subtitle) return;
-
-    const originalCount = parseFloat(subtitle.getAttribute("data-original")) || 0;
-    const currentCount  = parseFloat(input.value) || 0;
-
-    if (currentCount === originalCount) {
-        subtitle.innerHTML = `Ordered: ${originalCount}`;
-    } else {
-        subtitle.innerHTML = `Ordered: <del>${originalCount}</del> <strong style="color:#0284c7;">${currentCount}</strong>`;
-    }
-};
-
-window.triggerMemoryStateUpdate = function(catalogId, targetedState) {
-    const hiddenStatus = document.getElementById(`mdlStatusHidden_${catalogId}`);
-    const rowWrapper   = document.getElementById(`itemVerificationRow_${catalogId}`);
-    const qtyInput     = document.getElementById(`mdlQtyInput_${catalogId}`);
-
-    if (!hiddenStatus || !rowWrapper || !qtyInput) return;
-
-    if (hiddenStatus.value === targetedState) {
-        hiddenStatus.value = 'Pending';
-        rowWrapper.classList.remove('row-state-greyed-out', 'row-state-green-highlight');
-    } else {
-        hiddenStatus.value = targetedState;
-        rowWrapper.classList.remove('row-state-greyed-out', 'row-state-green-highlight');
-        
-        if (targetedState === 'Cancelled') {
-            qtyInput.value = 0;
-            rowWrapper.classList.add('row-state-greyed-out');
-            window.syncRowAuditText(catalogId);
-        } else if (targetedState === 'Fulfilled') {
-            rowWrapper.classList.add('row-state-green-highlight');
         }
-    }
-};
 
-window.closeChefNewProductModal = function() {
-    document.getElementById("chefNewProductModal").style.display = "none";
-};
-window.openChefNewProductModal = function() {
-    document.getElementById("chefNewProductModal").style.display = "flex";
-};
-window.closeEditReqModal = function() {
-    document.getElementById("editReqModalPopup").style.display = "none";
-};
+        if (rowCounter === 0) {
+            placeholder.style.display = "block";
+            form.style.display = "none";
+        } else {
+            placeholder.style.display = "none";
+            form.style.display = "flex";
+        }
+    };
+
+    window.submitMaterialRequisitionRequest = function(event) {
+        event.preventDefault();
+        const payloadItems = [];
+        for (let id in window.activeRequisitionCartMap) {
+            payloadItems.push({ id: id, qty: window.activeRequisitionCartMap[id].qty });
+        }
+
+        if (payloadItems.length === 0) return;
+
+        fetch("process_requisition.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ items: payloadItems })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert("✔ Material requisition submitted successfully!");
+                window.activeRequisitionCartMap = {};
+                window.renderRequisitionInterfaceState();
+            } else {
+                alert("❌ Critical Error: " + (data.error || "Execution failed."));
+            }
+        })
+        .catch(() => alert("❌ Connectivity failure to operational engine endpoint gateway."));
+    };
+
+    window.closeChefNewProductModal = function() { document.getElementById("chefNewProductModal").style.display = "none"; };
+    window.openChefNewProductModal = function() { document.getElementById("chefNewProductModal").style.display = "flex"; };
+})();
 </script>
-
 <?php include "includes/footer.php"; ?>
