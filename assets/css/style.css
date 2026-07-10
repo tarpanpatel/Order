@@ -1045,3 +1045,21 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
         margin-bottom: 4px;
     }
 }
+.log-filter-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px; }
+.filter-box-card { display: flex; gap: 10px; align-items: center; background: #fff; padding: 10px 15px; border-radius: 8px; border: 1px solid #e2e8f0; }
+.filter-box-card select { padding: 6px 12px; border-radius: 6px; border: 1px solid #cbd5e0; background: #fff; font-size: 13px; }
+.filter-box-card button, .btn-link-back { padding: 6px 14px; background: #06b6d4; color: #fff; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px; text-decoration: none; display: inline-block; }
+.filter-box-card button:hover, .btn-link-back:hover { background: #0891b2; }
+.btn-back-style { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e0; margin-right: 10px; }
+.btn-back-style:hover { background: #e2e8f0; }
+
+.log-table-container { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); text-align: left; }
+.past-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.past-table th { background: #f8fafc; padding: 12px; font-weight: 700; color: #4b5563; border-bottom: 2px solid #e2e8f0; }
+.past-table td { padding: 12px; border-bottom: 1px solid #edf2f7; color: #111827; vertical-align: middle; }
+.status-pill { font-size: 11px; padding: 3px 8px; border-radius: 12px; font-weight: 700; display: inline-block; }
+.status-pill.p-pending { background: #fef3c7; color: #d97706; }
+.status-pill.p-fulfilled { background: #d1fae5; color: #059669; }
+
+.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
+.modal-content { background: white; max-width: 500px; width: 90%; border-radius: 12px; padding: 25px; position: relative; color: #111827; text-align: left; }
