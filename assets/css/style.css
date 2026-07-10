@@ -683,3 +683,7 @@ header { background: #ffffff; padding: 8px 12px; display: flex; justify-content:
 /* Popup Receipt Internal Dynamic Lines Injectors Classes */
 .receipt-item-line { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; }
 .receipt-adjustment-line { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px; font-style: italic; }
+.category-section button.btn.btn-start {
+    /* width: 200px; */
+    max-width: 200px;
+}
