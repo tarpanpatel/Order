@@ -65,7 +65,10 @@ include "includes/header.php";
                                             <strong><?= htmlspecialchars($item['name']) ?></strong>
                                             <div>₹<?= number_format($item['price'], 2) ?></div>
                                         </div>
-                                        <button type="button" class="btn-tab-styled-add" onclick="window.addItemToCheckoutCart(<?= $item['id'] ?>, '<?= htmlspecialchars(addslashes($item['name'])) ?>', <?= $item['price'] ?>)">+ Add</button>
+                                        <button type="button" class="btn-tab-styled-add" 
+    onclick="window.addItemToCheckoutCart(this, <?= $item['id'] ?>, '<?= htmlspecialchars(addslashes($item['name'])) ?>', <?= $item['price'] ?>)">
+    + Add
+</button>
                                     </div>
                                 <?php endforeach; ?>
                             </div>
@@ -163,7 +166,16 @@ window.filterMenuCatalog = function(catId, btn) {
     });
 };
 
-function addItemToCheckoutCart(id, name, price) {
+function addItemToCheckoutCart(btn, id, name, price) {
+    // 1. Trigger Visual Feedback
+    btn.classList.add('is-clicked-active');
+    btn.innerText = "✔ Added";
+    setTimeout(() => {
+        btn.classList.remove('is-clicked-active');
+        btn.innerText = "+ Add";
+    }, 400);
+
+    // 2. Existing functionality
     <?php if (!$current_active_guest): ?>
         alert("Please choose and activate an active guest profile...");
         return;
