@@ -50,64 +50,42 @@ include "includes/header.php";
                     <?php endforeach; ?> 
                 </div> 
 
-                <div id="menuCatalogContainer"> 
-                    <?php foreach ($categories as $cat): 
-                        // REVOLUTIONARY FIX: Manually checks for any case version of category_id or category safely without changing original array case boundaries
-                        $cat_items = array_filter($menu_items, function($m) use ($cat) {
-                            $target_value = null;
-                            foreach ($m as $key => $val) {
-                                $lower_key = strtolower($key);
-                                if ($lower_key === 'category_id' || $lower_key === 'category') {
-                                    $target_value = $val;
-                                    break;
-                                }
-                            }
-                            return $target_value == $cat['id'];
-                        });
-                        if (empty($cat_items)) continue; 
-                    ?>
-                        <div class="category-block mb-15" id="cat_<?= $cat['id'] ?>"> 
-                            <h4 class="category-block-title category-title-custom"> 
-                                <?= htmlspecialchars($cat['name']) ?> 
-                            </h4> 
-                            <div class="material-item-grid"> 
-                                <?php foreach ($cat_items as $item): 
-                                    // Robust assignment reading properties safely regardless of database driver casing
-                                    $i_id    = 0;
-                                    $i_name  = 'Unnamed Item';
-                                    $i_price = 0.00;
-                                    $i_img   = '';
-
-                                    foreach ($item as $k => $v) {
-                                        $lk = strtolower($k);
-                                        if ($lk === 'id') $i_id = $v;
-                                        if ($lk === 'name') $i_name = $v;
-                                        if ($lk === 'price') $i_price = $v;
-                                        if ($lk === 'image_path') $i_img = $v;
-                                    }
-                                ?> 
-                                    <div class="material-item-card" data-search-name="<?= strtolower(htmlspecialchars($i_name)) ?>"> 
-                                        <div class="material-item-image-box"> 
-                                            <?php if (!empty($i_img) && file_exists($i_img)): ?> 
-                                                <img src="<?= htmlspecialchars($i_img) ?>" alt=""> 
-                                            <?php else: ?> 
-                                                <img src="https://placehold.co/150x100?text=No+Image" alt=""> 
-                                            <?php endif; ?> 
-                                        </div> 
-                                        <div class="material-item-name"> 
-                                            <strong><?= htmlspecialchars($i_name) ?></strong> 
-                                            <div>₹<?= number_format($i_price, 2) ?></div> 
-                                        </div> 
-                                        <button type="button" class="btn-tab-styled-add" 
-                                            onclick="window.addItemToCheckoutCart(this, <?= $i_id ?>, '<?= htmlspecialchars(addslashes($i_name)) ?>', <?= $i_price ?>)"> 
-                                            + Add 
-                                        </button> 
-                                    </div> 
-                                <?php endforeach; ?> 
-                            </div> 
-                        </div> 
-                    <?php endforeach; ?> 
-                </div> 
+               <div id="menuCatalogContainer">
+    <?php foreach ($categories as $cat): 
+        // CLEAN & DIRECT SEARCH: Matches directly against your verified category_id key name
+        $cat_items = array_filter($menu_items, function($m) use ($cat) { 
+            return isset($m['category_id']) && $m['category_id'] == $cat['id']; 
+        });
+        if (empty($cat_items)) continue;
+    ?>
+        <div class="category-block mb-15" id="cat_<?= $cat['id'] ?>">
+            <h4 class="category-block-title category-title-custom">
+                <?= htmlspecialchars($cat['name']) ?>
+            </h4>
+            <div class="material-item-grid">
+                <?php foreach ($cat_items as $item): ?>
+                    <div class="material-item-card" data-search-name="<?= strtolower(htmlspecialchars($item['name'])) ?>">
+                        <div class="material-item-image-box">
+                            <?php if (!empty($item['image_path']) && file_exists($item['image_path'])): ?>
+                                <img src="<?= htmlspecialchars($item['image_path']) ?>" alt="">
+                            <?php else: ?>
+                                <img src="https://placehold.co/150x100?text=No+Image" alt="">
+                            <?php endif; ?>
+                        </div>
+                        <div class="material-item-name">
+                            <strong><?= htmlspecialchars($item['name']) ?></strong>
+                            <div>₹<?= number_format($item['price'], 2) ?></div>
+                        </div>
+                        <button type="button" class="btn-tab-styled-add" 
+                            onclick="window.addItemToCheckoutCart(this, <?= $item['id'] ?>, '<?= htmlspecialchars(addslashes($item['name'])) ?>', <?= $item['price'] ?>)">
+                            + Add
+                        </button>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    <?php endforeach; ?>
+</div>
             </div> 
         </div> 
 
