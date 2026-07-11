@@ -2,7 +2,7 @@
 // /home/apartment/artistsfarmjaipur.com/Order/login.php
 ob_start();
 error_reporting(E_ALL);
-ini_set('display_errors', '0');
+ini_set('display_errors', '1');
 
 require_once "config/db.php";
 
@@ -22,51 +22,43 @@ try {
     die("Database Connection Error.");
 }
 
-$error = '';
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $user_id  = intval($_POST['user_id'] ?? 0);
-    $passcode = trim($_POST['passcode'] ?? '');
+if ($user_row) {
+            $is_match = password_verify($passcode, $user_row['password']);
 
-    if ($user_id > 0 && !empty($passcode)) {
-        $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
-        $stmt->execute([$user_id]);
-        $user_row = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        // SECURE HASH VERIFICATION
-        if ($user_row && password_verify($passcode, $user_row['password'])) {
-            $_SESSION["user_id"]   = $user_row['id'];
-            $_SESSION["username"]  = $user_row['username'];
-            $_SESSION["role"]      = $user_row['role'];
-            $_SESSION["order_authenticated"] = true;
-
-            // GENERATE 1-YEAR PERSISTENT TOKEN
-            $random_token = bin2hex(random_bytes(32));
-            $token_hash = hash('sha256', $random_token);
-            $expires = date('Y-m-d H:i:s', time() + 31536000); // 1 Year from now
+            // 🛠️ DIAGNOSTIC SCREEN PRINT OUT
+            echo "<div style='background:#ffffff; color:#1e293b; padding:25px; margin:20px; border:4px solid #ef4444; border-radius:12px; font-family:monospace; font-size:14px; position:fixed; top:20px; left:20px; right:20px; z-index:999999; box-shadow:0 20px 25px -5px rgba(0,0,0,0.5); text-align:left;'>";
+            echo "<h2 style='color:#ef4444; margin-top:0; border-bottom:2px solid #fee2e2; padding-bottom:10px;'>🔍 Live Login Diagnostic Tool</h2>";
+            echo "<p style='margin:10px 0;'><strong>1. Selected Profile ID:</strong> " . htmlspecialchars($user_id) . "</p>";
+            echo "<p style='margin:10px 0;'><strong>2. DB Username Found:</strong> \"" . htmlspecialchars($user_row['username']) . "\"</p>";
+            echo "<p style='margin:10px 0;'><strong>3. Passcode Received from Keypad:</strong> \"" . htmlspecialchars($passcode) . "\" (Length: " . strlen($passcode) . " characters)</p>";
+            echo "<p style='margin:10px 0;'><strong>4. Hash Stored inside Database:</strong> \"" . htmlspecialchars($user_row['password']) . "\" (Length: " . strlen($user_row['password']) . " characters)</p>";
+            echo "<p style='margin:15px 0; padding:12px; background:" . ($is_match ? "#dcfce7" : "#fee2e2") . "; color:" . ($is_match ? "#166534" : "#991b1b") . "; border-radius:6px; font-weight:bold; font-size:16px;'>";
+            echo "5. Does password_verify match? " . ($is_match ? "✅ MATCH ACCORDING TO PHP" : "❌ NO MATCH ACCORDING TO PHP");
+            echo "</p>";
+            echo "<p style='color:#64748b; font-size:12px; margin-top:15px;'>👉 Remove this debug code from login.php once you see what text is failing to line up.</p>";
+            echo "</div>";
             
-            $pdo->prepare("INSERT INTO user_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)")
-                ->execute([$user_row['id'], $token_hash, $expires]);
-                
-            // Set token in browser cookie
-            setcookie('pos_remember_token', $user_row['id'] . ':' . $random_token, time() + 31536000, '/', '', false, true);
+            if ($is_match) {
+                $_SESSION["user_id"]   = $user_row['id'];
+                $_SESSION["username"]  = $user_row['username'];
+                $_SESSION["role"]      = $user_row['role'];
+                $_SESSION["order_authenticated"] = true;
 
-            // Log entry
-            $log = $pdo->prepare("INSERT INTO security_login_logs (username_entered, passcode_entered, user_id, role_assigned, ip_address, browser_agent, device_type, login_status) VALUES (?, '***', ?, ?, ?, 'POS Terminal', 'Station', 'Success')");
-            $log->execute([$user_row['username'], $user_row['id'], $user_row['role'], $_SERVER['REMOTE_ADDR']]);
+                $log = $pdo->prepare("INSERT INTO security_login_logs (username_entered, passcode_entered, user_id, role_assigned, ip_address, browser_agent, device_type, login_status) VALUES (?, '***', ?, ?, ?, 'POS Terminal', 'Station', 'Success')");
+                $log->execute([$user_row['username'], $user_row['id'], $user_row['role'], $_SERVER['REMOTE_ADDR']]);
 
-            if ($user_row['role'] === 'Chef') {
-                header("Location: kitchen.php");
+                if ($user_row['role'] === 'Chef') {
+                    header("Location: kitchen.php");
+                } else {
+                    header("Location: index.php");
+                }
+                exit;
             } else {
-                header("Location: index.php");
+                $error = "Incorrect passcode entry validation.";
             }
-            exit;
         } else {
-            $error = "Incorrect passcode entry validation.";
+            $error = "Profile not found in database rows.";
         }
-    } else {
-        $error = "Please select a valid user profile.";
-    }
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
