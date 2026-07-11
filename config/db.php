@@ -1,28 +1,35 @@
 <?php
 // /home/apartment/artistsfarmjaipur.com/Order/config/db.php
 
-// 1. STANDARD SESSION SETUP
+// 1. SAFE SESSION LIFETIME INITIALIZATION LAYER
 $sessionPath = __DIR__ . '/../_sessions';
 if (!is_dir($sessionPath)) { 
     mkdir($sessionPath, 0755, true); 
 }
 
+// If a page prematurely started a default session, close it so we can apply our 1-year settings
+if (session_status() === PHP_SESSION_ACTIVE) {
+    session_write_close();
+}
+
+// Now securely enforce the 1-year long-term session configurations safely
 ini_set('session.save_path', $sessionPath);
-ini_set('session.gc_maxlifetime', 31536000); 
+ini_set('session.gc_maxlifetime', 31536000); // 1 Year on server memory
 session_set_cookie_params([
-    'lifetime' => 31536000, 
-    'path' => '/',    
+    'lifetime' => 31536000, // 1 Year on browser cookie memory
+    'path' => '/',          // Global path visibility scope
     'httponly' => true,
     'samesite' => 'Lax'
 ]);
 ini_set('session.cookie_lifetime', 31536000);
 ini_set('session.use_only_cookies', 1);
 
+// Safely restart the session with our updated, permanent variables
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// 2. DATABASE CONNECTION
+// 2. DATABASE CONNECTION STRINGS
 date_default_timezone_set('Asia/Kolkata');
 
 $db_host = "localhost";
@@ -40,7 +47,7 @@ try {
     die("Database connection failed: " . $e->getMessage());
 }
 
-// 3. PERSISTENT TOKEN AUTO-LOGIN ENGINE (Bypasses cPanel Session Drops)
+// 3. PERSISTENT TOKEN AUTO-LOGIN RECOVERY LOGIC (Bypasses cPanel Session Drops)
 if (!isset($_SESSION['user_id']) && isset($_COOKIE['pos_remember_token'])) {
     list($cookie_user_id, $cookie_token) = explode(':', $_COOKIE['pos_remember_token']);
     $cookie_user_id = intval($cookie_user_id);
@@ -66,7 +73,7 @@ if (!isset($_SESSION['user_id']) && isset($_COOKIE['pos_remember_token'])) {
     }
 }
 
-// 4. HELPER FUNCTIONS
+// 4. CORE REUSABLE PROTECTION SYSTEM SECURITY CHECKS
 function check_page_access($pdo) {
     if (isset($_SESSION['role']) && $_SESSION['role'] === 'Super Admin') {
         return true;
