@@ -71,18 +71,20 @@ include "includes/header.php";
 <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/nestedSortable/2.0.0/jquery.mjs.nestedSortable.min.js"></script>
 <script>
+   $(document).ready(function() {
     $('#menu-builder').nestedSortable({
-        listType: 'ul', // Explicitly define the list type
         items: 'li',
+        listType: 'ul',
         placeholder: 'placeholder',
         forcePlaceholderSize: true,
-        handle: 'div', // Optional: Use a specific handle (e.g., a drag icon)
-        helper: 'clone',
-        opacity: 0.6,
+        handle: 'div',        // Must match the wrapper inside your <li>
+        tolerance: 'pointer',
+        toleranceElement: '> div', // Prevents 'left' calculation errors
+        helper: 'clone',      // Ensures the sortable helper works correctly
         revert: 250,
-        tabSize: 25,
-        toleranceElement: '> div'
+        tabSize: 25
     });
+});
 </script>
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
