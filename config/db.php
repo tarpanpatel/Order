@@ -1,35 +1,6 @@
 <?php
 // /home/apartment/artistsfarmjaipur.com/Order/config/db.php
 
-// 1. SAFE SESSION LIFETIME INITIALIZATION LAYER
-$sessionPath = __DIR__ . '/../_sessions';
-if (!is_dir($sessionPath)) { 
-    mkdir($sessionPath, 0755, true); 
-}
-
-// If a page prematurely started a default session, close it so we can apply our 1-year settings
-if (session_status() === PHP_SESSION_ACTIVE) {
-    session_write_close();
-}
-
-// Now securely enforce the 1-year long-term session configurations safely
-ini_set('session.save_path', $sessionPath);
-ini_set('session.gc_maxlifetime', 31536000); // 1 Year on server memory
-session_set_cookie_params([
-    'lifetime' => 31536000, // 1 Year on browser cookie memory
-    'path' => '/',          // Global path visibility scope
-    'httponly' => true,
-    'samesite' => 'Lax'
-]);
-ini_set('session.cookie_lifetime', 31536000);
-ini_set('session.use_only_cookies', 1);
-
-// Safely restart the session with our updated, permanent variables
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-// 2. DATABASE CONNECTION STRINGS
 date_default_timezone_set('Asia/Kolkata');
 
 $db_host = "localhost";
@@ -47,52 +18,30 @@ try {
     die("Database connection failed: " . $e->getMessage());
 }
 
-// 3. PERSISTENT TOKEN AUTO-LOGIN RECOVERY LOGIC (Bypasses cPanel Session Drops)
-if (!isset($_SESSION['user_id']) && isset($_COOKIE['pos_remember_token'])) {
-    list($cookie_user_id, $cookie_token) = explode(':', $_COOKIE['pos_remember_token']);
-    $cookie_user_id = intval($cookie_user_id);
-    
-    $token_stmt = $pdo->prepare("SELECT * FROM user_tokens WHERE user_id = ? AND expires_at > NOW()");
-    $token_stmt->execute([$cookie_user_id]);
-    $tokens = $token_stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    foreach ($tokens as $t) {
-        if (hash_equals($t['token_hash'], hash('sha256', $cookie_token))) {
-            $user_stmt = $pdo->prepare("SELECT id, username, role FROM users WHERE id = ?");
-            $user_stmt->execute([$cookie_user_id]);
-            $user_row = $user_stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($user_row) {
-                $_SESSION["user_id"]   = $user_row['id'];
-                $_SESSION["username"]  = $user_row['username'];
-                $_SESSION["role"]      = $user_row['role'];
-                $_SESSION["order_authenticated"] = true;
-            }
-            break;
+// 🔐 Centralized Permission Helper Functions
+if (!function_exists('check_page_access')) {
+    function check_page_access($pdo) {
+        if (isset($_SESSION['role']) && $_SESSION['role'] === 'Super Admin') {
+            return true;
         }
+        $current_page = basename($_SERVER['PHP_SELF']);
+        $role = $_SESSION['role'] ?? 'Staff';
+
+        $stmt = $pdo->prepare("
+            SELECT 1 FROM sys_menu m
+            JOIN sys_role_menu rm ON m.id = rm.menu_id
+            WHERE rm.role_name = ? AND m.url = ?
+        ");
+        $stmt->execute([$role, $current_page]);
+        return (bool) $stmt->fetchColumn();
     }
 }
 
-// 4. CORE REUSABLE PROTECTION SYSTEM SECURITY CHECKS
-function check_page_access($pdo) {
-    if (isset($_SESSION['role']) && $_SESSION['role'] === 'Super Admin') {
-        return true;
+if (!function_exists('logAction')) {
+    function logAction($userId, $actionText) {
+        global $pdo;
+        $stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action) VALUES (?, ?)");
+        $stmt->execute([$userId, $actionText]);
     }
-    $current_page = basename($_SERVER['PHP_SELF']);
-    $role = $_SESSION['role'] ?? 'Staff';
-
-    $stmt = $pdo->prepare("
-        SELECT 1 FROM sys_menu m
-        JOIN sys_role_menu rm ON m.id = rm.menu_id
-        WHERE rm.role_name = ? AND m.url = ?
-    ");
-    $stmt->execute([$role, $current_page]);
-    return (bool) $stmt->fetchColumn();
-}
-
-function logAction($userId, $actionText) {
-    global $pdo;
-    $stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action) VALUES (?, ?)");
-    $stmt->execute([$userId, $actionText]);
 }
 ?>
