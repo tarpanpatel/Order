@@ -17,15 +17,15 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . "/../config/db.php";
 
-// 2. ENFORCEMENT GATEWAY: If session token is missing, redirect immediately back to login screen
+// 🛑 ENFORCEMENT GATEWAY: If session token is missing, redirect to index.php instead of login.php[cite: 12]
 if (!isset($_SESSION["user_id"]) || !isset($_SESSION["role"])) {
-    header("Location: login.php");
+    header("Location: index.php?error=unauthenticated");
     exit;
 }
 
-// 3. ROLE PERMISSION GUARD: Kick to login instead of crashing with a white screen if role verification fails
+// 🔐 ROLE PERMISSION GUARD: Redirect to index.php instead of login.php if role verification fails[cite: 12]
 if (!check_page_access($pdo)) {
-    header("Location: login.php?error=permissions_revoked");
+    header("Location: index.php?error=permissions_revoked");
     exit;
 }
 
