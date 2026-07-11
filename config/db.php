@@ -1,9 +1,28 @@
 <?php
 // /home/apartment/artistsfarmjaipur.com/Order/config/db.php
 
-// REMOVE all session_start() and ini_set() calls from here.
-// Login.php handles the session. This file should only handle DB connection.
+// 1. CENTRALIZED 1-YEAR ABSOLUTE SESSION PERSISTENCE (SAFE FOR CPANEL OVERRIDES)
+$sessionPath = __DIR__ . '/../_sessions';
+if (!is_dir($sessionPath)) { 
+    mkdir($sessionPath, 0755, true); 
+}
 
+ini_set('session.save_path', $sessionPath);
+ini_set('session.gc_maxlifetime', 31536000); // 1 Year on server
+session_set_cookie_params([
+    'lifetime' => 31536000, // 1 Year in browser cookie
+    'path' => '/Order/',    // Locks the cookie strictly to your POS directory scope
+    'httponly' => true,
+    'samesite' => 'Lax'
+]);
+ini_set('session.cookie_lifetime', 31536000);
+ini_set('session.use_only_cookies', 1);
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// 2. EXISTING DATABASE CONNECTION CONFIGURATION
 date_default_timezone_set('Asia/Kolkata');
 
 $db_host = "localhost";
@@ -21,47 +40,11 @@ try {
     die("Database connection failed: " . $e->getMessage());
 }
 
-try {
-    /* 🔑 FIXED: Removed the stray closing brace right after utf8mb4 */
-    $pdo = new PDO("mysql:host={$db_host};dbname={$db_name};charset=utf8mb4", $db_user, $db_pass, [
-        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION, 
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC 
-    ]);
-    
-    // Force MySQL session synchronization to Indian Standard Time
-    $pdo->exec("SET time_zone = '+05:30';"); 
-
-} catch (PDOException $e) {
-    die("Database connection failed: " . $e->getMessage()); 
-}
-
-function logAction($userId, $actionText) {
-    global $pdo;
-    $stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action) VALUES (?, ?)");
-    $stmt->execute([$userId, $actionText]);
-}
-
-function requireSuperAdmin() {
-    if (!isset($_SESSION["user_id"]) || $_SESSION["role"] !== "Super Admin") {
-        header("Location: index.php?error=unauthorized");
-        exit;
-    }
-}
-
-function logUserAction($pdo, $action_description) {
-    if (session_status() === PHP_SESSION_NONE) { session_start(); }
-    $user_id = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : null;
-    
-    $stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action, timestamp) VALUES (?, ?, NOW())");
-    $stmt->execute([$user_id, $action_description]);
-}
-// Add this to config/db.php
+// Keep your existing helper functions below (check_page_access, logAction, etc.)
 function check_page_access($pdo) {
-    // Super Admins get a free pass to everything
     if (isset($_SESSION['role']) && $_SESSION['role'] === 'Super Admin') {
         return true;
     }
-
     $current_page = basename($_SERVER['PHP_SELF']);
     $role = $_SESSION['role'] ?? 'Staff';
 
@@ -71,7 +54,6 @@ function check_page_access($pdo) {
         WHERE rm.role_name = ? AND m.url = ?
     ");
     $stmt->execute([$role, $current_page]);
-    
     return (bool) $stmt->fetchColumn();
 }
 ?>
