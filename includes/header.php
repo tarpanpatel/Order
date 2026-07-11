@@ -2,28 +2,29 @@
 /// /home/apartment/artistsfarmjaipur.com/Order/includes/header.php
 error_reporting(E_ALL);
 ini_set('display_errors', '0'); // Security: hide server paths
-
-// Re-assert persistent lifespans variables matching login layers safely
-$sessionPath = __DIR__ . "/../_sessions";
-ini_set('session.save_path', $sessionPath);
-ini_set('session.gc_maxlifetime', 1209600);
-ini_set('session.cookie_lifetime', 1209600);
-
 if (session_status() === PHP_SESSION_NONE) { 
+    // Re-assert high persistence values inline before startup
+    $sessionPath = __DIR__ . "/../_sessions";
+    if (is_dir($sessionPath)) {
+        ini_set('session.save_path', $sessionPath);
+    }
+    ini_set('session.gc_maxlifetime', 1209600);
+    ini_set('session.cookie_lifetime', 1209600);
     session_start(); 
 }
 
 require_once __DIR__ . "/../config/db.php";
 
-// 🛑 ENFORCEMENT GATEWAY: If session token is missing, redirect immediately back to login screen
+// 🛑 PERSISTENCE GUARD: Kick to login instantly if session variables are dropped
 if (!isset($_SESSION["user_id"]) || !isset($_SESSION["role"])) {
     header("Location: login.php");
     exit;
 }
 
-// Check menu item page level permission authorization parameters mapping index
+// 🔐 ROLE PERMISSION GUARD: Kick to login instead of crashing if role verification fails
 if (!check_page_access($pdo)) {
-    die("Access Denied: You do not have permission to access this area.");
+    header("Location: login.php?error=permissions_revoked");
+    exit;
 }
 
 $todayString = date('Y-m-d');
