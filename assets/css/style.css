@@ -516,3 +516,21 @@ div#adminSubMenuContent { display: flex; flex-direction: column; gap: 4px; paddi
     .card-name { font-size: 12px; height: auto; margin-bottom: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
     .card-price { font-size: 11px; margin-top: 1px; margin-bottom: 0; }
 }
+/* ==========================================================================
+   📋 MANUAL STAFF ATTENDANCE MODULE (attendance.php)
+   ========================================================================== */
+.attendance-grid { display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 15px; }
+.attendance-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; gap: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+.attendance-staff-profile { display: flex; flex-direction: column; text-align: left; flex: 1; min-width: 0; }
+.attendance-staff-name { font-size: 14px; font-weight: 700; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attendance-staff-role { font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; margin-top: 2px; }
+.attendance-controls-group { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.attendance-status-select { padding: 8px 12px; font-size: 13px; font-weight: 700; border-radius: 8px; border: 1px solid #cbd5e0; background: #ffffff; color: #334155; outline: none; cursor: pointer; min-width: 130px; }
+.attendance-input-remark { padding: 8px 12px; font-size: 13px; border-radius: 8px; border: 1px solid #cbd5e0; width: 220px; box-sizing: border-box; }
+
+/* Status Selective Dynamic Background Colors for Admins Gaze */
+.status-select-present { border-color: #a7f3d0 !important; background: #f0fdf4 !important; color: #15803d !important; }
+.status-select-absent { border-color: #fca5a5 !important; background: #fdf2f2 !important; color: #b91c1c !important; }
+.status-select-half { border-color: #fde68a !important; background: #fffbeb !important; color: #b45309 !important; }
+.status-select-leave { border-color: #c7d2fe !important; background: #f5f3ff !important; color: #4338ca !important; }
+.status-select-off { border-color: #e2e8f0 !important; background: #f8fafc !important; color: #475569 !important; }
