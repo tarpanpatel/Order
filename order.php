@@ -15,7 +15,7 @@ $menu_items = $pdo->query("SELECT * FROM `menu_items` WHERE `is_hidden` = 0 ORDE
 // Get the live active guest details token
 $current_active_guest = $pdo->query("SELECT * FROM guests WHERE status = 'Active' LIMIT 1")->fetch(PDO::FETCH_ASSOC); 
 
-include "includes/header.php";
+
 
 include "includes/header.php"; 
 
