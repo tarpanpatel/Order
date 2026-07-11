@@ -1,6 +1,9 @@
 <?php
 error_reporting(E_ALL);
-ini_set('display_errors', '0'); // Security: hide server paths
+
+// Force errors to display on the screen
+ini_set('display_errors', '1');
+ini_set('display_startup_errors', '1');
 
 // 1. FORCE 1-YEAR PERSISTENT SESSIONS (31,536,000 seconds)
 $sessionPath = __DIR__ . "/../_sessions";
