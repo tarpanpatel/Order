@@ -1,16 +1,15 @@
 <?php
 // /home/apartment/artistsfarmjaipur.com/Order/includes/left_menu.php
 
-// Ensure central database initialization checks run cleanly
 require_once __DIR__ . "/../config/db.php";
 
 $current_page = basename($_SERVER['PHP_SELF']);
 $user_logged_role = $_SESSION['role'] ?? 'Staff';
 
-// Fetch items dynamically based on verified user authorizations
+// Fetch authorized menu records matching specific role scopes
 if ($user_logged_role === 'Super Admin') {
     $menu_query = $pdo->query("SELECT * FROM sys_menu ORDER BY sort_order ASC");
-    $active_menu_items = $menu_query->fetchAll(PDO::FETCH_ASSOC);
+    $all_raw_menus = $menu_query->fetchAll(PDO::FETCH_ASSOC);
 } else {
     $menu_stmt = $pdo->prepare("
         SELECT m.* FROM sys_menu m
@@ -19,29 +18,63 @@ if ($user_logged_role === 'Super Admin') {
         ORDER BY m.sort_order ASC
     ");
     $menu_stmt->execute([$user_logged_role]);
-    $active_menu_items = $menu_stmt->fetchAll(PDO::FETCH_ASSOC);
+    $all_raw_menus = $menu_stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// Group menu records into distinct hierarchy objects
+$root_menu_items = [];
+$sub_menu_items  = [];
+$is_sub_page_currently_active = false;
+
+foreach ($all_raw_menus as $m) {
+    if (intval($m['parent_id']) > 0) {
+        $sub_menu_items[$m['parent_id']][] = $m;
+        if ($current_page === $m['url']) {
+            $is_sub_page_currently_active = true;
+        }
+    } else {
+        $root_menu_items[] = $m;
+    }
 }
 ?>
 
 <!-- NATIVE STRUCTURE AS DEFINED IN SECTION 3 OF THE MASTER THEME STYLESHEET -->
 <aside class="sidebar" id="sidebarNavDrawer">
-    <!-- Keep the exact header branding title styles -->
     <div class="desktop-sidebar-title">POS Dashboard</div>
     
     <nav>
-        <?php foreach ($active_menu_items as $menu): 
-            // Standard conditional class indicator assignment matching active views
-            $is_current = ($current_page === $menu['url']) ? 'active' : '';
+        <?php foreach ($root_menu_items as $root): 
+            $has_children = isset($sub_menu_items[$root['id']]);
             
-            $href_target = htmlspecialchars($menu['url']);
-            if (empty($menu['url']) || $menu['url'] === '#') {
-                $href_target = 'javascript:void(0);';
-            }
-        ?>
-            <!-- Render standard structural anchor loops tied into the primary style definitions -->
-            <a href="<?= $href_target ?>" class="<?= $is_current ?>">
-                <span><?= htmlspecialchars($menu['title']) ?></span>
-            </a>
+            // Check if this root link or any of its nested children are currently open
+            $is_root_active = ($current_page === $root['url']) || ($root['title'] === 'Admin Control' && $is_sub_page_currently_active);
+            $active_class = $is_root_active ? 'active' : '';
+            
+            if ($has_children): 
+            ?>
+                <!-- Parent Dropdown Link Component Container Group -->
+                <a href="javascript:void(0);" class="<?= $active_class ?>" onclick="toggleAdminDropdownMenu()" id="adminParentHeaderButton">
+                    <span><?= htmlspecialchars($root['title']) ?> ▾</span>
+                </a>
+                
+                <!-- Native Sub-Menu Content Layout Grid Wrapper -->
+                <div id="adminSubMenuContent" style="display: <?= $is_sub_page_currently_active ? 'flex' : 'none' ?>; flex-direction: column; gap: 4px; padding-left: 15px; margin-top: 4px;">
+                    <?php foreach ($sub_menu_items[$root['id']] as $sub): 
+                        $is_sub_active = ($current_page === $sub['url']) ? 'active' : '';
+                    ?>
+                        <a href="<?= htmlspecialchars($sub['url']) ?>" class="<?= $is_sub_active ?>" style="margin-bottom: 2px; padding: 10px 14px;">
+                            <span><?= htmlspecialchars($sub['title']) ?></span>
+                        </a>
+                    <?php endforeach; ?>
+                </div>
+            <?php else: 
+                $href_target = empty($root['url']) || $root['url'] === '#' ? 'javascript:void(0);' : htmlspecialchars($root['url']);
+            ?>
+                <!-- Regular Standalone Main Menu Sidebar Anchor Link Row -->
+                <a href="<?= $href_target ?>" class="<?= $active_class ?>">
+                    <span><?= htmlspecialchars($root['title']) ?></span>
+                </a>
+            <?php endif; ?>
         <?php endforeach; ?>
 
         <!-- Maintain target system styling structure for logouts exactly -->
@@ -50,3 +83,17 @@ if ($user_logged_role === 'Super Admin') {
         </a>
     </nav>
 </aside>
+
+<script>
+// Interactive dropdown toggle handler
+function toggleAdminDropdownMenu() {
+    const subMenuBox = document.getElementById("adminSubMenuContent");
+    if (subMenuBox) {
+        if (subMenuBox.style.display === "none" || subMenuBox.style.display === "") {
+            subMenuBox.style.display = "flex";
+        } else {
+            subMenuBox.style.display = "none";
+        }
+    }
+}
+</script>
