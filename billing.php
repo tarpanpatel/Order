@@ -498,7 +498,7 @@ include "includes/header.php";
         <!-- FIX 5: MOVE CONTROLS TO EXTREME TOP -->
         <div class="print-modal-actions-container" style="position: absolute; top: 15px; left: 20px; right: 20px; display: flex; justify-content: space-between; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 0;">
             <button class="btn print-modal-btn-print" onclick="window.print()" style="background: #00b0ff; color: white; border: none; padding: 6px 16px; border-radius: 6px; font-weight: bold; cursor: pointer;">Print Receipt</button>
-            <button class="btn print-modal-btn-close" onclick="closeEditInvoiceModal()" style="background: #ef4444; color: white; border: none; padding: 6px 16px; border-radius: 6px; font-weight: bold; cursor: pointer;">Close Window</button>
+            <button class="btn print-modal-btn-close" onclick="closeEditInvoiceModal()" style="background: #ef4444; color: white; border: none; padding: 6px 16px; border-radius: 6px; font-weight: bold; cursor: pointer;">Close</button>
         </div>
 
         <div class="print-modal-header" style="margin-top: 10px;">

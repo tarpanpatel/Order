@@ -28,6 +28,22 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_register_guest
     $advance_received_by = trim($_POST["advance_received_by"] ?? 'Unnamed');
     $pending_received_by = trim($_POST["pending_received_by"] ?? 'Unnamed');
 
+    // Compile dynamic miscellaneous charges into an array object mapping
+    $misc_input_types = $_POST['misc_types'] ?? [];
+    $misc_input_costs = $_POST['misc_amounts'] ?? [];
+    $misc_compiled = [];
+    
+    foreach ($misc_input_types as $idx => $m_type) {
+        $m_cost = floatval($misc_input_costs[$idx] ?? 0);
+        if (!empty($m_type) && $m_cost > 0) {
+            $misc_compiled[] = [
+                'type' => $m_type,
+                'amount' => $m_cost
+            ];
+        }
+    }
+    $misc_json_string = !empty($misc_compiled) ? json_encode($misc_compiled) : null;
+
     if ($checkout <= $checkin) {
         $message = "❌ Error: Check-out date must be after the check-in date.";
     } elseif (!empty($checkin) && !empty($checkout) && !empty($phone_number)) {
@@ -46,12 +62,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_register_guest
                 $message = "❌ Error: This date range conflicts with an active registry profile.";
                 $pdo->rollBack();
             } else {
-                $sql = "INSERT INTO guests (phone_number, adults, children, checkin_date, checkout_date, expected_checkout, notes, advance_paid, pending_amount, booking_source, no_of_guests, per_night_charges, total_charge, base_room_rent, advance_received_by, pending_received_by, status) 
-                        VALUES (?, ?, 0, ?, ?, CONCAT(?, ' 11:00:00'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Booked')";
+                $sql = "INSERT INTO guests (phone_number, adults, children, checkin_date, checkout_date, expected_checkout, notes, misc_arrangements, advance_paid, pending_amount, booking_source, no_of_guests, per_night_charges, total_charge, base_room_rent, advance_received_by, pending_received_by, status) 
+                        VALUES (?, ?, 0, ?, ?, CONCAT(?, ' 11:00:00'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Booked')";
                 
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
-                    $phone_number, 1, $checkin, $checkout, $checkout, $notes, $advance, $pending, 
+                    $phone_number, 1, $checkin, $checkout, $checkout, $notes, $misc_json_string, $advance, $pending, 
                     $booking_source, $no_of_guests, $per_night_charges, $per_night_charges, 
                     $per_night_charges, $advance_received_by, $pending_received_by
                 ]);
@@ -60,7 +76,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_register_guest
             }
         } catch (Exception $e) {
             $pdo->rollBack();
-            $message = "❌ Server error occurred processing booking transaction pipeline.";
+            $message = "❌ Server error occurred processing booking transaction pipeline: " . $e->getMessage();
         }
     } else {
         $message = "❌ Error: Check-In, Check-Out, and Phone Number are required fields.";
@@ -105,6 +121,18 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_booking
     $advance_received_by = trim($_POST["edit_advance_received_by"] ?? 'Unnamed');
     $pending_received_by = trim($_POST["edit_pending_received_by"] ?? 'Unnamed');
 
+    $misc_edit_types = $_POST['edit_misc_types'] ?? [];
+    $misc_edit_costs = $_POST['edit_misc_amounts'] ?? [];
+    $misc_compiled_edit = [];
+    
+    foreach ($misc_edit_types as $idx => $m_type) {
+        $m_cost = floatval($misc_edit_costs[$idx] ?? 0);
+        if (!empty($m_type) && $m_cost > 0) {
+            $misc_compiled_edit[] = ['type' => $m_type, 'amount' => $m_cost];
+        }
+    }
+    $misc_json_edit = !empty($misc_compiled_edit) ? json_encode($misc_compiled_edit) : null;
+
     if (!empty($checkin) && !empty($checkout) && !empty($phone)) {
         $pdo->beginTransaction();
         try {
@@ -116,10 +144,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_update_booking
                 echo "<script>alert('❌ Error: These modified parameters conflict with an existing room booking timeline.'); window.location.href = 'checkin.php';</script>";
                 exit;
             } else {
-                $sql = "UPDATE guests SET phone_number = ?, checkin_date = ?, checkout_date = ?, expected_checkout = CONCAT(?, ' 11:00:00'), notes = ?, advance_paid = ?, pending_amount = ?, booking_source = ?, no_of_guests = ?, per_night_charges = ?, total_charge = ?, base_room_rent = ?, advance_received_by = ?, pending_received_by = ? WHERE id = ?";
+                $sql = "UPDATE guests SET phone_number = ?, checkin_date = ?, checkout_date = ?, expected_checkout = CONCAT(?, ' 11:00:00'), notes = ?, misc_arrangements = ?, advance_paid = ?, pending_amount = ?, booking_source = ?, no_of_guests = ?, per_night_charges = ?, total_charge = ?, base_room_rent = ?, advance_received_by = ?, pending_received_by = ? WHERE id = ?";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
-                    $phone, $checkin, $checkout, $checkout, $notes, $advance, $pending, 
+                    $phone, $checkin, $checkout, $checkout, $notes, $misc_json_edit, $advance, $pending, 
                     $booking_source, $no_of_guests, $per_night_charges, $per_night_charges, 
                     $per_night_charges, $advance_received_by, $pending_received_by, $b_id
                 ]);
@@ -162,42 +190,8 @@ foreach ($bookings as $b) {
 }
 $disabledDatesJson = json_encode($disabledDatesArray);
 
-// Add this near your existing $pdo queries
 $all_system_users = $pdo->query("SELECT id, username FROM users ORDER BY username ASC")->fetchAll(PDO::FETCH_ASSOC);
-
-// ==========================================================================
-// BACKGROUND AUTOMATION: 1-DAY BEFORE ADVANCE ARRIVAL NOTIFIER REMINDER
-// ==========================================================================
-$lastNotificationSentDate = $_SESSION['last_reminder_broadcast_date'] ?? '';
-if ($lastNotificationSentDate !== $todayString) {
-    $tomorrowDateString = date('Y-m-d', strtotime('+1 day'));
-    
-    $tomorrowQuery = $pdo->prepare("SELECT * FROM guests WHERE DATE(checkin_date) = ? AND status = 'Booked'");
-    $tomorrowQuery->execute([$tomorrowDateString]);
-    $tomorrow_arrivals = $tomorrowQuery->fetchAll(PDO::FETCH_ASSOC);
-    
-    if (!empty($tomorrow_arrivals) && function_exists('sendAdminTelegramMessage')) {
-        $rem_msg = "🗓️ <b>TOMORROW'S ARRIVALS REMINDER SHEET</b>\n";
-        $rem_msg .= "📅 Check-in Date: <b>" . date('d M Y', strtotime($tomorrowDateString)) . "</b>\n";
-        $rem_msg .= "━━━━━━━━━━━━━━━━━━\n\n";
-        
-        foreach ($tomorrow_arrivals as $index => $res) {
-            $num = $index + 1;
-            $rem_msg .= "<b>{$num}. Phone:</b> 📱 (" . substr($res['phone_number'], -4) . ")\n";
-            $rem_msg .= "• Source: " . htmlspecialchars($res['booking_source']) . " | Headcount: " . $res['no_of_guests'] . " Pax\n";
-            $rem_msg .= "• Total Tariff: ₹" . number_format($res['per_night_charges'], 2) . "\n";
-            $rem_msg .= "• Advance Paid: ₹" . number_format($res['advance_paid'], 2) . " (" . htmlspecialchars($res['advance_received_by']) . ")\n";
-            if (!empty($res['notes'])) {
-                $rem_msg .= "• <i>Notes: " . htmlspecialchars($res['notes']) . "</i>\n";
-            }
-            $rem_msg .= "⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n";
-        }
-        
-        sendAdminTelegramMessage($rem_msg);
-    }
-    $_SESSION['last_reminder_broadcast_date'] = $todayString;
-}
-// ==========================================================================
+$misc_types_catalog = $pdo->query("SELECT charge_type FROM miscellaneous_catalog ORDER BY charge_type ASC")->fetchAll(PDO::FETCH_COLUMN);
 
 include "includes/header.php";
 ?>
@@ -218,6 +212,7 @@ include "includes/header.php";
 .calendar-day-cell.today-accent .day-number { color: #06b6d4; }
 .booking-strip-tag { color: white; font-size: 10px; font-weight: 700; padding: 3px 6px; border-radius: 4px; margin-top: 4px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; background: #4b5563; }
 .booking-strip-tag.live-active { background: #38a169 !important; }
+.misc-row-entry { display: grid; grid-template-columns: 1fr 100px 32px; gap: 6px; margin-bottom: 6px; align-items: center; }
 @media (max-width: 1023px) { .split-registration-container { grid-template-columns: 1fr !important; } }
 </style>
 
@@ -274,7 +269,16 @@ include "includes/header.php";
                     <div class="input-field-group"><label>Check-Out Date *</label><input type="date" id="fieldCheckout" name="checkout_date" required onchange="validateCheckoutDate(this)"></div>
                 </div>
                 
-                <div class="input-field-group"><label>Total Tariff (₹)</label><input type="number" id="fieldTotalTariff" name="per_night_charges" value="0" min="0" oninput="autoCalculatePendingBalance('field')"></div>
+                <div class="input-field-group"><label>Total Room Tariff (₹)</label><input type="number" id="fieldTotalTariff" name="per_night_charges" value="0" min="0" oninput="autoCalculatePendingBalance('field')"></div>
+
+                <!-- ADDED STRATEGIC MISCELLANEOUS DYNAMIC INPUT MATRIX PANEL -->
+                <div class="input-field-group">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                        <label>Dynamic Incidentals (Pets, Decoration etc)</label>
+                        <button type="button" onclick="appendMiscRow('creationMiscContainer', 'misc_types[]', 'misc_amounts[]')" style="padding:2px 8px; font-size:11px; background:#00b0ff; color:#fff; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">+ Add Line</button>
+                    </div>
+                    <div id="creationMiscContainer"></div>
+                </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div class="input-field-group"><label>Advance Paid (₹)</label><input type="number" id="fieldAdvancePaid" name="advance_paid" value="0" min="0" oninput="autoCalculatePendingBalance('field')"></div>
@@ -282,11 +286,9 @@ include "includes/header.php";
                         <label>Advance Received By</label>
                         <select name="advance_received_by" required>
                             <option value="">-- Select Staff/User --</option>
-    <?php foreach ($all_system_users as $u): ?>
-        <option value="<?= $u['id'] ?>">
-            <?= htmlspecialchars($u['username']) ?>
-        </option>
-    <?php endforeach; ?>
+                            <?php foreach ($all_system_users as $u): ?>
+                                <option value="<?= htmlspecialchars($u['username']) ?>"><?= htmlspecialchars($u['username']) ?></option>
+                            <?php endforeach; ?>
                         </select>
                     </div>
                 </div>
@@ -297,11 +299,9 @@ include "includes/header.php";
                         <label>Pending Received By</label>
                         <select name="pending_received_by" required>
                             <option value="">-- Select Staff/User --</option>
-    <?php foreach ($all_system_users as $u): ?>
-        <option value="<?= $u['id'] ?>">
-            <?= htmlspecialchars($u['username']) ?>
-        </option>
-    <?php endforeach; ?>
+                            <?php foreach ($all_system_users as $u): ?>
+                                <option value="<?= htmlspecialchars($u['username']) ?>"><?= htmlspecialchars($u['username']) ?></option>
+                            <?php endforeach; ?>
                         </select>
                     </div>
                 </div>
@@ -354,7 +354,11 @@ include "includes/header.php";
                 <tr><th style="padding: 4px 0; color: #4b5563;">Channel Source:</th><td id="lblSource"></td></tr>
                 <tr><th style="padding: 4px 0; color: #4b5563;">Headcount Group:</th><td><span id="lblGuestsCount"></span> Persons</td></tr>
                 <tr><th style="padding: 4px 0; color: #4b5563;">Duration Stay:</th><td><span id="lblCheckin" style="font-weight:600;"></span> to <span id="lblCheckout" style="font-weight:600;"></span></td></tr>
-                <tr><th style="padding: 4px 0; color: #4b5563;">Total Tariff:</th><td>₹<span id="lblRate"></span></td></tr>
+                <tr><th style="padding: 4px 0; color: #4b5563;">Room Tariff:</th><td>₹<span id="lblRate"></span></td></tr>
+                
+                <!-- READ SPECIFIC MISCELLANEOUS VALUES DISPLAY -->
+                <tr><th style="padding: 4px 0; color: #4b5563; vertical-align: top;">Special Layout Adjustments:</th><td id="lblMiscList" style="color:#00b0ff; font-weight:bold;"></td></tr>
+                
                 <tr><th style="padding: 4px 0; color: #4b5563;">Advance Ledger:</th><td><span style="color:#38a169; font-weight:700;">₹<span id="lblAdvance"></span></span> (<span id="lblAdvanceBy"></span>)</td></tr>
                 <tr><th style="padding: 4px 0; color: #4b5563;">Pending Ledger:</th><td><span style="color:#e53e3e; font-weight:700;">₹<span id="lblPending"></span></span> (<span id="lblPendingBy"></span>)</td></tr>
                 <tr><th style="padding: 4px 0; color: #4b5563; vertical-align: top;">Guest Notes:</th><td id="lblNotes" style="font-style: italic; color:#4a5568;"></td></tr>
@@ -369,7 +373,7 @@ include "includes/header.php";
             <h3 style="font-size: 16px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px;">Modify Dynamic Parameters</h3>
             <form method="POST" action="checkin.php" style="margin: 0;">
                 <input type="hidden" name="action_update_booking" value="1"><input type="hidden" name="edit_booking_id" id="txtEditId">
-                <div style="display: flex; flex-direction: column; gap: 12px; max-height: 60vh; overflow-y: auto; padding-right: 4px;" class="input-field-group">
+                <div style="display: flex; flex-direction: column; gap: 12px; max-height: 55vh; overflow-y: auto; padding-right: 4px;" class="input-field-group">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                         <div><label>Contact Phone *</label><input type="text" name="edit_phone_number" id="txtEditPhone" required></div>
                         <div>
@@ -382,8 +386,18 @@ include "includes/header.php";
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                         <div><label>No. of Guests</label><input type="number" name="edit_no_of_guests" id="txtEditGuestsCount" min="1"></div>
-                        <div><label>Total Tariff (₹)</label><input type="number" name="edit_per_night_charges" id="txtEditRate" min="0" oninput="autoCalculatePendingBalance('edit')"></div>
+                        <div><label>Room Tariff (₹)</label><input type="number" name="edit_per_night_charges" id="txtEditRate" min="0" oninput="autoCalculatePendingBalance('edit')"></div>
                     </div>
+                    
+                    <!-- EDIT MODE MISCELLANEOUS ENTRY STRIPS CONTAINER -->
+                    <div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                            <label>Dynamic Booking Extras</label>
+                            <button type="button" onclick="appendMiscRow('editMiscContainer', 'edit_misc_types[]', 'edit_misc_amounts[]')" style="padding:2px 6px; font-size:11px; background:#00b0ff; color:#fff; border:none; border-radius:4px; cursor:pointer;">+ Add</button>
+                        </div>
+                        <div id="editMiscContainer"></div>
+                    </div>
+
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                         <div><label>Check-In Date *</label><input type="date" name="edit_checkin_date" id="txtEditCheckin" min="<?php echo $todayString; ?>" required onchange="handleEditDateAutoLock()"></div>
                         <div><label>Check-Out Date *</label><input type="date" name="edit_checkout_date" id="txtEditCheckout" required></div>
@@ -394,11 +408,9 @@ include "includes/header.php";
                             <label>Advance Received By</label>
                             <select name="edit_advance_received_by" id="txtEditAdvanceBy" required>
                                 <option value="">-- Choose Collector --</option>
-                                <?php if (!empty($db_staff)): foreach ($db_staff as $staff_name): ?>
-                                    <option value="<?= htmlspecialchars($staff_name) ?>"><?= htmlspecialchars($staff_name) ?></option>
-                                <?php endforeach; else: ?>
-                                    <option value="Unnamed">Unnamed</option>
-                                <?php endif; ?>
+                                <?php foreach ($all_system_users as $u): ?>
+                                    <option value="<?= htmlspecialchars($u['username']) ?>"><?= htmlspecialchars($u['username']) ?></option>
+                                <?php endforeach; ?>
                             </select>
                         </div>
                     </div>
@@ -408,11 +420,9 @@ include "includes/header.php";
                             <label>Pending Received By</label>
                             <select name="edit_pending_received_by" id="txtEditPendingBy" required>
                                 <option value="">-- Choose Collector --</option>
-                                <?php if (!empty($db_staff)): foreach ($db_staff as $staff_name): ?>
-                                    <option value="<?= htmlspecialchars($staff_name) ?>"><?= htmlspecialchars($staff_name) ?></option>
-                                <?php endforeach; else: ?>
-                                    <option value="Unnamed">Unnamed</option>
-                                <?php endif; ?>
+                                <?php foreach ($all_system_users as $u): ?>
+                                    <option value="<?= htmlspecialchars($u['username']) ?>"><?= htmlspecialchars($u['username']) ?></option>
+                                <?php endforeach; ?>
                             </select>
                         </div>
                     </div>
@@ -426,7 +436,38 @@ include "includes/header.php";
 
 <script>
 const blacklistedBookedDates = <?php echo $disabledDatesJson; ?>;
+const availablePredefinedCatalogOptions = <?php echo json_encode($misc_types_catalog); ?>;
 let currentActiveSelectedBookingObject = null;
+
+// RENDER MISCELLANEOUS FORMS DYNAMIC INPUT ELEMENTS
+function appendMiscRow(targetContainerId, typeNameAttr, valNameAttr, initialType = '', initialVal = '') {
+    const container = document.getElementById(targetContainerId);
+    const rowId = 'misc_row_' + Date.now() + Math.floor(Math.random() * 100);
+    
+    let dropdownOptions = `<option value="">-- Select Type --</option>`;
+    availablePredefinedCatalogOptions.forEach(opt => {
+        const selected = (opt === initialType) ? 'selected' : '';
+        dropdownOptions += `<option value="${opt}" ${selected}>${opt}</option>`;
+    });
+
+    const html = `
+        <div class="misc-row-entry" id="${rowId}">
+            <select name="${typeNameAttr}" required style="padding:8px; font-size:13px; border-radius:6px; border:1px solid #cbd5e0;">
+                ${dropdownOptions}
+            </select>
+            <input type="number" name="${valNameAttr}" value="${initialVal}" required placeholder="Amount" min="1" style="padding:8px; font-size:13px; border-radius:6px; border:1px solid #cbd5e0;" oninput="recalculatePendingBorders()">
+            <button type="button" onclick="document.getElementById('${rowId}').remove(); recalculatePendingBorders();" style="background:#ef4444; color:#fff; border:none; border-radius:6px; height:32px; cursor:pointer; font-weight:bold;">✕</button>
+        </div>
+    `;
+    container.insertAdjacentHTML('beforeend', html);
+}
+
+function recalculatePendingBorders() {
+    autoCalculatePendingBalance('field');
+    if(document.getElementById('modalEditView').style.display === 'block') {
+        autoCalculatePendingBalance('edit');
+    }
+}
 
 function setSystemDefaultFormTimestamps() {
     const checkinInput = document.getElementById("fieldCheckin");
@@ -467,7 +508,15 @@ function autoCalculatePendingBalance(prefix) {
     const advance = parseFloat(document.getElementById(prefix === 'field' ? 'fieldAdvancePaid' : 'txtEditAdvance').value) || 0;
     const balanceField = document.getElementById(prefix === 'field' ? 'fieldPendingBalance' : 'txtEditPending');
     
-    balanceField.value = tariff - advance;
+    // Calculate total including dynamically typed miscellaneous entries
+    let miscTotal = 0;
+    const containerId = (prefix === 'field') ? 'creationMiscContainer' : 'editMiscContainer';
+    const dynamicAmounts = document.getElementById(containerId).querySelectorAll('input[type="number"]');
+    dynamicAmounts.forEach(input => {
+        miscTotal += parseFloat(input.value) || 0;
+    });
+
+    balanceField.value = (tariff + miscTotal) - advance;
 }
 
 function validateCheckoutDate(checkoutInput) {
@@ -501,6 +550,18 @@ function openDetailsModal(bookingData) {
     document.getElementById("lblPendingBy").innerText   = bookingData.pending_received_by || 'Unnamed';
     document.getElementById("lblNotes").innerText       = bookingData.notes ? bookingData.notes : "None";
 
+    // Format dynamic array logs for the text view
+    const miscContainer = document.getElementById("lblMiscList");
+    miscContainer.innerHTML = "";
+    if (bookingData.misc_arrangements) {
+        const parsed = JSON.parse(bookingData.misc_arrangements) || [];
+        if (parsed.length > 0) {
+            parsed.forEach(item => {
+                miscContainer.innerHTML += `• ${item.type}: ₹${parseFloat(item.amount).toFixed(2)}<br>`;
+            });
+        } else { miscContainer.innerText = "None"; }
+    } else { miscContainer.innerText = "None"; }
+
     const badge = document.getElementById("lblStatusBadge");
     if (bookingData.status === "Active") {
         badge.innerText = "Live Active Ledger";
@@ -530,6 +591,16 @@ function switchToEditMode() {
     document.getElementById("txtEditCheckin").value     = currentActiveSelectedBookingObject.cid.substring(0, 10);
     document.getElementById("txtEditCheckout").value    = currentActiveSelectedBookingObject.cod.substring(0, 10);
     
+    // Clear and pop edit layout inputs matching array contexts
+    const editContainer = document.getElementById("editMiscContainer");
+    editContainer.innerHTML = "";
+    if (currentActiveSelectedBookingObject.misc_arrangements) {
+        const parsed = JSON.parse(currentActiveSelectedBookingObject.misc_arrangements) || [];
+        parsed.forEach(item => {
+            appendMiscRow('editMiscContainer', 'edit_misc_types[]', 'edit_misc_amounts[]', item.type, item.amount);
+        });
+    }
+
     handleEditDateAutoLock();
     
     document.getElementById("modalReadView").style.display = "none";
