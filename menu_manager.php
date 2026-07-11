@@ -71,11 +71,17 @@ include "includes/header.php";
 <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/nestedSortable/2.0.0/jquery.mjs.nestedSortable.min.js"></script>
 <script>
-    $('#menu-builder').nestedSortable({ placeholder: 'placeholder', items: 'li' });
-
-    function saveMenu() {
-        // Logic to extract hierarchy and role checkboxes and POST to this page
-        alert("Hierarchy saved!"); // Add AJAX POST here
-    }
+    $('#menu-builder').nestedSortable({
+        listType: 'ul', // Explicitly define the list type
+        items: 'li',
+        placeholder: 'placeholder',
+        forcePlaceholderSize: true,
+        handle: 'div', // Optional: Use a specific handle (e.g., a drag icon)
+        helper: 'clone',
+        opacity: 0.6,
+        revert: 250,
+        tabSize: 25,
+        toleranceElement: '> div'
+    });
 </script>
 <?php include "includes/footer.php"; ?>
