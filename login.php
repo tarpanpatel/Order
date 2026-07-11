@@ -20,8 +20,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once "config/db.php";
 
-// If user context token exists already, bypass entry authentication entirely
-if (isset($_SESSION["user_id"])) {
+if (isset($_SESSION["user_id"]) && !isset($_GET['error'])) {
     if (isset($_SESSION["role"]) && $_SESSION["role"] === 'Chef') {
         header("Location: kitchen.php");
     } else {
