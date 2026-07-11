@@ -44,7 +44,7 @@ include "includes/header.php";
 
                 <div id="menuCatalogContainer">
                     <?php foreach ($categories as $cat): 
-                        $cat_items = array_filter($menu_items, function($m) use ($cat) { return $m['category_'] == $cat['id']; });
+                        $cat_items = array_filter($menu_items, function($m) use ($cat) { return $m['category_id'] == $cat['id']; });
                         if (empty($cat_items)) continue;
                     ?>
                         <div class="category-block mb-15" id="cat_<?= $cat['id'] ?>">
@@ -166,16 +166,7 @@ window.filterMenuCatalog = function(catId, btn) {
     });
 };
 
-function addItemToCheckoutCart(btn, id, name, price) {
-    // 1. Trigger Visual Feedback
-    btn.classList.add('is-clicked-active');
-    btn.innerText = "✔ Added";
-    setTimeout(() => {
-        btn.classList.remove('is-clicked-active');
-        btn.innerText = "+ Add";
-    }, 400);
-
-    // 2. Existing functionality
+function addItemToCheckoutCart(id, name, price) {
     <?php if (!$current_active_guest): ?>
         alert("Please choose and activate an active guest profile...");
         return;
