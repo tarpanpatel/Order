@@ -491,19 +491,31 @@ include "includes/header.php";
     <?php endif; ?>
 </div>
 
-<div id="cleanPrintFriendlyModal" class="print-modal-overlay">
-    <div class="print-modal-box">
-        <div class="print-modal-header">
-            <h3 class="print-modal-company-title">ARTISTS FARM JAIPUR</h3>
-            <span class="print-modal-subtitle">Official Bill Invoice Copy</span>
-            <div class="print-modal-guest-meta">
-                <div><b>Guest:</b> <span id="pGuestName"><?= htmlspecialchars($guest['guest_name'] ?? '') ?></span></div>
-                <div><b>Phone:</b> <span id="pGuestPhone"><?= htmlspecialchars($guest['phone_number'] ?? '') ?></span></div>
-                <div><b>Date:</b> <span><?= date('d M Y, h:i A') ?></span></div>
+<!-- PRINT-FRIENDLY POPUP MODAL (MODIFIED OVERHAUL) -->
+<div id="cleanPrintFriendlyModal" class="print-modal-overlay" style="display:none; align-items: flex-start; padding-top: 30px;">
+    <div class="print-modal-box" style="position: relative; max-height: 85vh; overflow-y: auto; padding-top: 60px;">
+        
+        <!-- FIX 5: MOVE CONTROLS TO EXTREME TOP -->
+        <div class="print-modal-actions-container" style="position: absolute; top: 15px; left: 20px; right: 20px; display: flex; justify-content: space-between; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 0;">
+            <button class="btn print-modal-btn-print" onclick="window.print()" style="background: #00b0ff; color: white; border: none; padding: 6px 16px; border-radius: 6px; font-weight: bold; cursor: pointer;">Print Receipt</button>
+            <button class="btn print-modal-btn-close" onclick="closeEditInvoiceModal()" style="background: #ef4444; color: white; border: none; padding: 6px 16px; border-radius: 6px; font-weight: bold; cursor: pointer;">Close Window</button>
+        </div>
+
+        <div class="print-modal-header" style="margin-top: 10px;">
+            <!-- FIX 1: REMOVED "Official Bill Invoice Copy" TEXT -->
+            <h3 class="print-modal-company-title" style="margin-bottom: 12px;">ARTISTS FARM JAIPUR</h3>
+            
+            <!-- FIX 2 & 3: COMBINED PHONE + DATE REMOVED OFFLINE LINE -->
+            <div class="print-modal-guest-meta" style="font-size: 13px; line-height: 1.6; border-bottom: 1px dashed #cbd5e0; padding-bottom: 10px; margin-bottom: 15px;">
+                <div style="font-weight: bold; font-size: 15px; margin-bottom: 4px;">Guest: <span id="pGuestName"><?= htmlspecialchars($guest['guest_name'] ?? '') ?></span></div>
+                <div style="display: flex; justify-content: space-between; color: #4b5563;">
+                    <span><b>Phone:</b> <span id="pGuestPhone"><?= htmlspecialchars($guest['phone_number'] ?? '') ?></span></span>
+                    <span><b>Date:</b> <span><?= date('d M Y, h:i A') ?></span></span>
+                </div>
             </div>
         </div>
 
-        <div class="print-modal-section-title">Stay Logistics</div>
+        <div class="print-modal-section-title" style="font-weight: bold; border-left: 3px solid #00b0ff; padding-left: 8px; margin-bottom: 10px; font-size: 14px; color: #1f2937;">Stay Logistics</div>
         <div class="print-modal-row">
             <span>Room Tariff (Contract Base):</span>
             <span>₹<?= number_format($base_rent, 2) ?></span>
@@ -526,21 +538,24 @@ include "includes/header.php";
                 <span><?= $pending_payment_collected ? htmlspecialchars($pending_collector) : 'Not recorded' ?></span>
             </div>
         <?php endif; ?>
-        <div class="print-modal-row-total-dashed">
+        <div class="print-modal-row-total-dashed" style="margin-bottom: 20px;">
             <span>Stay Balance Still Due:</span>
             <span>₹<?= number_format($accommodation_due_now, 2) ?></span>
         </div>
 
-        <div class="print-modal-section-title">KOT Food & Incidentals</div>
+        <div class="print-modal-section-title" style="font-weight: bold; border-left: 3px solid #00b0ff; padding-left: 8px; margin-bottom: 10px; font-size: 14px; color: #1f2937;">KOT Food & Incidentals</div>
+        
+        <!-- CONTAIN CONTAINER FOR PAGINATED ITEMS -->
         <div id="popupReceiptItems" class="print-modal-items-container"></div>
+        
+        <!-- FIX 4: INTERACTIVE LOAD MORE LINK BUTTON -->
+        <div id="receiptLoadMoreContainer" style="display: none; text-align: center; margin: 10px 0; padding: 5px; border-bottom: 1px dashed #e2e8f0;">
+            <a href="javascript:void(0)" onclick="expandHiddenReceiptRows()" style="color: #00b0ff; font-weight: bold; font-size: 12px; text-decoration: none; outline: none;">➕ View More Long-Bill Line Items...</a>
+        </div>
 
-        <div class="print-modal-grand-total-row">
+        <div class="print-modal-grand-total-row" style="margin-top: 15px; border-top: 2px double #1f2937; padding-top: 10px;">
             <span>Total Outstanding Payable:</span>
             <span class="print-modal-grand-total-val">₹<?= number_format($checkout_total_due, 2) ?></span>
-        </div>
-        <div class="print-modal-actions-container">
-            <button class="btn print-modal-btn-print" onclick="window.print()">Print</button>
-            <button class="btn print-modal-btn-close" onclick="closeEditInvoiceModal()">Close</button>
         </div>
     </div>
 </div>
@@ -560,15 +575,25 @@ function toggleLabelRequirement() {
     }
 }
 
+// FIX 4: PAGINATION MECHANICS STATE GLOBALS
+let currentVisibleReceiptRows = 0;
+const receiptRowsThreshold = 8;
+let allGeneratedReceiptNodes = [];
+
 window.openCleanBillPopup = function() {
     const itemsContainer = document.getElementById("popupReceiptItems"); 
     itemsContainer.innerHTML = "";
     
+    // Reset global pagination parameters
+    currentVisibleReceiptRows = 0;
+    document.getElementById("receiptLoadMoreContainer").style.display = "none";
+
+    let itemLinesHtml = "";
     const cleanItems = <?php echo json_encode(array_values($served_items ?? [])); ?>;
     cleanItems.forEach(item => { 
         let net = item.quantity - item.returned_qty;
         if(net > 0) {
-            itemsContainer.innerHTML += `<div class="receipt-item-line"><span>${item.name} x${net}</span><span>₹${(net * item.price).toFixed(2)}</span></div>`; 
+            itemLinesHtml += `<div class="receipt-item-line dynamic-receipt-row" style="display:none; justify-content: space-between; font-size: 13px; margin-bottom: 6px;"><span>${item.name} x${net}</span><span>₹${(net * item.price).toFixed(2)}</span></div>`; 
         }
     });
     
@@ -577,15 +602,40 @@ window.openCleanBillPopup = function() {
         const sign = (item.type === "charge") ? "+" : "-";
         const colorClass = (item.type === "payment") ? "text-green-success" : "";
         
-        itemsContainer.innerHTML += `
-            <div class="receipt-adjustment-line ${colorClass}">
+        itemLinesHtml += `
+            <div class="receipt-adjustment-line dynamic-receipt-row ${colorClass}" style="display:none; justify-content: space-between; font-size: 13px; margin-bottom: 6px; font-style: italic; color: #4b5563;">
                 <span>↳ ${item.reason}</span>
                 <span>${sign}₹${parseFloat(item.amount).toFixed(2)}</span>
             </div>`;
     });
     
+    itemsContainer.innerHTML = itemLinesHtml;
+    allGeneratedReceiptNodes = Array.from(itemsContainer.querySelectorAll('.dynamic-receipt-row'));
+    
+    // Evaluate if bill size stretches across the threshold boundary rules
+    if (allGeneratedReceiptNodes.length > receiptRowsThreshold) {
+        for (let i = 0; i < receiptRowsThreshold; i++) {
+            allGeneratedReceiptNodes[i].style.display = 'flex';
+            currentVisibleReceiptRows++;
+        }
+        document.getElementById("receiptLoadMoreContainer").style.display = "block";
+    } else {
+        allGeneratedReceiptNodes.forEach(node => node.style.display = 'flex');
+    }
+    
     document.getElementById("cleanPrintFriendlyModal").style.display = "flex";
 };
+
+function expandHiddenReceiptRows() {
+    const limit = currentVisibleReceiptRows + 15; // Load next 15 lines dynamically
+    for (let i = currentVisibleReceiptRows; i < limit && i < allGeneratedReceiptNodes.length; i++) {
+        allGeneratedReceiptNodes[i].style.display = 'flex';
+        currentVisibleReceiptRows++;
+    }
+    if (currentVisibleReceiptRows >= allGeneratedReceiptNodes.length) {
+        document.getElementById("receiptLoadMoreContainer").style.display = "none";
+    }
+}
 
 function closeEditInvoiceModal() {
     document.getElementById("cleanPrintFriendlyModal").style.display = "none";
