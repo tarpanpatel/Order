@@ -503,11 +503,11 @@ include "includes/header.php";
 
         <div class="print-modal-header" style="margin-top: 10px;">
             <!-- FIX 1: REMOVED "Official Bill Invoice Copy" TEXT -->
-            <h3 class="print-modal-company-title" style="margin-bottom: 12px;">ARTISTS FARM JAIPUR</h3>
+            
             
             <!-- FIX 2 & 3: COMBINED PHONE + DATE REMOVED OFFLINE LINE -->
             <div class="print-modal-guest-meta" style="font-size: 13px; line-height: 1.6; border-bottom: 1px dashed #cbd5e0; padding-bottom: 10px; margin-bottom: 15px;">
-                <div style="font-weight: bold; font-size: 15px; margin-bottom: 4px;">Guest: <span id="pGuestName"><?= htmlspecialchars($guest['guest_name'] ?? '') ?></span></div>
+                 
                 <div style="display: flex; justify-content: space-between; color: #4b5563;">
                     <span><b>Phone:</b> <span id="pGuestPhone"><?= htmlspecialchars($guest['phone_number'] ?? '') ?></span></span>
                     <span><b>Date:</b> <span><?= date('d M Y, h:i A') ?></span></span>

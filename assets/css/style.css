@@ -275,7 +275,7 @@ div#adminSubMenuContent { display: flex; flex-direction: column; gap: 4px; paddi
 /* Print Receipts Overlay */
 .print-modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 999999; justify-content: center; align-items: center; backdrop-filter: blur(2px); }
 .print-modal-box { background: #ffffff; max-width: 420px; width: 90%; border-radius: 8px; padding: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); text-align: left; color: #000000; font-family: monospace; }
-.print-modal-header { text-align: center; margin-bottom: 15px; border-bottom: 2px dashed #000; }
+.print-modal-header { text-align: center; margin-bottom: 15px;   }
 .print-modal-company-title { margin: 0 0 5px 0; font-size: 16px; text-transform: uppercase; letter-spacing: 1px; }
 .print-modal-subtitle { font-size: 11px; color: #555; }
 .print-modal-guest-meta { margin: 10px 0; font-size: 12px; text-align: left; }
