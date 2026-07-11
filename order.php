@@ -44,11 +44,8 @@ include "includes/header.php";
 
                 <div id="menuCatalogContainer">
                     <?php foreach ($categories as $cat): 
-                        // FIXED: Added an isset fallback check to safely handle array keys dynamically and eliminate the line 48 warning
-                        $cat_items = array_filter($menu_items, function($m) use ($cat) { 
-                            $item_cat = isset($m['category']) ? $m['category'] : (isset($m['category_id']) ? $m['category_id'] : null);
-                            return $item_cat == $cat['id']; 
-                        });
+                        // FIXED: Changed array match from $m['category_id'] to match the native column $m['category']
+                        $cat_items = array_filter($menu_items, function($m) use ($cat) { return $m['category'] == $cat['id']; });
                         if (empty($cat_items)) continue;
                     ?>
                         <div class="category-block mb-15" id="cat_<?= $cat['id'] ?>">
@@ -155,7 +152,7 @@ window.searchMenu = function() {
 
 window.filterMenuCatalog = function(catId, btn) {
     activeFilteredTabId = catId;[cite: 10]
-    document.getElementById("catalogQuickSearchInput").value = "";  [cite: 10]
+    document.getElementById("catalogQuickSearchInput").value = ""; [cite: 10]
 
     document.querySelectorAll(".catalog-tab-btn").forEach(b => b.classList.remove("active"));[cite: 10]
     if (btn) btn.classList.add("active");[cite: 10]
