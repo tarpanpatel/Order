@@ -11,6 +11,8 @@ $menu_items = $pdo->query("SELECT * FROM menu_items WHERE is_hidden = 0 ORDER BY
 $current_active_guest = $pdo->query("SELECT * FROM guests WHERE status = 'Active' LIMIT 1")->fetch(PDO::FETCH_ASSOC); 
 
 include "includes/header.php"; 
+
+?>
 <!-- TEMPORARY DIAGNOSTIC DEBUG WINDOW -->
 <div class="app-body" style="background: #fff5f5; border: 2px dashed #ff5252; padding: 15px; margin-bottom: 20px; border-radius: 8px; font-family: monospace;">
     <h3 style="color: #c53030; margin-top: 0; margin-bottom: 10px;">📋 System Diagnostic Console</h3>
@@ -37,8 +39,6 @@ if (!empty($categories)) {
 ?>
     </pre>
 </div>
-?>
-
 <div class="app-body"> 
 
     <div class="category-section"> 
