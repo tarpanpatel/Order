@@ -1,12 +1,11 @@
 <?php
-
+// /home/apartment/artistsfarmjaipur.com/Order/index.php
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 require_once "config/db.php";
 
- 
-// --- NEW FEATURE: AJAX/POST HANDLER FOR INCOMING DEFICIENT MATERIALS ---
+// --- AJAX/POST HANDLER FOR INCOMING DEFICIENT MATERIALS ---
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_receive_deficient_stock"])) {
     $log_id = intval($_POST["log_id"]);
     $incoming_qty = intval($_POST["incoming_qty"]);
@@ -14,7 +13,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_receive_defici
     if ($log_id > 0 && $incoming_qty > 0) {
         $pdo->beginTransaction();
         try {
-            // Fetch current deficit status metrics
             $stmt = $pdo->prepare("SELECT deficit_qty, delivered_qty FROM deficient_stock_logs WHERE id = ?");
             $stmt->execute([$log_id]);
             $log = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -23,7 +21,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_receive_defici
                 $new_deficit = max(0, $log['deficit_qty'] - $incoming_qty);
                 $new_delivered = $log['delivered_qty'] + min($incoming_qty, $log['deficit_qty']);
 
-                // Recalculate deficit and update delivery totals
                 $update = $pdo->prepare("UPDATE deficient_stock_logs SET delivered_qty = ?, deficit_qty = ? WHERE id = ?");
                 $update->execute([$new_delivered, $new_deficit, $log_id]);
             }
@@ -36,7 +33,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["action_receive_defici
     }
 }
 
-// --- CENTRAL ANALYTICS ROUTER: EVALUATE MATERIAL STOCK THRESHOLDS ---
+// --- EVALUATE MATERIAL STOCK THRESHOLDS ---
 $stock_alerts = $pdo->query("
     SELECT m.item_name, m.min_threshold_qty, COALESCE(SUM(k.qty), 0) as current_available_stock
     FROM materials_registry m
@@ -45,10 +42,9 @@ $stock_alerts = $pdo->query("
     HAVING current_available_stock <= m.min_threshold_qty
 ")->fetchAll(PDO::FETCH_ASSOC);
 
-// 1. FETCH ACTIVE GUEST CARD DETAILED LEDGER DATA
+// FETCH SYSTEM METRICS DATA
 $guest = $pdo->query("SELECT * FROM guests WHERE status = 'Active' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 
-// 2. FETCH LAST 5 KITCHEN ORDERS WITH CONCATENATED MENU ITEM NAMES
 $recent_orders = $pdo->query("SELECT o.id, g.guest_name, o.order_time, o.status,
                               (SELECT GROUP_CONCAT(CONCAT(mi.name, ' (x', oi.quantity, ')') SEPARATOR ', ') 
                                FROM order_items oi 
@@ -58,7 +54,6 @@ $recent_orders = $pdo->query("SELECT o.id, g.guest_name, o.order_time, o.status,
                               JOIN guests g ON o.guest_id = g.id 
                               ORDER BY o.id DESC LIMIT 5")->fetchAll(PDO::FETCH_ASSOC);
 
-// 3. FETCH LAST 5 PENDING MATERIAL REQUESTS WITH THE CORRECT CATALOG JOIN
 $recent_requisitions = $pdo->query("SELECT r.id, r.requested_at, r.status,
                                     (SELECT GROUP_CONCAT(CONCAT(rc.item_name, ' (x', ri.quantity, ')') SEPARATOR ', ')
                                      FROM requisition_items ri
@@ -68,7 +63,6 @@ $recent_requisitions = $pdo->query("SELECT r.id, r.requested_at, r.status,
                                     WHERE r.status = 'Pending' OR r.status = '' 
                                     ORDER BY r.id DESC LIMIT 5")->fetchAll(PDO::FETCH_ASSOC);
 
-// 4. FETCH ONLY ACTIVE DEFICIENCIES WHERE DEFICIT QUANTITY IS GREATER THAN 0
 $deficient_items = $pdo->query("SELECT d.*, rc.item_name 
                                 FROM deficient_stock_logs d 
                                 JOIN req_catalog rc ON d.catalog_id = rc.id 
@@ -78,12 +72,9 @@ $deficient_items = $pdo->query("SELECT d.*, rc.item_name
 include "includes/header.php";
 ?>
 
-
-
 <div class="app-body">
     <div class="category-section" style="margin-bottom: 5px;">
         <h2 class="category-title" style="text-transform: none;">📊 Operational Environment</h2>
-       
     </div>
 
     <?php if (!empty($stock_alerts)): ?>
@@ -100,7 +91,7 @@ include "includes/header.php";
     <?php endif; ?>
 
     <div class="dashboard-grid-matrix">
-
+        <!-- Guest Profile Widget -->
         <div class="widget-card" style="border-top: 3px solid #38a169 !important;">
             <div>
                 <h3 class="widget-title">🟢 Active Resident Profile</h3>
@@ -141,6 +132,7 @@ include "includes/header.php";
             <?php endif; ?>
         </div>
 
+        <!-- Kitchen Tickets Widget -->
         <div class="widget-card" style="border-top: 3px solid #06b6d4 !important;">
             <div>
                 <h3 class="widget-title">🍽️ Recent Kitchen Tickets</h3>
@@ -167,6 +159,7 @@ include "includes/header.php";
             <a href="kitchen.php" class="widget-btn-action">See more Kitchen Orders →</a>
         </div>
 
+        <!-- Requisitions Widget -->
         <div class="widget-card" style="border-top: 3px solid #eab308 !important;">
             <div>
                 <h3 class="widget-title">📦 Open Material Requisitions</h3>
@@ -193,6 +186,7 @@ include "includes/header.php";
             <a href="requisitions.php" class="widget-btn-action">See more Material Requests →</a>
         </div>
 
+        <!-- Deficiencies Widget -->
         <div class="widget-card" style="border-top: 3px solid #e53e3e !important;">
             <div>
                 <h3 class="widget-title" style="color: #e53e3e;">⚠️ Stock Deficiencies</h3>
@@ -202,7 +196,7 @@ include "includes/header.php";
                             <div style="width: 100%; display: flex; justify-content: space-between; align-items: start;">
                                 <div style="min-width: 0; flex: 1;">
                                     <strong style="color: #b91c1c; font-size: 13px; display: block;">
-                                        <?= htmlspecialchars($dItem['item_name']) ?> (Short: <span style="font-size:14px;">x<?= $dItem['deficit_qty'] ?></span>)
+                                        <?= htmlspecialchars($dItem['item_name']) ?> (Short: <span>x<?= $dItem['deficit_qty'] ?></span>)
                                     </strong>
                                     <span style="color: #6b7280; font-size: 11px; display: block; margin-top: 2px;">
                                         Req #<?= $dItem['requisition_id'] ?> • Asked: <?= $dItem['ordered_qty'] ?> | Recv: <?= $dItem['delivered_qty'] ?>
@@ -228,7 +222,6 @@ include "includes/header.php";
             </div>
             <span class="widget-btn-action" style="background:#fafafa; color:#9ca3af; cursor:default; margin-top: 10px;">Automated Deficiency Audit Trail Log</span>
         </div>
-
     </div>
 </div>
 

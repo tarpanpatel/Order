@@ -1,12 +1,14 @@
 <?php
-// /home/apartment/artistsfarmjaipur.com/Order/index.php
+// /home/apartment/artistsfarmjaipur.com/Order/login.php
 ob_start();
 error_reporting(E_ALL);
-ini_set('display_errors', '1'); // Temporarily show errors to debug any 500 issues
+ini_set('display_errors', '0');
 
-// 1. SET PROPER 1-YEAR SESSION PERSISTENCE LIFE (31,536,000 SECONDS)
+// ⚙️ LOCK PROPER 1-YEAR SESSION PERSISTENCE (31,536,000 SECONDS)
 $sessionPath = __DIR__ . '/_sessions';
-if (!is_dir($sessionPath)) { mkdir($sessionPath, 0755, true); }
+if (!is_dir($sessionPath)) { 
+    mkdir($sessionPath, 0755, true); 
+}
 
 ini_set('session.save_path', $sessionPath);
 ini_set('session.gc_maxlifetime', 31536000);
@@ -20,52 +22,64 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once "config/db.php";
 
-// 2. HANDLE PASSCODE ENTRY SUBMISSION LOGIC
+// If a user session is active, auto-route them into the application
+if (isset($_SESSION["user_id"]) && !isset($_GET['error'])) {
+    if (isset($_SESSION["role"]) && $_SESSION["role"] === 'Chef') {
+        header("Location: kitchen.php");
+    } else {
+        header("Location: index.php");
+    }
+    exit;
+}
+
+// Fetch user profile contexts for the visual dropdown select
+try {
+    $db_users = $pdo->query("SELECT id, username, role FROM users ORDER BY username ASC")->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    die("Database Connection Error.");
+}
+
 $error = '';
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action_system_login'])) {
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $user_id  = intval($_POST['user_id'] ?? 0);
     $passcode = trim($_POST['passcode'] ?? '');
+
+    $client_ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    $browser_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown Signature';
+    $device = "Terminal Workstation PC";
 
     if ($user_id > 0 && !empty($passcode)) {
         $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
         $stmt->execute([$user_id]);
         $user_row = $stmt->fetch(PDO::FETCH_ASSOC);
 
+        // 🔐 SECURE DATABASE VERIFICATION LAYER (NO HARDCODED CODES)
         if ($user_row && password_verify($passcode, $user_row['password'])) {
             $_SESSION["user_id"]   = $user_row['id'];
             $_SESSION["username"]  = $user_row['username'];
             $_SESSION["role"]      = $user_row['role'];
             $_SESSION["order_authenticated"] = true;
 
-            // Security: Log standard metadata but never plaintext credentials
-            $log = $pdo->prepare("INSERT INTO security_login_logs (username_entered, passcode_entered, user_id, role_assigned, ip_address, browser_agent, device_type, login_status) VALUES (?, '***', ?, ?, ?, 'Browser Workspace', 'Terminal', 'Success')");
-            $log->execute([$user_row['username'], $user_row['id'], $user_row['role'], $_SERVER['REMOTE_ADDR']]);
+            // Log entry securely (using asterisks to mask sensitive fields)
+            $log = $pdo->prepare("INSERT INTO security_login_logs (username_entered, passcode_entered, user_id, role_assigned, ip_address, browser_agent, device_type, login_status) VALUES (?, '***', ?, ?, ?, ?, ?, 'Success')");
+            $log->execute([$user_row['username'], $user_row['id'], $user_row['role'], $client_ip, $browser_agent, $device]);
 
-            header("Location: index.php");
+            if ($user_row['role'] === 'Chef') {
+                header("Location: kitchen.php");
+            } else {
+                header("Location: index.php");
+            }
             exit;
         } else {
+            $failed_name = $user_row ? $user_row['username'] : 'Unknown';
             $error = "Incorrect passcode verification entry validation.";
+            
+            $log = $pdo->prepare("INSERT INTO security_login_logs (username_entered, passcode_entered, user_id, role_assigned, ip_address, browser_agent, device_type, login_status) VALUES (?, '***', ?, 'None', ?, ?, ?, 'Failed')");
+            $log->execute([$failed_name, $user_id, $client_ip, $browser_agent, $device]);
         }
     } else {
-        $error = "Please select a valid user identity context.";
+        $error = "Please select a valid user identity profile context.";
     }
-}
-
-// 3. ROUTING MANAGER: If logged in, dynamically load the matching dashboard interface view
-if (isset($_SESSION["user_id"])) {
-    if ($_SESSION["role"] === 'Chef') {
-        include "kitchen.php";
-    } else {
-        include "order.php";
-    }
-    exit;
-}
-
-// 4. LANDING SCREEN: If not logged in, render the secure passcode login view pad
-try {
-    $db_users = $pdo->query("SELECT id, username, role FROM users ORDER BY username ASC")->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    die("Database Connection Failure: " . $e->getMessage());
 }
 ?>
 <!DOCTYPE html>
@@ -77,7 +91,7 @@ try {
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #111827; display: flex; justify-content: center; align-items: center; min-height: 100vh; color: #fff; }
-        .login-container { background: #1f2937; width: 100%; max-width: 380px; padding: 30px 24px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); border: 1px solid #374151; text-align: left; }
+        .login-container { background: #1f2937; width: 100%; max-width: 380px; padding: 30px 24px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); border: 1px solid #374151; }
         h2 { text-align: center; margin-bottom: 4px; font-weight: 600; font-size: 22px; color: #f3f4f6; }
         p.subtitle { text-align: center; font-size: 13px; color: #9ca3af; margin-bottom: 20px; }
         .display-wrapper { position: relative; margin-bottom: 20px; }
@@ -97,14 +111,13 @@ try {
 
 <div class="login-container">
     <h2>Access Verified Gateway</h2>
-    <p class="subtitle">Select your identity profile and enter passcode</p>
+    <p class="subtitle">Select your identity name profile context and code</p>
     
     <?php if(!empty($error)): ?>
         <div class="error-banner"><?= htmlspecialchars($error) ?></div>
     <?php endif; ?>
 
-    <form method="POST" id="loginForm" action="index.php">
-        <input type="hidden" name="action_system_login" value="1">
+    <form method="POST" id="loginForm" action="login.php">
         <select name="user_id" required class="user-dropdown-select">
             <option value="">-- Choose Your Username Profile --</option>
             <?php foreach ($db_users as $u): ?>

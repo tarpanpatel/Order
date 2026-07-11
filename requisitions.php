@@ -38,7 +38,7 @@ include "includes/header.php";
 
 <div class="app-body">
     <div class="category-section req-header-flex">
-        <h2 class="req-header-title">📦 Material Requisition Request</h2>
+        <h2 class="req-header-title">📦 Stock Request</h2>
         <button type="button" class="btn btn-start btn-request-new" onclick="window.openChefNewProductModal()">+ Request New Product</button>
     </div>
 
