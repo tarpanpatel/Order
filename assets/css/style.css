@@ -288,7 +288,7 @@ div#adminSubMenuContent { display: flex; flex-direction: column; gap: 4px; paddi
 .print-modal-items-container { border-bottom: 2px dashed #000; padding-bottom: 8px; margin-bottom: 12px; }
 .print-modal-grand-total-row { display: flex; justify-content: space-between; font-size: 14px; font-weight: bold; text-transform: uppercase; }
 .print-modal-grand-total-val { font-size: 15px; border-bottom: 4px double #000; }
-.print-modal-actions-container { margin-top: 20px; display: flex; gap: 8px; justify-content: flex-end; }
+.print-modal-actions-container {  display: flex; gap: 8px; justify-content: flex-end; }
 .print-modal-btn-print { background: #4a5568; max-width: 80px; color: white; padding: 6px 12px; font-size: 12px; cursor: pointer; }
 .print-modal-btn-close { background: #e2e8f0; max-width: 80px; color: #111827; padding: 6px 14px; border: none; cursor: pointer; font-size: 12px; }
 
