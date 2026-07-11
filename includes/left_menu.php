@@ -1,13 +1,13 @@
 <?php
 // /home/apartment/artistsfarmjaipur.com/Order/includes/left_menu.php
 
-// Ensure database connection and session parameters are initialized safely
+// Ensure central database initialization checks run cleanly
 require_once __DIR__ . "/../config/db.php";
 
 $current_page = basename($_SERVER['PHP_SELF']);
 $user_logged_role = $_SESSION['role'] ?? 'Staff';
 
-// Fetch allowed items dynamically based on database visibility rows
+// Fetch items dynamically based on verified user authorizations
 if ($user_logged_role === 'Super Admin') {
     $menu_query = $pdo->query("SELECT * FROM sys_menu ORDER BY sort_order ASC");
     $active_menu_items = $menu_query->fetchAll(PDO::FETCH_ASSOC);
@@ -23,30 +23,30 @@ if ($user_logged_role === 'Super Admin') {
 }
 ?>
 
-<!-- Original styling class selectors wrapper retained exactly -->
-<div class="left-menu-panel" id="leftMenuPanel">
-    <div class="menu-items-scroll-box">
+<!-- NATIVE STRUCTURE AS DEFINED IN SECTION 3 OF THE MASTER THEME STYLESHEET -->
+<aside class="sidebar" id="sidebarNavDrawer">
+    <!-- Keep the exact header branding title styles -->
+    <div class="desktop-sidebar-title">POS Dashboard</div>
+    
+    <nav>
         <?php foreach ($active_menu_items as $menu): 
-            // Handle dynamic link generation matching current view status
+            // Standard conditional class indicator assignment matching active views
             $is_current = ($current_page === $menu['url']) ? 'active' : '';
             
-            // Default anchor target mapping logic
             $href_target = htmlspecialchars($menu['url']);
             if (empty($menu['url']) || $menu['url'] === '#') {
                 $href_target = 'javascript:void(0);';
             }
         ?>
-            <a href="<?= $href_target ?>" class="menu-item-btn <?= $is_current ?>">
-                <!-- Keep your exact system icons if populated, fallback safely if empty -->
-                <i class="<?= htmlspecialchars($menu['icon'] ?: 'fa-solid fa-link') ?>"></i>
+            <!-- Render standard structural anchor loops tied into the primary style definitions -->
+            <a href="<?= $href_target ?>" class="<?= $is_current ?>">
                 <span><?= htmlspecialchars($menu['title']) ?></span>
             </a>
         <?php endforeach; ?>
 
-        <!-- Retain original protected sign out anchor markup exactly -->
-        <a href="logout.php" class="menu-item-btn sign-out-btn" style="margin-top: 20px;">
-            <i class="fa-solid fa-right-from-bracket"></i>
-            <span>Sign Out</span>
+        <!-- Maintain target system styling structure for logouts exactly -->
+        <a href="logout.php" style="color: #ff5252 !important; border-color: #ff5252 !important; margin-top: 20px;">
+            <span>[➔] Sign Out Terminal</span>
         </a>
-    </div>
-</div>
+    </nav>
+</aside>
