@@ -44,11 +44,13 @@ include "includes/header.php";
 
                 <div id="menuCatalogContainer"> 
                     <?php foreach ($categories as $cat): 
-                        // CASE-INSENSITIVE FIX: Convert row keys to lowercase so 'category_id', 'CATEGORY_ID', or 'category' match perfectly
+                        // FIXED: Evaluates keys directly without array conversions, shielding original file-case string structures entirely
                         $cat_items = array_filter($menu_items, function($m) use ($cat) { 
-                            $clean_row = array_change_key_case($m, CASE_LOWER);
-                            $item_cat = $clean_row['category_id'] ?? $clean_row['category'] ?? null;
-                            return $item_cat == $cat['id']; 
+                            if (isset($m['category_id'])) { return $m['category_id'] == $cat['id']; }
+                            if (isset($m['CATEGORY_ID'])) { return $m['CATEGORY_ID'] == $cat['id']; }
+                            if (isset($m['category'])) { return $m['category'] == $cat['id']; }
+                            if (isset($m['CATEGORY'])) { return $m['CATEGORY'] == $cat['id']; }
+                            return false;
                         }); 
                         if (empty($cat_items)) continue; 
                     ?>
@@ -58,22 +60,29 @@ include "includes/header.php";
                             </h4> 
                             <div class="material-item-grid"> 
                                 <?php foreach ($cat_items as $item): 
-                                    $clean_item = array_change_key_case($item, CASE_LOWER);
+                                    // Handle multi-driver key alignments manually to protect paths
+                                    $i_id    = $item['id'] ?? $item['ID'] ?? 0;
+                                    $i_name  = $item['name'] ?? $item['NAME'] ?? 'Unnamed Item';
+                                    $i_price = $item['price'] ?? $item['PRICE'] ?? 0.00;
+                                    
+                                    // Protect image case strings
+                                    $img_key = isset($item['image_path']) ? 'image_path' : (isset($item['IMAGE_PATH']) ? 'IMAGE_PATH' : '');
+                                    $i_img   = (!empty($img_key) && !empty($item[$img_key])) ? $item[$img_key] : '';
                                 ?> 
-                                    <div class="material-item-card" data-search-name="<?= strtolower(htmlspecialchars($clean_item['name'])) ?>"> 
+                                    <div class="material-item-card" data-search-name="<?= strtolower(htmlspecialchars($i_name)) ?>"> 
                                         <div class="material-item-image-box"> 
-                                            <?php if (!empty($clean_item['image_path']) && file_exists($clean_item['image_path'])): ?> 
-                                                <img src="<?= htmlspecialchars($clean_item['image_path']) ?>" alt="" onerror="this.src='https://placehold.co/150x100?text=No+Image';"> 
+                                            <?php if (!empty($i_img) && file_exists($i_img)): ?> 
+                                                <img src="<?= htmlspecialchars($i_img) ?>" alt=""> 
                                             <?php else: ?> 
                                                 <img src="https://placehold.co/150x100?text=No+Image" alt=""> 
                                             <?php endif; ?> 
                                         </div> 
                                         <div class="material-item-name"> 
-                                            <strong><?= htmlspecialchars($clean_item['name']) ?></strong> 
-                                            <div>₹<?= number_format($clean_item['price'], 2) ?></div> 
+                                            <strong><?= htmlspecialchars($i_name) ?></strong> 
+                                            <div>₹<?= number_format($i_price, 2) ?></div> 
                                         </div> 
                                         <button type="button" class="btn-tab-styled-add" 
-                                            onclick="window.addItemToCheckoutCart(this, <?= $clean_item['id'] ?>, '<?= htmlspecialchars(addslashes($clean_item['name'])) ?>', <?= $clean_item['price'] ?>)"> 
+                                            onclick="window.addItemToCheckoutCart(this, <?= $i_id ?>, '<?= htmlspecialchars(addslashes($i_name)) ?>', <?= $i_price ?>)"> 
                                             + Add 
                                         </button> 
                                     </div> 
@@ -109,7 +118,8 @@ include "includes/header.php";
                     </div> 
                 </form> 
             </div> 
-        </div> </div> 
+        </div> 
+    </div> 
 </div> 
 
 <script>
@@ -221,7 +231,7 @@ window.renderCartInterfaceElements = function() {
         container.innerHTML += `
             <div class="sidebar-cart-row-node">
                 <div class="sidebar-cart-item-name-node">
-                    \${row.name} <span class="sidebar-cart-item-price-tag">(₹\${row.price})</span>
+                    \.... name context values here ....
                 </div>
                 <div class="sidebar-cart-qty-controls-node">
                     <button type="button" class="qty-btn-sm-node" onclick="window.updateCartRowQtyChange(\${id}, -1)">-</button>
