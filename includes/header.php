@@ -3,18 +3,30 @@
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 
+// Load central DB connection and secure session engine variables directly[cite: 8]
 require_once __DIR__ . "/../config/db.php";
 
+$current_page = basename($_SERVER['PHP_SELF']);
+
+// 🛑 ENFORCEMENT GATEWAY: If logged out, save where they wanted to go and redirect to login
 if (!isset($_SESSION["user_id"]) || !isset($_SESSION["role"])) {
-    header("Location: login.php");
+    // Hold onto the requested file name and query string parameters (like ?filter_month=2026-07)
+    $redirect_target = $current_page;
+    if (!empty($_SERVER['QUERY_STRING'])) {
+        $redirect_target .= '?' . $_SERVER['QUERY_STRING'];
+    }
+    
+    header("Location: login.php?next=" . urlencode($redirect_target));
     exit;
 }
 
+// 🔐 ROLE PERMISSION GUARD: Redirect back to login if page access check fails
 if (!check_page_access($pdo)) {
     header("Location: login.php?error=permissions_revoked");
     exit;
 }
 
+$todayString = date('Y-m-d');
 $todayString = date('Y-m-d');
 $has_active_guest = $pdo->query("SELECT COUNT(*) FROM guests WHERE status = 'Active'")->fetchColumn() > 0;
 $is_staff_role = isset($_SESSION['role']) && $_SESSION['role'] === 'Staff';
