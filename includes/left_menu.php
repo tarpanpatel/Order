@@ -38,11 +38,12 @@ foreach ($all_raw_menus as $m) {
 }
 ?>
 
-<!-- NATIVE STRUCTURE AS DEFINED IN SECTION 3 OF THE MASTER THEME STYLESHEET -->
-<aside class="sidebar" id="sidebarNavDrawer">
+<!-- NATIVE STRUCTURE AS DEFINED IN SECTION 3 OF THE MASTER THEME STYLESHEET WITH HEIGHT OVERFLOW FIXES -->
+<aside class="sidebar" id="sidebarNavDrawer" style="height: auto !important; min-height: 100vh !important; display: flex; flex-direction: column;">
     <div class="desktop-sidebar-title">POS Dashboard</div>
     
-    <nav>
+    <!-- Added a dedicated scrolling window wrapper to guarantee all expanded sub-menus can be fully scrolled to -->
+    <nav style="flex: 1; overflow-y: auto; max-height: calc(100vh - 120px); padding-right: 4px;">
         <?php foreach ($root_menu_items as $root): 
             $has_children = isset($sub_menu_items[$root['id']]);
             
@@ -78,7 +79,7 @@ foreach ($all_raw_menus as $m) {
         <?php endforeach; ?>
 
         <!-- Maintain target system styling structure for logouts exactly -->
-        <a href="logout.php" style="color: #ff5252 !important; border-color: #ff5252 !important; margin-top: 20px;">
+        <a href="logout.php" style="color: #ff5252 !important; border-color: #ff5252 !important; margin-top: 20px; display: block;">
             <span>[➔] Sign Out Terminal</span>
         </a>
     </nav>
