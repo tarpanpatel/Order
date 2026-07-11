@@ -1,126 +1,63 @@
 <?php
 // /home/apartment/artistsfarmjaipur.com/Order/includes/left_menu.php
-if (!isset($pdo)) {
-    require_once __DIR__ . '/../config/db.php';
-}
 
-$current_page = basename($_SERVER['PHP_SELF']);
-$user_role = $_SESSION['role'] ?? 'Staff';
-$is_super_admin = ($user_role === 'Super Admin');
+// Load database environment safely
+require_once __DIR__ . "/../config/db.php";
 
-// 🔑 FIXED: Initialize variable to NULL to prevent "Undefined" warnings
-$active_guest = null;
+$current_active_script = basename($_SERVER['PHP_SELF']);
+$user_logged_role = $_SESSION['role'] ?? 'Staff';
 
-// Fetch Dynamic Menus based on Role Access
-if ($is_super_admin) {
-    $menuStmt = $pdo->query("SELECT * FROM sys_menu ORDER BY parent_id ASC, sort_order ASC");
-    $allowed_menus = $menuStmt->fetchAll(PDO::FETCH_ASSOC);
+// Fetch allowed visibility parameters dynamically based on user role permissions
+if ($user_logged_role === 'Super Admin') {
+    // Super Admins automatically see all records sorted by index order
+    $menu_query = $pdo->query("
+        SELECT * FROM sys_menu 
+        ORDER BY sort_order ASC
+    ");
+    $active_menu_items = $menu_query->fetchAll(PDO::FETCH_ASSOC);
 } else {
-    $stmt = $pdo->prepare("
+    // Staff/Chefs only see items explicitly mapped to their role rows
+    $menu_stmt = $pdo->prepare("
         SELECT m.* FROM sys_menu m
         JOIN sys_role_menu rm ON m.id = rm.menu_id
         WHERE rm.role_name = ?
-        ORDER BY m.parent_id ASC, m.sort_order ASC
+        ORDER BY m.sort_order ASC
     ");
-    $stmt->execute([$user_role]);
-    $allowed_menus = $stmt->fetchAll(PDO::FETCH_ASSOC);
-}
-
-// Attempt to fetch active guest
-try {
-    $active_guest = $pdo->query("SELECT id, guest_name, phone_number FROM guests WHERE status = 'Active' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
-} catch (Exception $e) {
-    $active_guest = null;
-}
-
-// Organize into Main items and Sub-items
-$main_menus = [];
-$sub_menus = [];
-foreach ($allowed_menus as $menu) {
-    if ($menu['parent_id'] == 0) {
-        $main_menus[$menu['id']] = $menu;
-    } else {
-        $sub_menus[$menu['parent_id']][] = $menu;
-    }
+    $menu_stmt->execute([$user_logged_role]);
+    $active_menu_items = $menu_stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 ?>
 
-<div class="sidebar" id="appLeftNavigationMenu" style="position: fixed; top: 0; left: 0; height: 100vh; width: 280px; background: #ffffff; box-shadow: 4px 0 25px rgba(0,0,0,0.15); display: flex; flex-direction: column; z-index: 10001; box-sizing: border-box; padding: 15px 16px; overflow-y: auto;">
-    
-    <button type="button" class="close-drawer-btn" onclick="toggleLeftMenu(false)" style="position:absolute; top:12px; right:15px; background:none; border:none; font-size:20px; cursor:pointer;">✕</button>
+<div class="sidebar-navigation-container" style="background: #ffffff; border-right: 1px solid #e2e8f0; height: 100vh; padding: 20px 10px; width: 260px; box-sizing: border-box;">
+    <!-- Brand Context -->
+    <div style="padding: 10px; margin-bottom: 20px; border-bottom: 1px dashed #cbd5e0; text-align: left;">
+        <strong style="color: #0f172a; font-size: 16px; font-weight: 800; letter-spacing: 0.5px;">ARTISTS FARM</strong>
+        <span style="display: block; font-size: 11px; color: #64748b; font-weight: 600; margin-top: 2px;">Role: <?= htmlspecialchars($user_logged_role) ?></span>
+    </div>
 
-    <nav style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
-        
-        <div id="sidebarActionArea" style="">
-            <?php if ($active_guest): ?>
-                <a href="billing.php" class="sidebar-action-card" style="background: #e53e3e; color: white; display:flex; justify-content:center; align-items:center;">
-                    🛑 Guest Checkout<? //= htmlspecialchars($active_guest['guest_name']) ?>
-                </a>
-            <?php else: ?>
-                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px;">
-                    <form method="POST" action="checkin.php" style="margin: 0;">
-                        <input type="hidden" name="action_sidebar_activate" value="1">
-                        <select name="sidebar_guest_select" required style="width: 100%; padding: 6px; margin-bottom: 6px; border-radius: 6px; border: 1px solid #cbd5e0; font-size: 11px;">
-                            <option value="">-- Choose Guest to Activate --</option>
-                            <?php 
-                            $guests = $pdo->query("SELECT id, guest_name, phone_number FROM guests WHERE status = 'Checked In' ORDER BY checkin_date DESC")->fetchAll();
-                            foreach ($guests as $g): ?>
-                                <option value="<?= $g['id'] ?>"><?= htmlspecialchars($g['guest_name']) ?> (<?= substr($g['phone_number'], -4) ?>)</option>
-                            <?php endforeach; ?>
-                        </select>
-                        <button type="submit" class="sidebar-action-card sb-btn-inactive">▶ Activate Ledger</button>
-                    </form>
-                </div>
-            <?php endif; ?>
-        </div>
-
-        <?php foreach ($main_menus as $menu): ?>
-            <?php if ($menu['title'] === 'Admin Control'): ?>
-                <div class="admin-settings-wrapper" style="margin-top: 6px; border-top: 1px solid #cbd5e0; padding-top: 6px;">
-                    <div onclick="toggleAdminSubMenu()" class="nav-link" style="display: flex; justify-content: space-between; cursor: pointer; padding: 10px 16px;margin-bottom: 15px;">
-                        <span><?= htmlspecialchars($menu['icon']) ?> Admin Control</span>
-                        <span id="adminMenuChevron">▶</span>
-                    </div>
-                    <div id="adminSubMenuContent" style="display: none; padding-left: 15px;">
-                        <?php foreach ($sub_menus[$menu['id']] ?? [] as $sub): ?>
-                            <a href="<?= htmlspecialchars($sub['url']) ?>" class="nav-link" style="font-size: 12px; padding: 8px 12px;"><?= htmlspecialchars($sub['title']) ?></a>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-            <?php else: ?>
-                <a href="<?= htmlspecialchars($menu['url']) ?>" class="nav-link <?= ($current_page === $menu['url']) ? 'active' : '' ?>">
-                    <?= htmlspecialchars($menu['icon']) ?> <?= htmlspecialchars($menu['title']) ?>
-                </a>
-            <?php endif; ?>
+    <!-- Dynamic Link Loop Renderer -->
+    <nav style="display: flex; flex-direction: column; gap: 4px;">
+        <?php foreach ($active_menu_items as $menu): 
+            $is_current = ($current_active_script === $menu['url']) ? true : false;
+        ?>
+            <a href="<?= htmlspecialchars($menu['url']) ?>" 
+               style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; font-size: 13px; font-weight: 700; border-radius: 8px; text-decoration: none; transition: all 0.2s;
+                      background: <?= $is_current ? '#00b0ff' : 'transparent' ?>; 
+                      color: <?= $is_current ? '#ffffff' : '#475569' ?>;"
+               onmouseover="if(!<?= $is_current ? 'true' : 'false' ?>) this.style.backgroundColor='#f1f5f9';"
+               onmouseout="if(!<?= $is_current ? 'true' : 'false' ?>) this.style.backgroundColor='transparent';">
+                
+                <i class="<?= htmlspecialchars($menu['icon'] ?? 'fa-solid fa-link') ?>" style="font-size: 14px; width: 20px; text-align: center;"></i>
+                <span><?= htmlspecialchars($menu['title']) ?></span>
+            </a>
         <?php endforeach; ?>
-
-        <a href="logout.php" class="nav-link" style="margin-top: 20px; color: #e53e3e; text-align: center;">🔒 Sign Out</a>
     </nav>
-</div>
 
-<script>
-function toggleAdminSubMenu() {
-    const content = document.getElementById("adminSubMenuContent");
-    const chevron = document.getElementById("adminMenuChevron");
-    if (!content || !chevron) return;
-    if (content.style.display === "none" || content.style.display === "") {
-        content.style.display = "flex";
-        chevron.style.transform = "rotate(90deg)";
-        localStorage.setItem("adminPanelExpanded", "true");
-    } else {
-        content.style.display = "none";
-        chevron.style.transform = "rotate(0deg)";
-        localStorage.setItem("adminPanelExpanded", "false");
-    }
-}
-document.addEventListener("DOMContentLoaded", () => {
-    if (localStorage.getItem("adminPanelExpanded") === "true") {
-        const content = document.getElementById("adminSubMenuContent");
-        const chevron = document.getElementById("adminMenuChevron");
-        if (content && chevron) {
-            content.style.display = "flex";
-            chevron.style.transform = "rotate(90deg)";
-        }
-    }
-});
-</script>
+    <!-- Logout Anchor -->
+    <div style="position: absolute; bottom: 20px; left: 10px; right: 10px;">
+        <a href="logout.php" style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; font-size: 13px; font-weight: 700; color: #ef4444; text-decoration: none; border-radius: 8px;" onmouseover="this.style.backgroundColor='#fef2f2';" onmouseout="this.style.backgroundColor='transparent';">
+            <i class="fa-solid fa-right-from-bracket" style="font-size: 14px; width: 20px; text-align: center;"></i>
+            <span>Sign Out Terminal</span>
+        </a>
+    </div>
+</div>
