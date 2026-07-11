@@ -95,47 +95,48 @@ $(document).ready(function() {
         listType: 'ul',
         placeholder: 'placeholder',
         forcePlaceholderSize: true,
-        handle: 'div',
+        handle: 'div',        // Matches the wrapper inside your <li>
         tolerance: 'pointer',
         toleranceElement: '> div'
     });
 });
 
+// ROBUST SERIALIZER: Bypasses the plugin's crash-prone .toArray()
 function saveMenu() {
-    // This function converts your sorted list into a JSON object
-    var menuData = $('#menu-builder').nestedSortable('toArray', {
-        startDepthCount: 0
-    });
-
-    // Helper to structure the flat array into a tree
-    var tree = [];
-    var lookup = {};
-    
-    // First pass: create lookup
-    $('.sortable li').each(function() {
-        var id = $(this).data('id');
-        var roles = [];
-        $(this).find('.role-chk:checked').each(function() {
-            roles.push($(this).val());
+    // Recursive function to build the tree object
+    function getHierarchy(ul) {
+        var items = [];
+        ul.children('li').each(function() {
+            var li = $(this);
+            var item = {
+                id: li.data('id'),
+                // Collect checked roles
+                roles: li.children('div').find('.role-chk:checked').map(function(){
+                    return $(this).val();
+                }).get(),
+                children: []
+            };
+            
+            // Check if this LI has a nested UL (children)
+            var subUl = li.children('ul');
+            if (subUl.length > 0) {
+                item.children = getHierarchy(subUl);
+            }
+            items.push(item);
         });
-        lookup[id] = { id: id, roles: roles, children: [] };
-    });
+        return items;
+    }
 
-    // Second pass: build hierarchy
-    $('#menu-builder li').each(function() {
-        var id = $(this).data('id');
-        var parentId = $(this).parent().closest('li').data('id') || 0;
-        if(parentId === 0) {
-            tree.push(lookup[id]);
-        } else {
-            lookup[parentId].children.push(lookup[id]);
-        }
-    });
+    // Capture the structure
+    var menuTree = getHierarchy($('#menu-builder'));
 
-    $.post('menu_manager.php', { menu_data: JSON.stringify(tree) }, function(response) {
-        alert("Hierarchy and permissions updated!");
+    // Send to server
+    $.post('menu_manager.php', { menu_data: JSON.stringify(menuTree) }, function(response) {
+        alert("Hierarchy and permissions saved successfully!");
         location.reload();
-    }, 'json');
+    }, 'json').fail(function() {
+        alert("Error: Failed to save menu structure.");
+    });
 }
 </script>
 <?php include "includes/footer.php"; ?>
