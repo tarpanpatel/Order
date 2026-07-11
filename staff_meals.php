@@ -233,17 +233,29 @@ function autoFillPrice() {
     }
 }
 
-// Pagination Logic for Logs
+// Pagination Logic for Logs (Fixed: Runs instantly on tab load instead of waiting for DOMContentLoaded)
 let currentRenderedCount = 0;
 const entriesPerPage = 10;
-let logRows = [];
+const logRows = Array.from(document.querySelectorAll('.staff-log-row'));
 
-document.addEventListener("DOMContentLoaded", () => {
-    logRows = Array.from(document.querySelectorAll('.staff-log-row'));
-    if (logRows.length > 0) {
-        loadMoreLogs();
+function loadMoreLogs() {
+    const btn = document.getElementById('loadMoreBtn');
+    const limit = currentRenderedCount + entriesPerPage;
+    
+    for (let i = currentRenderedCount; i < limit && i < logRows.length; i++) {
+        logRows[i].style.display = 'table-row';
+        currentRenderedCount++;
     }
-});
+    
+    if (btn) {
+        btn.style.display = currentRenderedCount >= logRows.length ? 'none' : 'block';
+    }
+}
+
+// Force table rendering initialization immediately on file mount
+if (logRows.length > 0) {
+    loadMoreLogs();
+}
 
 function loadMoreLogs() {
     const btn = document.getElementById('loadMoreBtn');
