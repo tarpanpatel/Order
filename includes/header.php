@@ -2,35 +2,84 @@
 // /home/apartment/artistsfarmjaipur.com/Order/includes/header.php
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
+ 
 
-// Load central DB connection and secure session engine variables directly[cite: 8]
+// 1. CONFIGURE WORKSPACE LIFETIMES BEFORE ANY SESSION IS ACTIVE
+$sessionPath = __DIR__ . '/../_sessions';
+if (!is_dir($sessionPath)) { 
+    mkdir($sessionPath, 0755, true); 
+}
+
+// If session parameters leak out, intercept them cleanly
+if (session_status() === PHP_SESSION_ACTIVE) {
+    session_write_close();
+}
+
+ini_set('session.save_path', $sessionPath);
+ini_set('session.gc_maxlifetime', 31536000); 
+session_set_cookie_params([
+    'lifetime' => 31536000, 
+    'path' => '/',    
+    'httponly' => true,
+    'samesite' => 'Lax'
+]);
+ini_set('session.cookie_lifetime', 31536000);
+ini_set('session.use_only_cookies', 1);
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// 2. NOW SAFELY LOAD THE REQUISITE DATABASE LAYER
 require_once __DIR__ . "/../config/db.php";
 
 $current_page = basename($_SERVER['PHP_SELF']);
 
-// 🛑 ENFORCEMENT GATEWAY: If logged out, save where they wanted to go and redirect to login
+// 3. PERSISTENT COOKIE REMEMBER TOKEN ENGINE (Bypasses Server Logouts)
+if (!isset($_SESSION['user_id']) && isset($_COOKIE['pos_remember_token'])) {
+    list($cookie_user_id, $cookie_token) = explode(':', $_COOKIE['pos_remember_token']);
+    $cookie_user_id = intval($cookie_user_id);
+    
+    $token_stmt = $pdo->prepare("SELECT * FROM user_tokens WHERE user_id = ? AND expires_at > NOW()");
+    $token_stmt->execute([$cookie_user_id]);
+    $tokens = $token_stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    foreach ($tokens as $t) {
+        if (hash_equals($t['token_hash'], hash('sha256', $cookie_token))) {
+            $user_stmt = $pdo->prepare("SELECT id, username, role FROM users WHERE id = ?");
+            $user_stmt->execute([$cookie_user_id]);
+            $user_row = $user_stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($user_row) {
+                $_SESSION["user_id"]   = $user_row['id'];
+                $_SESSION["username"]  = $user_row['username'];
+                $_SESSION["role"]      = $user_row['role'];
+                $_SESSION["order_authenticated"] = true;
+            }
+            break;
+        }
+    }
+}
+
+// 4. AUTHENTICATION PROTECTION GATEWAY (With Target Appending)
 if (!isset($_SESSION["user_id"]) || !isset($_SESSION["role"])) {
-    // Hold onto the requested file name and query string parameters (like ?filter_month=2026-07)
     $redirect_target = $current_page;
     if (!empty($_SERVER['QUERY_STRING'])) {
         $redirect_target .= '?' . $_SERVER['QUERY_STRING'];
     }
-    
     header("Location: login.php?next=" . urlencode($redirect_target));
     exit;
 }
 
-// 🔐 ROLE PERMISSION GUARD: Redirect back to login if page access check fails
+// 5. ROLE ACCESS PERMISSION CHECKER
 if (!check_page_access($pdo)) {
     header("Location: login.php?error=permissions_revoked");
     exit;
 }
 
 $todayString = date('Y-m-d');
-$todayString = date('Y-m-d');
 $has_active_guest = $pdo->query("SELECT COUNT(*) FROM guests WHERE status = 'Active'")->fetchColumn() > 0;
 $is_staff_role = isset($_SESSION['role']) && $_SESSION['role'] === 'Staff';
-$current_page = basename($_SERVER['PHP_SELF']);
 
 $current_active_guest = $pdo->query("SELECT * FROM guests WHERE status = 'Active' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 
