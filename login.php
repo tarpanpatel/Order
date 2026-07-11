@@ -1,29 +1,12 @@
 <?php
 // /home/apartment/artistsfarmjaipur.com/Order/login.php
 ob_start();
-error_reporting(E_ALL);
-ini_set('display_errors', '0');
 
-// ⚙️ LOCK PROPER 1-YEAR SESSION PERSISTENCE (31,536,000 SECONDS)
-$sessionPath = __DIR__ . '/_sessions';
-if (!is_dir($sessionPath)) { 
-    mkdir($sessionPath, 0755, true); 
-}
-
-ini_set('session.save_path', $sessionPath);
-ini_set('session.gc_maxlifetime', 31536000);
-session_set_cookie_params(31536000);
-ini_set('session.cookie_lifetime', 31536000);
-ini_set('session.use_only_cookies', 1);
-
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
+// Load database and central session parameters first[cite: 11]
 require_once "config/db.php";
 
-// If a user session is active, auto-route them into the application
-if (isset($_SESSION["user_id"]) && !isset($_GET['error'])) {
+// If a session is already active, safely bypass login[cite: 14]
+if (isset($_SESSION["user_id"])) {
     if (isset($_SESSION["role"]) && $_SESSION["role"] === 'Chef') {
         header("Location: kitchen.php");
     } else {
@@ -32,7 +15,7 @@ if (isset($_SESSION["user_id"]) && !isset($_GET['error'])) {
     exit;
 }
 
-// Fetch user profile contexts for the visual dropdown select
+// Fetch user profile contexts for the visual dropdown select[cite: 14]
 try {
     $db_users = $pdo->query("SELECT id, username, role FROM users ORDER BY username ASC")->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
@@ -44,25 +27,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $user_id  = intval($_POST['user_id'] ?? 0);
     $passcode = trim($_POST['passcode'] ?? '');
 
-    $client_ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
-    $browser_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown Signature';
-    $device = "Terminal Workstation PC";
-
     if ($user_id > 0 && !empty($passcode)) {
         $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
         $stmt->execute([$user_id]);
         $user_row = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        // 🔐 SECURE DATABASE VERIFICATION LAYER (NO HARDCODED CODES)
+        // SECURE AUTHENTICATION CHECK
         if ($user_row && password_verify($passcode, $user_row['password'])) {
             $_SESSION["user_id"]   = $user_row['id'];
             $_SESSION["username"]  = $user_row['username'];
             $_SESSION["role"]      = $user_row['role'];
             $_SESSION["order_authenticated"] = true;
 
-            // Log entry securely (using asterisks to mask sensitive fields)
-            $log = $pdo->prepare("INSERT INTO security_login_logs (username_entered, passcode_entered, user_id, role_assigned, ip_address, browser_agent, device_type, login_status) VALUES (?, '***', ?, ?, ?, ?, ?, 'Success')");
-            $log->execute([$user_row['username'], $user_row['id'], $user_row['role'], $client_ip, $browser_agent, $device]);
+            $log = $pdo->prepare("INSERT INTO security_login_logs (username_entered, passcode_entered, user_id, role_assigned, ip_address, browser_agent, device_type, login_status) VALUES (?, '***', ?, ?, ?, 'POS Terminal', 'Station', 'Success')");
+            $log->execute([$user_row['username'], $user_row['id'], $user_row['role'], $_SERVER['REMOTE_ADDR']]);
 
             if ($user_row['role'] === 'Chef') {
                 header("Location: kitchen.php");
@@ -71,14 +49,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
             exit;
         } else {
-            $failed_name = $user_row ? $user_row['username'] : 'Unknown';
-            $error = "Incorrect passcode verification entry validation.";
-            
-            $log = $pdo->prepare("INSERT INTO security_login_logs (username_entered, passcode_entered, user_id, role_assigned, ip_address, browser_agent, device_type, login_status) VALUES (?, '***', ?, 'None', ?, ?, ?, 'Failed')");
-            $log->execute([$failed_name, $user_id, $client_ip, $browser_agent, $device]);
+            $error = "Incorrect passcode entry validation.";
         }
     } else {
-        $error = "Please select a valid user identity profile context.";
+        $error = "Please select a valid user profile.";
     }
 }
 ?>
@@ -91,7 +65,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #111827; display: flex; justify-content: center; align-items: center; min-height: 100vh; color: #fff; }
-        .login-container { background: #1f2937; width: 100%; max-width: 380px; padding: 30px 24px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); border: 1px solid #374151; }
+        .login-container { background: #1f2937; width: 100%; max-width: 380px; padding: 30px 24px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); border: 1px solid #374151; text-align: left; }
         h2 { text-align: center; margin-bottom: 4px; font-weight: 600; font-size: 22px; color: #f3f4f6; }
         p.subtitle { text-align: center; font-size: 13px; color: #9ca3af; margin-bottom: 20px; }
         .display-wrapper { position: relative; margin-bottom: 20px; }
@@ -111,7 +85,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
 <div class="login-container">
     <h2>Access Verified Gateway</h2>
-    <p class="subtitle">Select your identity name profile context and code</p>
+    <p class="subtitle">Select your identity profile and enter passcode</p>
     
     <?php if(!empty($error)): ?>
         <div class="error-banner"><?= htmlspecialchars($error) ?></div>
@@ -152,12 +126,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if(num === 'C') { field.value = ''; return; }
         if(field.value.length < 4) { field.value += num; }
     }
-    document.getElementById('loginForm').addEventListener('submit', function(e) {
-        if(field.value.length !== 4) {
-            e.preventDefault();
-            alert("Please enter a 4-digit passcode.");
-        }
-    });
 </script>
 </body>
 </html>
