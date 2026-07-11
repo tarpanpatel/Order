@@ -32,10 +32,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $stmt->execute([$user_id]);
         $user_row = $stmt->fetch(PDO::FETCH_ASSOC);
 
-       if ($user_row) {
+        // 🛠️ LIVE INTERACTIVE ON-SCREEN DIAGNOSTIC TOOL TRIGGER
+        if ($user_row) {
             $is_match = password_verify($passcode, $user_row['password']);
 
-            // 🛠️ DIAGNOSTIC SCREEN PRINT OUT
             echo "<div style='background:#ffffff; color:#1e293b; padding:25px; margin:20px; border:4px solid #ef4444; border-radius:12px; font-family:monospace; font-size:14px; position:fixed; top:20px; left:20px; right:20px; z-index:999999; box-shadow:0 20px 25px -5px rgba(0,0,0,0.5); text-align:left;'>";
             echo "<h2 style='color:#ef4444; margin-top:0; border-bottom:2px solid #fee2e2; padding-bottom:10px;'>🔍 Live Login Diagnostic Tool</h2>";
             echo "<p style='margin:10px 0;'><strong>1. Selected Profile ID:</strong> " . htmlspecialchars($user_id) . "</p>";
@@ -45,15 +45,27 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             echo "<p style='margin:15px 0; padding:12px; background:" . ($is_match ? "#dcfce7" : "#fee2e2") . "; color:" . ($is_match ? "#166534" : "#991b1b") . "; border-radius:6px; font-weight:bold; font-size:16px;'>";
             echo "5. Does password_verify match? " . ($is_match ? "✅ MATCH ACCORDING TO PHP" : "❌ NO MATCH ACCORDING TO PHP");
             echo "</p>";
-            echo "<p style='color:#64748b; font-size:12px; margin-top:15px;'>👉 Remove this debug code from login.php once you see what text is failing to line up.</p>";
+            echo "<p style='color:#64748b; font-size:12px; margin-top:15px;'>👉 Read the details above. If it says NO MATCH, either the passcode typed is wrong or your database table contains a corrupted or flat plain-text string.</p>";
             echo "</div>";
-            
+
             if ($is_match) {
                 $_SESSION["user_id"]   = $user_row['id'];
                 $_SESSION["username"]  = $user_row['username'];
                 $_SESSION["role"]      = $user_row['role'];
                 $_SESSION["order_authenticated"] = true;
 
+                // GENERATE 1-YEAR PERSISTENT TOKEN
+                $random_token = bin2hex(random_bytes(32));
+                $token_hash = hash('sha256', $random_token);
+                $expires = date('Y-m-d H:i:s', time() + 31536000); // 1 Year from now
+                
+                $pdo->prepare("INSERT INTO user_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)")
+                    ->execute([$user_row['id'], $token_hash, $expires]);
+                    
+                // Set token in browser cookie
+                setcookie('pos_remember_token', $user_row['id'] . ':' . $random_token, time() + 31536000, '/', '', false, true);
+
+                // Log entry
                 $log = $pdo->prepare("INSERT INTO security_login_logs (username_entered, passcode_entered, user_id, role_assigned, ip_address, browser_agent, device_type, login_status) VALUES (?, '***', ?, ?, ?, 'POS Terminal', 'Station', 'Success')");
                 $log->execute([$user_row['username'], $user_row['id'], $user_row['role'], $_SERVER['REMOTE_ADDR']]);
 
@@ -67,8 +79,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $error = "Incorrect passcode entry validation.";
             }
         } else {
-            $error = "Profile not found in database rows.";
+            $error = "Profile context not discovered inside system rows.";
         }
+    } else {
+        $error = "Please select a valid user profile.";
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
