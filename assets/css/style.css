@@ -534,3 +534,92 @@ div#adminSubMenuContent { display: flex; flex-direction: column; gap: 4px; paddi
 .status-select-half { border-color: #fde68a !important; background: #fffbeb !important; color: #b45309 !important; }
 .status-select-leave { border-color: #c7d2fe !important; background: #f5f3ff !important; color: #4338ca !important; }
 .status-select-off { border-color: #e2e8f0 !important; background: #f8fafc !important; color: #475569 !important; }
+/* ==========================================================================
+   📅 ATTENDANCE CALENDAR & SALARY DASHBOARD (attendance_salary.php)
+   ========================================================================== */
+.calendar-grid-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    margin-bottom: 30px;
+}
+
+.calendar-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 12px;
+    min-width: 800px;
+}
+
+.calendar-table th, .calendar-table td {
+    border-right: 1px solid #edf2f7;
+    border-bottom: 1px solid #edf2f7;
+    padding: 8px 4px;
+    text-align: center;
+    vertical-align: middle;
+    min-width: 40px;
+    height: 45px;
+}
+
+/* Sticky First Column for Staff Names */
+.calendar-table th:first-child, 
+.calendar-table td:first-child {
+    position: sticky;
+    left: 0;
+    background: #ffffff;
+    z-index: 2;
+    min-width: 150px;
+    text-align: left;
+    padding-left: 15px;
+    font-weight: 700;
+    color: #1e293b;
+    border-right: 2px solid #cbd5e0;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.03);
+}
+
+.calendar-table thead th {
+    background: #f8fafc;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    color: #475569;
+    font-weight: 700;
+    font-size: 11px;
+}
+
+.calendar-table thead th:first-child {
+    z-index: 3; /* Top left corner stays above both axes */
+}
+
+/* Interactive Grid Cells */
+.cal-cell {
+    cursor: pointer;
+    font-weight: 800;
+    transition: filter 0.1s ease;
+    border-radius: 4px;
+    margin: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: calc(100% - 4px);
+}
+.cal-cell:hover { filter: brightness(0.9); }
+
+.cal-p { background: #dcfce7; color: #166534; } /* Present */
+.cal-a { background: #fee2e2; color: #b91c1c; } /* Absent */
+.cal-h { background: #fef9c3; color: #b45309; } /* Half Day */
+.cal-l { background: #e0e7ff; color: #4338ca; } /* Paid Leave */
+.cal-o { background: #f1f5f9; color: #475569; } /* Weekly Off */
+.cal-empty { background: #ffffff; color: #cbd5e0; }
+
+/* Financial Summary Table */
+.salary-summary-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
+.salary-summary-table th { background: #f8fafc; padding: 12px; color: #475569; border-bottom: 2px solid #cbd5e0; }
+.salary-summary-table td { padding: 12px; border-bottom: 1px solid #edf2f7; color: #1e293b; vertical-align: middle; }
+.wage-input-inline { width: 80px; padding: 6px; border: 1px dashed #cbd5e0; border-radius: 4px; text-align: right; font-weight: 700; }
+.btn-outline-action { padding: 4px 10px; font-size: 11px; font-weight: 700; color: #00b0ff; border: 1px solid #00b0ff; background: transparent; border-radius: 4px; cursor: pointer; }
+.btn-outline-action:hover { background: #e1f5fe; }
