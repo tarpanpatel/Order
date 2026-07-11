@@ -1,11 +1,12 @@
 <?php
 // /home/apartment/artistsfarmjaipur.com/Order/login.php
 ob_start();
+error_reporting(E_ALL);
+ini_set('display_errors', '0');
 
-// Load database and central session parameters first[cite: 11]
 require_once "config/db.php";
 
-// If a session is already active, safely bypass login[cite: 14]
+// If already authenticated via session or auto-login token, bypass login entirely
 if (isset($_SESSION["user_id"])) {
     if (isset($_SESSION["role"]) && $_SESSION["role"] === 'Chef') {
         header("Location: kitchen.php");
@@ -15,7 +16,6 @@ if (isset($_SESSION["user_id"])) {
     exit;
 }
 
-// Fetch user profile contexts for the visual dropdown select[cite: 14]
 try {
     $db_users = $pdo->query("SELECT id, username, role FROM users ORDER BY username ASC")->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
@@ -32,13 +32,25 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $stmt->execute([$user_id]);
         $user_row = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        // SECURE AUTHENTICATION CHECK
+        // SECURE HASH VERIFICATION
         if ($user_row && password_verify($passcode, $user_row['password'])) {
             $_SESSION["user_id"]   = $user_row['id'];
             $_SESSION["username"]  = $user_row['username'];
             $_SESSION["role"]      = $user_row['role'];
             $_SESSION["order_authenticated"] = true;
 
+            // GENERATE 1-YEAR PERSISTENT TOKEN
+            $random_token = bin2hex(random_bytes(32));
+            $token_hash = hash('sha256', $random_token);
+            $expires = date('Y-m-d H:i:s', time() + 31536000); // 1 Year from now
+            
+            $pdo->prepare("INSERT INTO user_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)")
+                ->execute([$user_row['id'], $token_hash, $expires]);
+                
+            // Set token in browser cookie
+            setcookie('pos_remember_token', $user_row['id'] . ':' . $random_token, time() + 31536000, '/', '', false, true);
+
+            // Log entry
             $log = $pdo->prepare("INSERT INTO security_login_logs (username_entered, passcode_entered, user_id, role_assigned, ip_address, browser_agent, device_type, login_status) VALUES (?, '***', ?, ?, ?, 'POS Terminal', 'Station', 'Success')");
             $log->execute([$user_row['username'], $user_row['id'], $user_row['role'], $_SERVER['REMOTE_ADDR']]);
 
