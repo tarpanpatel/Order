@@ -44,14 +44,18 @@ include "includes/header.php";
 
                 <div id="menuCatalogContainer"> 
                     <?php foreach ($categories as $cat): 
-                        // FIXED: Evaluates keys directly without array conversions, shielding original file-case string structures entirely
-                        $cat_items = array_filter($menu_items, function($m) use ($cat) { 
-                            if (isset($m['category_id'])) { return $m['category_id'] == $cat['id']; }
-                            if (isset($m['CATEGORY_ID'])) { return $m['CATEGORY_ID'] == $cat['id']; }
-                            if (isset($m['category'])) { return $m['category'] == $cat['id']; }
-                            if (isset($m['CATEGORY'])) { return $m['CATEGORY'] == $cat['id']; }
-                            return false;
-                        }); 
+                        // REVOLUTIONARY FIX: Manually checks for any case version of category_id or category safely without changing original array case boundaries
+                        $cat_items = array_filter($menu_items, function($m) use ($cat) {
+                            $target_value = null;
+                            foreach ($m as $key => $val) {
+                                $lower_key = strtolower($key);
+                                if ($lower_key === 'category_id' || $lower_key === 'category') {
+                                    $target_value = $val;
+                                    break;
+                                }
+                            }
+                            return $target_value == $cat['id'];
+                        });
                         if (empty($cat_items)) continue; 
                     ?>
                         <div class="category-block mb-15" id="cat_<?= $cat['id'] ?>"> 
@@ -60,14 +64,19 @@ include "includes/header.php";
                             </h4> 
                             <div class="material-item-grid"> 
                                 <?php foreach ($cat_items as $item): 
-                                    // Handle multi-driver key alignments manually to protect paths
-                                    $i_id    = $item['id'] ?? $item['ID'] ?? 0;
-                                    $i_name  = $item['name'] ?? $item['NAME'] ?? 'Unnamed Item';
-                                    $i_price = $item['price'] ?? $item['PRICE'] ?? 0.00;
-                                    
-                                    // Protect image case strings
-                                    $img_key = isset($item['image_path']) ? 'image_path' : (isset($item['IMAGE_PATH']) ? 'IMAGE_PATH' : '');
-                                    $i_img   = (!empty($img_key) && !empty($item[$img_key])) ? $item[$img_key] : '';
+                                    // Robust assignment reading properties safely regardless of database driver casing
+                                    $i_id    = 0;
+                                    $i_name  = 'Unnamed Item';
+                                    $i_price = 0.00;
+                                    $i_img   = '';
+
+                                    foreach ($item as $k => $v) {
+                                        $lk = strtolower($k);
+                                        if ($lk === 'id') $i_id = $v;
+                                        if ($lk === 'name') $i_name = $v;
+                                        if ($lk === 'price') $i_price = $v;
+                                        if ($lk === 'image_path') $i_img = $v;
+                                    }
                                 ?> 
                                     <div class="material-item-card" data-search-name="<?= strtolower(htmlspecialchars($i_name)) ?>"> 
                                         <div class="material-item-image-box"> 
@@ -231,7 +240,7 @@ window.renderCartInterfaceElements = function() {
         container.innerHTML += `
             <div class="sidebar-cart-row-node">
                 <div class="sidebar-cart-item-name-node">
-                    \.... name context values here ....
+                    \${row.name} <span class="sidebar-cart-item-price-tag">(₹\${row.price})</span>
                 </div>
                 <div class="sidebar-cart-qty-controls-node">
                     <button type="button" class="qty-btn-sm-node" onclick="window.updateCartRowQtyChange(\${id}, -1)">-</button>
