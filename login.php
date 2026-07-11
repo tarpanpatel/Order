@@ -22,7 +22,17 @@ try {
     die("Database Connection Error.");
 }
 
-if ($user_row) {
+$error = '';
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $user_id  = intval($_POST['user_id'] ?? 0);
+    $passcode = trim($_POST['passcode'] ?? '');
+
+    if ($user_id > 0 && !empty($passcode)) {
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+        $stmt->execute([$user_id]);
+        $user_row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+       if ($user_row) {
             $is_match = password_verify($passcode, $user_row['password']);
 
             // 🛠️ DIAGNOSTIC SCREEN PRINT OUT
