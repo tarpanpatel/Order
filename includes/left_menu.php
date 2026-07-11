@@ -45,12 +45,17 @@ function renderSidebar($items, $parentId, $current_page) {
 }
 ?>
 
-<aside class="sidebar" id="sidebarNavDrawer">
-    <div class="desktop-sidebar-title">POS Dashboard</div>
-    <nav>
+<!-- NATIVE STRUCTURE UPDATED TO ALLOW DYNAMIC INNER SCROLLING -->
+<aside class="sidebar" id="sidebarNavDrawer" style="display: flex; flex-direction: column; height: 100vh; position: fixed; top: 0; left: 0;">
+    <!-- Fixed Title Header -->
+    <div class="desktop-sidebar-title" style="flex-shrink: 0; margin-bottom: 15px;">POS Dashboard</div>
+    
+    <!-- Scrollable Navigation Panel -->
+    <nav style="flex: 1; overflow-y: auto; overflow-x: hidden; padding-right: 4px; display: flex; flex-direction: column; gap: 2px;">
         <?php renderSidebar($nested, 0, $current_page); ?>
         
-        <a href="logout.php" style="color: #ff5252 !important; border-color: #ff5252 !important; margin-top: 20px;">
+        <!-- Sign Out remains neatly bound inside the scroll context at the base -->
+        <a href="logout.php" style="color: #ff5252 !important; border-color: #ff5252 !important; margin-top: auto; margin-bottom: 20px; flex-shrink: 0;">
             <span>[➔] Sign Out Terminal</span>
         </a>
     </nav>
