@@ -3,28 +3,23 @@
 error_reporting(E_ALL);
 ini_set('display_errors', '0');
 
-// Load central DB connection and secure session engine variables directly[cite: 11]
 require_once __DIR__ . "/../config/db.php";
 
-// 🛑 ENFORCEMENT GATEWAY: If logged out, redirect immediately to login screen[cite: 10]
 if (!isset($_SESSION["user_id"]) || !isset($_SESSION["role"])) {
     header("Location: login.php");
     exit;
 }
 
-// 🔐 ROLE PERMISSION GUARD: Redirect back to login if page access check fails
 if (!check_page_access($pdo)) {
     header("Location: login.php?error=permissions_revoked");
     exit;
 }
 
 $todayString = date('Y-m-d');
-
 $has_active_guest = $pdo->query("SELECT COUNT(*) FROM guests WHERE status = 'Active'")->fetchColumn() > 0;
 $is_staff_role = isset($_SESSION['role']) && $_SESSION['role'] === 'Staff';
 $current_page = basename($_SERVER['PHP_SELF']);
 
-// Compile guest listings directly for the dropdown controllers
 $current_active_guest = $pdo->query("SELECT * FROM guests WHERE status = 'Active' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 
 $todaysStmt = $pdo->prepare("
@@ -44,10 +39,6 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
     <title>POS System</title>
     <link rel="stylesheet" href="assets/css/style.css?v=<?= time(); ?>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-      
-    </style>
-
 </head>
 <body>
 <div id="globalSystemLoaderScreen" style="
