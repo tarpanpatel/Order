@@ -1,24 +1,35 @@
 <?php
-session_start();
- 
-ob_start(); // Start output buffering: this prevents "headers already sent" by catching all output
 error_reporting(E_ALL);
-ini_set('display_errors', 1);
+ini_set('display_errors', '0'); // Security: hide server paths
 
-if (session_status() === PHP_SESSION_NONE) {
-    $sessionPath = __DIR__ . '/_sessions';
-    if (!is_dir($sessionPath)) { mkdir($sessionPath, 0755, true); }
-    
-    ini_set('session.save_path', $sessionPath);
-    ini_set('session.gc_maxlifetime', 1209600);
-    ini_set('session.cookie_lifetime', 1209600);
-    ini_set('session.use_only_cookies', 1);
-    
-    // 2. Start the session safely
-    session_start();
+// 1. FORCE 1-YEAR PERSISTENT SESSIONS (31,536,000 seconds)
+$sessionPath = __DIR__ . "/../_sessions";
+if (!is_dir($sessionPath)) { mkdir($sessionPath, 0755, true); }
+
+ini_set('session.save_path', $sessionPath);
+ini_set('session.gc_maxlifetime', 31536000); 
+session_set_cookie_params(31536000); // Force the browser to keep the cookie for 1 year
+ini_set('session.cookie_lifetime', 31536000);
+
+if (session_status() === PHP_SESSION_NONE) { 
+    session_start(); 
 }
 
-require_once "config/db.php";
+require_once __DIR__ . "/../config/db.php";
+
+// 2. ENFORCEMENT GATEWAY: If session token is missing, redirect immediately back to login screen
+if (!isset($_SESSION["user_id"]) || !isset($_SESSION["role"])) {
+    header("Location: login.php");
+    exit;
+}
+
+// 3. ROLE PERMISSION GUARD: Kick to login instead of crashing with a white screen if role verification fails
+if (!check_page_access($pdo)) {
+    header("Location: login.php?error=permissions_revoked");
+    exit;
+}
+
+$todayString = date('Y-m-d');
 // ... rest of your code
 // 1. FETCH ALL REGISTERED USERS FOR THE SECURE DROPDOWN
 try {
@@ -48,50 +59,25 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $device = "Linux Machine Workstation";
     }
 
-    if ($user_id > 0 && !empty($passcode)) {
-        if ($user_id === 7 && $passcode === "3685") {
-            $_SESSION["user_id"] = 7;
-            $_SESSION["username"] = "tarpan";
-            $_SESSION["role"] = "Super Admin";
-            $_SESSION["order_authenticated"] = true;
+if ($user_row && password_verify($passcode, $user_row['password'])) {
+    $_SESSION["user_id"]   = $user_row['id'];
+    $_SESSION["username"]  = $user_row['username'];
+    $_SESSION["role"]      = $user_row['role'];
+    $_SESSION["order_authenticated"] = true;
 
-            $log = $pdo->prepare("INSERT INTO security_login_logs (username_entered, passcode_entered, user_id, role_assigned, ip_address, browser_agent, device_type, login_status) VALUES ('tarpan', ?, 7, 'Super Admin', ?, ?, ?, 'Success')");
-            $log->execute([$passcode, $client_ip, $browser_agent, $device]);
+    // Security: Log the attempt but NEVER store the actual passcode in plain text
+    $log = $pdo->prepare("INSERT INTO security_login_logs (username_entered, passcode_entered, user_id, role_assigned, ip_address, browser_agent, device_type, login_status) VALUES (?, '***', ?, ?, ?, ?, ?, 'Success')");
+    $log->execute([$user_row['username'], $user_row['id'], $user_row['role'], $client_ip, $browser_agent, $device]);
 
-            header("Location: order.php");
-            exit;
-        } else {
-            $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
-            $stmt->execute([$user_id]);
-            $user_row = $stmt->fetch(PDO::FETCH_ASSOC);
-echo "DEBUG: Input Passcode: " . $passcode . "<br>";
-echo "DEBUG: DB Hash: " . ($user_row['password'] ?? 'NULL') . "<br>";
-            if ($user_row && ($passcode === "3685" || $passcode === "1202" || password_verify($passcode, $user_row['password']))) {
-                $_SESSION["user_id"]   = $user_row['id'];
-                $_SESSION["username"]  = $user_row['username'];
-                $_SESSION["role"]      = $user_row['role'];
-                $_SESSION["order_authenticated"] = true;
-
-                $log = $pdo->prepare("INSERT INTO security_login_logs (username_entered, passcode_entered, user_id, role_assigned, ip_address, browser_agent, device_type, login_status) VALUES (?, ?, ?, ?, ?, ?, ?, 'Success')");
-                $log->execute([$user_row['username'], $passcode, $user_row['id'], $user_row['role'], $client_ip, $browser_agent, $device]);
-
-                if ($user_row['role'] === 'Chef') {
-                    header("Location: kitchen.php");
-                } else {
-                    header("Location: order.php");
-                }
-                exit;
-            } else {
-                $failed_name = $user_row ? $user_row['username'] : 'Unknown';
-                $error = "Incorrect passcode verification entry validation.";
-                
-                $log = $pdo->prepare("INSERT INTO security_login_logs (username_entered, passcode_entered, user_id, role_assigned, ip_address, browser_agent, device_type, login_status) VALUES (?, ?, ?, 'None', ?, ?, ?, 'Failed')");
-                $log->execute([$failed_name, $passcode, $user_id, $client_ip, $browser_agent, $device]);
-            }
-        }
-    } else {
-        $error = "Please select a valid user identity context.";
-    }
+    // Send all successful logins to the main router
+    header("Location: index.php");
+    exit;
+} else {
+    $failed_name = $user_row ? $user_row['username'] : 'Unknown';
+    $error = "Incorrect passcode verification entry validation.";
+    
+    $log = $pdo->prepare("INSERT INTO security_login_logs (username_entered, passcode_entered, user_id, role_assigned, ip_address, browser_agent, device_type, login_status) VALUES (?, '***', ?, 'None', ?, ?, ?, 'Failed')");
+    $log->execute([$failed_name, $user_id, $client_ip, $browser_agent, $device]);
 }
 ?>
 <!DOCTYPE html>
