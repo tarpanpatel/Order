@@ -3,42 +3,24 @@
 if (session_status() === PHP_SESSION_NONE) { session_start(); } 
 require_once "config/db.php"; 
 
-// Fetching menu categories and configurations directly from the verified database mapping
-$categories = $pdo->query("SELECT * FROM menu_categories ORDER BY sort_order ASC")->fetchAll(PDO::FETCH_ASSOC); 
-$menu_items = $pdo->query("SELECT * FROM menu_items WHERE is_hidden = 0 ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC); 
+if (session_status() === PHP_SESSION_NONE) { session_start(); } 
+require_once "config/db.php"; 
+if (session_status() === PHP_SESSION_NONE) { session_start(); } 
+require_once "config/db.php"; 
+
+// FORCE SELECTION FROM THE EXPLICIT FOOD TABLES TO PREVENT SYSTEM OVERRIDES
+$categories = $pdo->query("SELECT * FROM `menu_categories` ORDER BY sort_order ASC")->fetchAll(PDO::FETCH_ASSOC); 
+$menu_items = $pdo->query("SELECT * FROM `menu_items` WHERE `is_hidden` = 0 ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC); 
 
 // Get the live active guest details token
 $current_active_guest = $pdo->query("SELECT * FROM guests WHERE status = 'Active' LIMIT 1")->fetch(PDO::FETCH_ASSOC); 
 
+include "includes/header.php";
+
 include "includes/header.php"; 
 
 ?>
-<!-- TEMPORARY DIAGNOSTIC DEBUG WINDOW -->
-<div class="app-body" style="background: #fff5f5; border: 2px dashed #ff5252; padding: 15px; margin-bottom: 20px; border-radius: 8px; font-family: monospace;">
-    <h3 style="color: #c53030; margin-top: 0; margin-bottom: 10px;">📋 System Diagnostic Console</h3>
-    
-    <strong>1. Categories Count Found:</strong> <?= count($categories) ?><br>
-    <strong>2. Total Menu Items Fetched:</strong> <?= count($menu_items) ?><br>
-    
-    <hr style="border: none; border-top: 1px dashed #fca5a5; margin: 10px 0;">
-    
-    <strong>3. Raw Database Keys & Samples:</strong>
-    <pre style="background: #2d3748; color: #fff; padding: 10px; border-radius: 6px; overflow-x: auto; max-height: 250px; font-size: 11px;">
-<?php
-if (!empty($menu_items)) {
-    echo "First Menu Item Database Row Structure:\n";
-    print_r($menu_items[0]);
-} else {
-    echo "CRITICAL: The menu_items array is completely empty. No data returned from query.\n";
-}
 
-if (!empty($categories)) {
-    echo "\nFirst Category Database Row Structure:\n";
-    print_r($categories[0]);
-}
-?>
-    </pre>
-</div>
 <div class="app-body"> 
 
     <div class="category-section"> 
