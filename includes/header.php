@@ -1,17 +1,33 @@
 <?php
-// Report all PHP errors
+/// /home/apartment/artistsfarmjaipur.com/Order/includes/header.php
 error_reporting(E_ALL);
+ini_set('display_errors', '0'); // Security: hide server paths
 
-// Force errors to be displayed on the screen
-ini_set('display_errors', '1');
-ini_set('display_startup_errors', '1');
-// /home/apartment/artistsfarmjaipur.com/Order/includes/header.php
-if (session_status() === PHP_SESSION_NONE) { session_start(); }
+// Re-assert persistent lifespans variables matching login layers safely
+$sessionPath = __DIR__ . "/../_sessions";
+ini_set('session.save_path', $sessionPath);
+ini_set('session.gc_maxlifetime', 1209600);
+ini_set('session.cookie_lifetime', 1209600);
+
+if (session_status() === PHP_SESSION_NONE) { 
+    session_start(); 
+}
+
 require_once __DIR__ . "/../config/db.php";
-if (!isset($_SESSION["role"]) || !check_page_access($pdo)) {
+
+// 🛑 ENFORCEMENT GATEWAY: If session token is missing, redirect immediately back to login screen
+if (!isset($_SESSION["user_id"]) || !isset($_SESSION["role"])) {
+    header("Location: login.php");
+    exit;
+}
+
+// Check menu item page level permission authorization parameters mapping index
+if (!check_page_access($pdo)) {
     die("Access Denied: You do not have permission to access this area.");
 }
+
 $todayString = date('Y-m-d');
+
 $has_active_guest = $pdo->query("SELECT COUNT(*) FROM guests WHERE status = 'Active'")->fetchColumn() > 0;
 $is_staff_role = isset($_SESSION['role']) && $_SESSION['role'] === 'Staff';
 $current_page = basename($_SERVER['PHP_SELF']);
@@ -39,7 +55,7 @@ $all_booked_guests = $todaysStmt->fetchAll(PDO::FETCH_ASSOC);
     <style>
       
     </style>
-    
+
 </head>
 <body>
 <div id="globalSystemLoaderScreen" style="
