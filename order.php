@@ -9,8 +9,8 @@ if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once "config/db.php"; 
 
 // FORCE SELECTION FROM THE EXPLICIT FOOD TABLES TO PREVENT SYSTEM OVERRIDES
-$categories = $pdo->query("SELECT * FROM `menu_categories` ORDER BY sort_order ASC")->fetchAll(PDO::FETCH_ASSOC); 
-$menu_items = $pdo->query("SELECT * FROM `menu_items` WHERE `is_hidden` = 0 ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC); 
+$categories = $pdo->query("SELECT * FROM menu_categories ORDER BY sort_order ASC")->fetchAll(PDO::FETCH_ASSOC); 
+$menu_items = $pdo->query("SELECT * FROM menu_items WHERE is_hidden = 0 ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC); 
 
 // Get the live active guest details token
 $current_active_guest = $pdo->query("SELECT * FROM guests WHERE status = 'Active' LIMIT 1")->fetch(PDO::FETCH_ASSOC); 
