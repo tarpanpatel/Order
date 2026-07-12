@@ -68,13 +68,16 @@ include "includes/header.php";
             <div class="material-item-grid">
                 <?php foreach ($cat_items as $item): ?>
                     <div class="material-item-card" data-search-name="<?= strtolower(htmlspecialchars($item['name'])) ?>">
-                        <div class="material-item-image-box">
-                            <?php if (!empty($item['image_path']) && file_exists($item['image_path'])): ?>
-                                <img src="<?= htmlspecialchars($item['image_path']) ?>" alt="">
-                            <?php else: ?>
-                                <img src="https://placehold.co/150x100?text=No+Image" alt="">
-                            <?php endif; ?>
-                        </div>
+                       <div class="material-item-image-box">
+    <?php 
+    // FIXED: Verify image_path is populated before running server storage checks to prevent empty pointer drops
+    if (!empty($item['image_path']) && !is_null($item['image_path']) && file_exists($item['image_path'])): 
+    ?>
+        <img src="<?= htmlspecialchars($item['image_path']) ?>" alt="">
+    <?php else: ?>
+        <img src="https://placehold.co/150x100?text=No+Image" alt="">
+    <?php endif; ?>
+</div>
                         <div class="material-item-name">
                             <strong><?= htmlspecialchars($item['name']) ?></strong>
                             <div>₹<?= number_format($item['price'], 2) ?></div>
