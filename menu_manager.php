@@ -40,7 +40,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['menu_data'])) {
     $pdo->query("UPDATE sys_menu SET parent_id = 0, sort_order = 0");
     $pdo->query("DELETE FROM sys_role_menu WHERE role_name != 'Super Admin'"); 
 
-    function saveMenuRecursive($items, $parentId = 0, $depth = 0) {
+function saveMenuRecursive($items, $parentId = 0, $depth = 0) {
         global $pdo;
         $order = 0;
         foreach ($items as $item) {
@@ -50,8 +50,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['menu_data'])) {
             $url = trim($item['url']);
             $icon = trim($item['icon']) ?: 'fa-solid fa-link';
             
+            // FIXED: Variable name matching forced to $parentId to align parameters cleanly
             $stmt = $pdo->prepare("UPDATE sys_menu SET parent_id = ?, sort_order = ?, title = ?, url = ?, icon = ? WHERE id = ?");
-            $stmt->execute([parentId, $order, $title, $url, $icon, $id]);
+            $stmt->execute([$parentId, $order, $title, $url, $icon, $id]);
             
             if (!empty($item['roles'])) {
                 foreach ($item['roles'] as $role) {
