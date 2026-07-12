@@ -7,7 +7,7 @@ if (!isset($_SESSION["role"]) || $_SESSION["role"] !== 'Super Admin') die("Acces
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['action_add_menu'])) {
     $title = trim($_POST['new_title']);
     $url = trim($_POST['new_url']);
-    $icon = trim($_POST['new_icon']) ?: 'fa-solid fa-link'; // Default secure mapping
+    $icon = trim($_POST['new_icon']) ?: 'fa-solid fa-link'; 
     
     if (!empty($title) && !empty($url)) {
         $stmt = $pdo->prepare("INSERT INTO sys_menu (title, url, icon, sort_order, parent_id) VALUES (?, ?, ?, 999, 0)");
@@ -48,11 +48,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['menu_data'])) {
             $id = intval($item['id']);
             $title = trim($item['title']);
             $url = trim($item['url']);
-            $icon = trim($item['icon']) ?: 'fa-solid fa-link'; // Captures the dynamically picked icon class cleanly
+            $icon = trim($item['icon']) ?: 'fa-solid fa-link';
             
-            // FIXED: Added icon parameter synchronization directly to the structural compilation pipeline
             $stmt = $pdo->prepare("UPDATE sys_menu SET parent_id = ?, sort_order = ?, title = ?, url = ?, icon = ? WHERE id = ?");
-            $stmt->execute([$parentId, $order, $title, $url, $icon, $id]);
+            $stmt->execute([parentId, $order, $title, $url, $icon, $id]);
             
             if (!empty($item['roles'])) {
                 foreach ($item['roles'] as $role) {
@@ -86,22 +85,18 @@ function renderInitialList($items, $parentId = 0) {
             echo '<div class="menu-item-card">';
             echo '  <i class="fa-solid fa-grip-vertical drag-handle" title="Drag left/right to nest, up/down to reorder"></i>';
             
-            // INTERACTIVE ICON PICKER TRIGGER BUTTON
-            echo '  <button type="button" class="btn-picker-trigger" onclick="window.openIconSelectorModal(this)" title="Click to change icon dynamically">';
+            echo '  <button type="button" class="btn-picker-trigger" onclick="window.openIconSelectorModal(this)" title="Click to open full searchable picker">';
             echo '     <i class="'.htmlspecialchars($menu['icon']).' menu-item-icon"></i>';
             echo '     <input type="hidden" class="menu-icon-value" value="'.htmlspecialchars($menu['icon']).'">';
             echo '  </button>';
             
-            // Editable Title
             echo '  <input type="text" class="field-input-full menu-title-input" value="'.htmlspecialchars($menu['title']).'" title="Edit Display Name">';
             
-            // Editable URL Link
             echo '  <i class="fa-solid fa-link" style="color:#cbd5e0; font-size:12px; margin-left:8px;"></i>';
             echo '  <input type="text" class="field-input-full menu-url-input" value="'.htmlspecialchars($menu['url']).'" title="Edit Link URL" placeholder="e.g., page.php or #">';
             
             echo '  <div class="flex-1"></div>'; 
             
-            // Roles
             echo '  <div class="role-checkboxes">';
             echo '    <label><input type="checkbox" class="role-chk" value="Staff" '.(in_array('Staff', $role_map[$menu['id']]??[]) ? 'checked' : '').'> Staff</label>';
             echo '    <label><input type="checkbox" class="role-chk" value="Chef" '.(in_array('Chef', $role_map[$menu['id']]??[]) ? 'checked' : '').'> Chef</label>';
@@ -136,7 +131,6 @@ include "includes/header.php";
     .drag-handle { cursor: grab; color: #94a3b8; font-size: 18px; padding: 0 8px; }
     .drag-handle:active { cursor: grabbing; color: #00b0ff; }
     
-    /* STYLED INTERACTIVE INTERFACE SWITCH ELEMENT */
     .btn-picker-trigger {
         background: #f1f5f9; border: 1px solid #cbd5e0; 
         padding: 6px 10px; border-radius: 6px; cursor: pointer;
@@ -157,33 +151,37 @@ include "includes/header.php";
     .manager-grid { display: grid; grid-template-columns: 1fr 340px; gap: 20px; align-items: start; margin-top: 15px; }
     @media (max-width: 1024px) { .manager-grid { grid-template-columns: 1fr; } }
 
-    /* SYSTEM MODAL FONTAWESOME MATRIX DASHBOARD */
+    /* SEARCHABLE MODAL DESIGN */
     .icon-modal-backdrop {
         position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
         background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px);
         z-index: 99999; display: none; align-items: center; justify-content: center;
     }
     .icon-modal-content {
-        background: #ffffff; width: 90%; max-width: 500px; padding: 24px;
+        background: #ffffff; width: 95%; max-width: 550px; padding: 24px;
         border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
         border: 1px solid #e2e8f0; text-align: left;
     }
     .icon-modal-grid {
-        display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px;
-        margin-top: 15px; max-height: 280px; overflow-y: auto; padding: 4px;
+        display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px;
+        margin-top: 15px; max-height: 320px; overflow-y: auto; padding: 4px;
     }
     .icon-select-card {
         background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
-        padding: 14px; text-align: center; cursor: pointer; font-size: 18px;
-        color: #334155; transition: all 0.15s ease-in-out;
+        padding: 12px 6px; text-align: center; cursor: pointer; font-size: 18px;
+        color: #334155; transition: all 0.15s ease-in-out; display: flex; flex-direction: column; align-items: center; gap: 4px;
     }
-    .icon-select-card:hover { background: #00b0ff; border-color: #00b0ff; color: #ffffff; transform: scale(1.1); }
+    .icon-select-card span { font-size: 9px; font-weight: 500; color: #64748b; text-overflow: ellipsis; overflow: hidden; width: 100%; white-space: nowrap; }
+    .icon-select-card:hover { background: #00b0ff; border-color: #00b0ff; color: #ffffff; transform: scale(1.08); }
+    .icon-select-card:hover span { color: #fff; }
+    .icon-search-input { width: 100%; padding: 10px 12px; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 14px; outline: none; }
+    .icon-search-input:focus { border-color: #00b0ff; box-shadow: 0 0 0 3px rgba(0,176,255,0.15); }
 </style>
 
 <div class="app-body">
     <div class="page-header" style="margin-bottom: 15px; border-bottom: 1px dashed #cbd5e0; padding-bottom: 15px;">
-        <h2 style="font-size: 20px; color: #0f172a; margin: 0 0 5px 0;">🛠 Interactive Menu Manager</h2>
-        <p style="color: #64748b; font-size: 13px; margin: 0;">Drag the grip icon to nest/reorder. Click the icon grids to change them interactively without coding. Rename items or change URLs directly in the text boxes.</p>
+        <h2 style="font-size: 20px; color: #0f172a; margin: 0 0 5px 0;">🛠 Searchable Interactive Menu Manager</h2>
+        <p style="color: #64748b; font-size: 13px; margin: 0;">Drag the grip icon to nest/reorder. Click any square icon button to search and choose from the complete core FontAwesome directory arrays instantly.</p>
     </div>
 
     <?php if(isset($_GET['msg'])): ?>
@@ -216,14 +214,13 @@ include "includes/header.php";
                 </div>
                 
                 <div class="mb-15">
-                    <label class="field-label-sm">Interactive Icon Selection</label>
+                    <label class="field-label-sm">Interactive Icon Picker</label>
                     <div style="display: flex; gap: 10px; align-items: center;">
                         <button type="button" class="btn-picker-trigger" id="newFormIconPickerBtn" onclick="window.openIconSelectorModal(this, true)" style="width: 55px; height: 42px;">
                             <i class="fa-solid fa-link" style="font-size: 18px;"></i>
                         </button>
-                        <!-- Form hidden collector value element -->
                         <input type="hidden" name="new_icon" id="newFormIconHiddenValue" value="fa-solid fa-link">
-                        <span style="font-size: 12px; color: #64748b; font-weight: bold;">Click square to change icon selection</span>
+                        <span style="font-size: 12px; color: #64748b; font-weight: bold;">Click card box to search library...</span>
                     </div>
                 </div>
                 
@@ -233,36 +230,15 @@ include "includes/header.php";
     </div>
 </div>
 
-<!-- FLOATING INTEGRATED ICON PICKER MODAL LAYER -->
+<!-- LMDX SEARCH ENGINE ICON COMPONENT -->
 <div class="icon-modal-backdrop" id="systemIconModalBackdrop" onclick="window.closeIconSelectorModal(event)">
     <div class="icon-modal-content" onclick="event.stopPropagation()">
-        <h3 style="margin-top: 0; font-size: 16px; color: #0f172a; border-bottom: 1px dashed #cbd5e0; padding-bottom: 10px;">🎨 Select Dashboard Icon</h3>
+        <h3 style="margin-top: 0; font-size: 15px; color: #0f172a; margin-bottom: 12px;">🔍 Search Icon Directory</h3>
+        <input type="text" id="iconLibrarySearchInput" class="icon-search-input" placeholder="Type keyword to filter icons (e.g., chart, user, table, food, secure, setting)..." onkeyup="window.filterIconLibraryMatrix(this.value)">
         
-        <div class="icon-modal-grid">
-            <!-- Hospitality POS optimized specific FontAwesome icon maps -->
-            <div class="icon-select-card" data-icon="fa-solid fa-chart-line"><i class="fa-solid fa-chart-line"></i></div>
-            <div class="icon-select-card" data-icon="fa-solid fa-chart-bar"><i class="fa-solid fa-chart-bar"></i></div>
-            <div class="icon-select-card" data-icon="fa-solid fa-user"><i class="fa-solid fa-user"></i></div>
-            <div class="icon-select-card" data-icon="fa-solid fa-users"><i class="fa-solid fa-users"></i></div>
-            <div class="icon-select-card" data-icon="fa-solid fa-receipt"><i class="fa-solid fa-receipt"></i></div>
-            <div class="icon-select-card" data-icon="fa-solid fa-utensils"><i class="fa-solid fa-utensils"></i></div>
-            <div class="icon-select-card" data-icon="fa-solid fa-kitchen-set"><i class="fa-solid fa-kitchen-set"></i></div>
-            <div class="icon-select-card" data-icon="fa-solid fa-boxes-stacked"><i class="fa-solid fa-boxes-stacked"></i></div>
-            <div class="icon-select-card" data-icon="fa-solid fa-cart-shopping"><i class="fa-solid fa-cart-shopping"></i></div>
-            <div class="icon-select-card" data-icon="fa-solid fa-wallet"><i class="fa-solid fa-wallet"></i></div>
-            <div class="icon-select-card" data-icon="fa-solid fa-credit-card"><i class="fa-solid fa-credit-card"></i></div>
-            <div class="icon-select-card" data-icon="fa-solid fa-clock-history"><i class="fa-solid fa-clock-history"></i></div>
-            <div class="icon-select-card" data-icon="fa-solid fa-gears"><i class="fa-solid fa-gears"></i></div>
-            <div class="icon-select-card" data-icon="fa-solid fa-shield-halved"><i class="fa-solid fa-shield-halved"></i></div>
-            <div class="icon-select-card" data-icon="fa-solid fa-file-export"><i class="fa-solid fa-file-export"></i></div>
-            <div class="icon-select-card" data-icon="fa-solid fa-bell"><i class="fa-solid fa-bell"></i></div>
-            <div class="icon-select-card" data-icon="fa-solid fa-key"><i class="fa-solid fa-key"></i></div>
-            <div class="icon-select-card" data-icon="fa-solid fa-envelope"><i class="fa-solid fa-envelope"></i></div>
-            <div class="icon-select-card" data-icon="fa-solid fa-warehouse"><i class="fa-solid fa-warehouse"></i></div>
-            <div class="icon-select-card" data-icon="fa-solid fa-link"><i class="fa-solid fa-link"></i></div>
-        </div>
+        <div class="icon-modal-grid" id="modalIconsGlobalMountGrid"></div>
         
-        <button type="button" class="btn" onclick="window.closeIconSelectorModal(null)" style="width: 100%; margin-top: 15px; padding: 10px; background:#64748b; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Cancel</button>
+        <button type="button" class="btn" onclick="window.closeIconSelectorModal(null)" style="width: 100%; margin-top: 15px; padding: 10px; background:#64748b; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Close Selector</button>
     </div>
 </div>
 
@@ -274,6 +250,30 @@ include "includes/header.php";
 let currentActiveTargetButtonNode = null;
 let isTargetingCreationFormCard = false;
 
+// COMPLETE SYSTEM LIBRARY INDEX ARRAY MATCHING STYLES COMPLIANCE
+const COMPLETE_FONTAWESOME_MAP_INDEX = [
+    // Analytics & Metrics
+    "fa-chart-line", "fa-chart-bar", "fa-chart-pie", "fa-chart-area", "fa-chart-gantt", "fa-arrow-trend-up", "fa-arrow-trend-down", "fa-percent", "fa-gauge", "fa-gauge-high", "fa-signal", "fa-database",
+    // Users & Identity
+    "fa-user", "fa-users", "fa-user-tie", "fa-user-shield", "fa-user-gear", "fa-user-check", "fa-user-plus", "fa-user-minus", "fa-user-lock", "fa-id-card", "fa-address-book", "fa-circle-user",
+    // Commerce & Financials
+    "fa-receipt", "fa-wallet", "fa-credit-card", "fa-indian-rupee-sign", "fa-money-bill", "fa-money-bill-wave", "fa-money-check-dollar", "fa-cash-register", "fa-scale-balanced", "fa-calculator", "fa-piggy-bank", "fa-coins",
+    // Food & Dining
+    "fa-utensils", "fa-kitchen-set", "fa-bowl-food", "fa-pizza-slice", "fa-burger", "fa-mug-hot", "fa-wine-glass", "fa-cake-candles", "fa-ice-cream", "fa-apple-whole", "fa-egg", "fa-plate-wheat", "fa-stroopwafel",
+    // Logistics, Sourcing & Infrastructure
+    "fa-boxes-stacked", "fa-box", "fa-box-open", "fa-warehouse", "fa-truck", "fa-truck-loading", "fa-cart-shopping", "fa-cart-plus", "fa-store", "fa-shop", "fa-industry", "fa-dolly", "fa-barcode", "fa-qrcode",
+    // Operations & Configurations
+    "fa-gear", "fa-gears", "fa-sliders", "fa-wrench", "fa-screwdriver-wrench", "fa-hammer", "fa-nut-wrench", "fa-compass", "fa-circle-info", "fa-circle-question", "fa-circle-exclamation", "fa-triangle-exclamation",
+    // Safety & Verification
+    "fa-shield-halved", "fa-lock", "fa-lock-open", "fa-key", "fa-key-skeleton", "fa-passport", "fa-fingerprint", "fa-eye", "fa-eye-slash", "fa-vault", "fa-circle-check", "fa-signature",
+    // Documentation & Files
+    "fa-file-lines", "fa-file-invoice", "fa-file-invoice-dollar", "fa-file-export", "fa-file-import", "fa-file-csv", "fa-file-pdf", "fa-clipboard-list", "fa-clipboard-check", "fa-folder", "fa-folder-open", "fa-book",
+    // Communication & Alert Systems
+    "fa-envelope", "fa-message", "fa-comments", "fa-phone", "fa-bell", "fa-bell-slash", "fa-bullhorn", "fa-circle-nodes", "fa-share-nodes", "fa-link", "fa-at", "fa-wifi",
+    // General Layouts
+    "fa-house", "fa-hotel", "fa-bed", "fa-calendar", "fa-calendar-days", "fa-calendar-check", "fa-clock", "fa-hourglass-half", "fa-map-location-dot", "fa-location-dot", "fa-compass", "fa-list-check", "fa-bars-staggered"
+];
+
 $(document).ready(function() {
     $('#menu-builder').nestedSortable({
         items: 'li',
@@ -284,33 +284,70 @@ $(document).ready(function() {
         tolerance: 'pointer',
         toleranceElement: '> div',
         maxLevels: 3, 
-        isTree: true,       
+        isTree: true,        
         tabSize: 30,         
         opacity: 0.8
     });
 
-    // Handle selection event from modal grid options
-    $('.icon-select-card').on('click', function() {
+    // Populate full dashboard grid on init execution
+    buildInteractiveGridMatrix(COMPLETE_FONTAWESOME_MAP_INDEX);
+});
+
+function buildInteractiveGridMatrix(iconClassesArray) {
+    const mountPoint = document.getElementById("modalIconsGlobalMountGrid");
+    if (!mountPoint) return;
+
+    let contentHtml = "";
+    iconClassesArray.forEach(className => {
+        const structuralCleanLabel = className.replace("fa-", "").replace("-", " ");
+        contentHtml += `
+            <div class="icon-select-card" data-icon="fa-solid ${className}" title="${className}">
+                <i class="fa-solid ${className}"></i>
+                <span>${structuralCleanLabel}</span>
+            </div>
+        `;
+    });
+
+    mountPoint.innerHTML = contentHtml;
+
+    // Bind event hooks dynamically
+    $('.icon-select-card').off('click').on('click', function() {
         const pickedIconClass = $(this).data('icon');
         
         if (isTargetingCreationFormCard) {
-            // Target elements inside creation box
-            $('#newFormIconPickerBtn find("i")').attr('class', pickedIconClass);
             $('#newFormIconHiddenValue').val(pickedIconClass);
             document.getElementById('newFormIconPickerBtn').innerHTML = `<i class="${pickedIconClass}" style="font-size: 18px;"></i>`;
         } else if (currentActiveTargetButtonNode) {
-            // Target live active list node variables inside the dynamic hierarchy
             $(currentActiveTargetButtonNode).find('.menu-item-icon').attr('class', pickedIconClass + ' menu-item-icon');
             $(currentActiveTargetButtonNode).find('.menu-icon-value').val(pickedIconClass);
         }
         
         window.closeIconSelectorModal(null);
     });
-});
+}
+
+window.filterIconLibraryMatrix = function(queryStr) {
+    const cleanQuery = queryStr.toLowerCase().trim();
+    if (cleanQuery === "") {
+        $('.icon-select-card').show();
+        return;
+    }
+
+    $('.icon-select-card').each(function() {
+        const iconAttrLabel = $(this).data('icon').toLowerCase();
+        if (iconAttrLabel.includes(cleanQuery)) {
+            $(this).show();
+        } else {
+            $(this).hide();
+        }
+    });
+};
 
 window.openIconSelectorModal = function(triggerElement, isForCreationForm = false) {
     currentActiveTargetButtonNode = triggerElement;
     isTargetingCreationFormCard = isForCreationForm;
+    document.getElementById("iconLibrarySearchInput").value = "";
+    $('.icon-select-card').show();
     $('#systemIconModalBackdrop').css('display', 'flex').hide().fadeIn(150);
 };
 
@@ -331,7 +368,7 @@ function saveMenu() {
                 id: li.data('id'),
                 title: card.find('.menu-title-input').val(), 
                 url: card.find('.menu-url-input').val(),
-                icon: card.find('.menu-icon-value').val(), // FIXED: Captures updated class mappings safely during traversal
+                icon: card.find('.menu-icon-value').val(), 
                 roles: card.find('.role-chk:checked').map(function(){
                     return $(this).val();
                 }).get(),
