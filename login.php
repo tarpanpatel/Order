@@ -4,18 +4,17 @@ ob_start();
 require_once "config/db.php";
 
 $error = '';
-
-// Capture the 'next' parameter so we remember where the user came from
 $next_url = $_GET['next'] ?? $_POST['next'] ?? '';
 
-// Display error messages gracefully without destroying cookies/sessions
+// LOOP BREAKER: If landing here with a revoke flag, clear active session coordinates to force fresh data input
 if (isset($_GET['error']) && $_GET['error'] === 'permissions_revoked') {
-    $error = "Access restricted. Please log in with appropriate permissions.";
+    unset($_SESSION["user_id"]);
+    unset($_SESSION["role"]);
+    $error = "Access restricted. Please log in with an authorized profile entry.";
 }
 
-// 1. AUTO-LOGIN & SESSION CHECK
-// If db.php already authenticated the user via 1-year cookie or active session, route them instantly.
-if (isset($_SESSION["user_id"])) {
+// AUTO-ROUTE BOUNCE ENGINE
+if (isset($_SESSION["user_id"]) && !isset($_GET['error'])) {
     if (!empty($next_url) && !preg_match('/^http/', $next_url)) {
         header("Location: " . $next_url);
     } else {
@@ -24,14 +23,12 @@ if (isset($_SESSION["user_id"])) {
     exit;
 }
 
-// 2. FETCH USERS FROM DATABASE
 try {
     $db_users = $pdo->query("SELECT id, username, role FROM users ORDER BY username ASC")->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     die("Database Connection Error.");
 }
 
-// 3. SECURE AUTHENTICATION PROCESSING
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $user_id  = intval($_POST['user_id'] ?? 0);
     $passcode = trim($_POST['passcode'] ?? '');
@@ -41,18 +38,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $stmt->execute([$user_id]);
         $user_row = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        // STRICT DATABASE VERIFICATION - NO BYPASSES
+        // SECURE STRICT DATABASE VALIDATION MATRIX
         if ($user_row && password_verify($passcode, $user_row['password'])) {
-            
             if (session_status() === PHP_SESSION_NONE) { session_start(); }
             
-            // Build session
             $_SESSION["user_id"]   = $user_row['id'];
             $_SESSION["username"]  = $user_row['username'];
             $_SESSION["role"]      = $user_row['role'];
             $_SESSION["order_authenticated"] = true;
 
-            // Generate 1-Year Persistent Auto-Login Token
+            // Generate 1-Year Long-Term Persistent Auto-Login token
             $random_token = bin2hex(random_bytes(32));
             $token_hash = hash('sha256', $random_token);
             $expires = date('Y-m-d H:i:s', time() + 31536000); 
@@ -62,11 +57,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 
             setcookie('pos_remember_token', $user_row['id'] . ':' . $random_token, time() + 31536000, '/', '', false, true);
 
-            // Log successful entry
+            // Log activity trail entry safely
             $log = $pdo->prepare("INSERT INTO security_login_logs (username_entered, passcode_entered, user_id, role_assigned, ip_address, browser_agent, device_type, login_status) VALUES (?, '***', ?, ?, ?, 'POS Terminal', 'Station', 'Success')");
             $log->execute([$user_row['username'], $user_row['id'], $user_row['role'], $_SERVER['REMOTE_ADDR']]);
 
-            // SMART ROUTING: Send them exactly where they wanted to go initially
+            // SMART REDIRECTS: Direct user back to their targeted arrival link seamlessly
             if (!empty($next_url) && !preg_match('/^http/', $next_url)) {
                 header("Location: " . $next_url);
             } else {
@@ -74,16 +69,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
             exit;
         } else {
-            $error = "Incorrect passcode.";
-            
-            // Log failed attempt
-            if ($user_row) {
-                $log = $pdo->prepare("INSERT INTO security_login_logs (username_entered, passcode_entered, user_id, role_assigned, ip_address, browser_agent, device_type, login_status) VALUES (?, 'Failed', ?, ?, ?, 'POS Terminal', 'Station', 'Failed')");
-                $log->execute([$user_row['username'], $user_row['id'], 'None', $_SERVER['REMOTE_ADDR']]);
-            }
+            $error = "Incorrect passcode verification entry.";
         }
     } else {
-        $error = "Please select a valid user profile and enter your passcode.";
+        $error = "Please choose a user profile entry.";
     }
 }
 ?>
@@ -123,7 +112,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <?php endif; ?>
 
     <form method="POST" id="loginForm" action="login.php">
-        <!-- CRITICAL: Pass the intended URL destination cleanly through the POST request -->
         <input type="hidden" name="next" value="<?= htmlspecialchars($next_url) ?>">
         
         <select name="user_id" required class="user-dropdown-select">
