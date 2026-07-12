@@ -53,9 +53,41 @@ include "includes/header.php";
                     <?php endforeach; ?> 
                 </div> 
 
-               <div id="menuCatalogContainer">
+              <div id="menuCatalogContainer">
+    <!-- HARD TARGET TESTING BLOCK -->
+    <div style="background: #2d3748; color: #fff; padding: 15px; margin-bottom: 20px; border-radius: 8px; font-family: monospace; font-size: 12px; text-align: left;">
+        <h3>🔍 Loop Diagnostic Panel</h3>
+        <strong>Total raw items inside $menu_items array:</strong> <?= count($menu_items) ?><br><br>
+        
+        <strong>Casing Test:</strong><br>
+        <?php if (!empty($menu_items)): ?>
+            Available array keys in the first item: <span style="color: #68d391;"><?= implode(', ', array_keys($menu_items[0])) ?></span>
+        <?php else: ?>
+            <span style="color: #fc8181;">CRITICAL: $menu_items is empty before the loop starts!</span>
+        <?php endif; ?>
+        
+        <hr style="border: dashed 1px #4a5568; margin: 15px 0;">
+        
+        <strong>Category Matching Test:</strong><br>
+        <ul style="padding-left: 20px; margin: 5px 0;">
+        <?php 
+        foreach ($categories as $cat) {
+            $match_count = 0;
+            foreach ($menu_items as $item) {
+                // Check whatever key variants exist
+                $item_cat = $item['category_id'] ?? $item['category'] ?? $item['CATEGORY_ID'] ?? null;
+                if ($item_cat == $cat['id']) {
+                    $match_count++;
+                }
+            }
+            echo "<li>Category <strong>[" . htmlspecialchars($cat['name']) . "] (ID: " . $cat['id'] . ")</strong> matches with <strong>" . $match_count . "</strong> items.</li>";
+        }
+        ?>
+        </ul>
+    </div>
+
+    <!-- Original loop remains below so you can see if things change -->
     <?php foreach ($categories as $cat): 
-        // CLEAN & DIRECT SEARCH: Matches directly against your verified category_id key name
         $cat_items = array_filter($menu_items, function($m) use ($cat) { 
             return isset($m['category_id']) && $m['category_id'] == $cat['id']; 
         });
