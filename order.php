@@ -211,20 +211,49 @@ window.renderCartInterfaceElements = function() {
         let rowCost = row.qty * row.price;
         totalGrossSum += rowCost;
 
+        window.renderCartInterfaceElements = function() {
+    const container = document.getElementById("cartItemsContainerRows");
+    const form = document.getElementById("checkoutCartSubmissionForm");
+    const placeholder = document.getElementById("cartEmptyPlaceholder");
+    
+    container.innerHTML = "";
+    
+    let totalGrossSum = 0;
+    let keysCount = 0;
+
+    for (let id in window.activeCartStateMap) {
+        keysCount++;
+        let row = window.activeCartStateMap[id];
+        let rowCost = row.qty * row.price;
+        totalGrossSum += rowCost;
+
+        // FIXED: Stripped backslash escapes so JavaScript evaluates variables dynamically
         container.innerHTML += `
             <div class="sidebar-cart-row-node">
                 <div class="sidebar-cart-item-name-node">
-                    \${row.name} <span class="sidebar-cart-item-price-tag">(₹\${row.price})</span>
+                    ${row.name} <span class="sidebar-cart-item-price-tag">(₹${row.price})</span>
                 </div>
                 <div class="sidebar-cart-qty-controls-node">
-                    <button type="button" class="qty-btn-sm-node" onclick="window.updateCartRowQtyChange(\${id}, -1)">-</button>
-                    <span class="qty-val-display-node">\${row.qty}</span>
-                    <button type="button" class="qty-btn-sm-node" onclick="window.updateCartRowQtyChange(\${id}, 1)">+</button>
+                    <button type="button" class="qty-btn-sm-node" onclick="window.updateCartRowQtyChange(${id}, -1)">-</button>
+                    <span class="qty-val-display-node">${row.qty}</span>
+                    <button type="button" class="qty-btn-sm-node" onclick="window.updateCartRowQtyChange(${id}, 1)">+</button>
                 </div>
-                <input type="hidden" name="cart_items[\${id}][qty]" value="\${row.qty}">
+                <input type="hidden" name="cart_items[${id}][qty]" value="${row.qty}">
             </div>
         `;
     }
+
+    document.getElementById("labelCartTotalGross").innerText = totalGrossSum.toFixed(2);
+
+    if (keysCount === 0) {
+        placeholder.style.display = "block";
+        form.style.display = "none";
+    } else {
+        placeholder.style.display = "none";
+        form.style.display = "flex";
+    }
+};
+   
 
     document.getElementById("labelCartTotalGross").innerText = totalGrossSum.toFixed(2);
 
