@@ -28,17 +28,25 @@ function renderSidebar($items, $parentId, $current_page) {
         $has_children = isset($items[$menu['id']]);
         $is_active = ($current_page === $menu['url']) ? 'active' : '';
         
+        // Safe fallback icon string check if any record column fields happen to be empty
+        $icon_class = !empty($menu['icon']) ? htmlspecialchars($menu['icon']) : 'fa-solid fa-link';
+        
         if ($has_children) {
-            // Dropdown Parent
+            // Dropdown Parent Links
             echo '<a href="javascript:void(0);" onclick="toggleSubMenu(this)" class="menu-item-dropdown">';
+            // FIXED: Injected FontAwesome icon element inline before the label string text
+            echo '<i class="' . $icon_class . '" style="margin-right: 10px; width: 20px; text-align: center;"></i>';
             echo '<span>' . htmlspecialchars($menu['title']) . ' ▾</span></a>';
+            
             // Wrapper matches style.css #adminSubMenuContent
             echo '<div id="adminSubMenuContent" style="display: none; flex-direction:column; gap: 4px; padding-left: 15px; margin-top: 4px;">';
             renderSidebar($items, $menu['id'], $current_page);
             echo '</div>';
         } else {
-            // Standard Link
+            // Standard Navigation Sidebar Links
             echo '<a href="'.htmlspecialchars($menu['url']).'" class="'.$is_active.'">';
+            // FIXED: Injected FontAwesome icon element inline before the label string text
+            echo '<i class="' . $icon_class . '" style="margin-right: 10px; width: 20px; text-align: center;"></i>';
             echo '<span>' . htmlspecialchars($menu['title']) . '</span></a>';
         }
     }
@@ -56,7 +64,8 @@ function renderSidebar($items, $parentId, $current_page) {
         
         <!-- Sign Out remains neatly bound inside the scroll context at the base -->
         <a href="logout.php" style="color: #ff5252 !important; border-color: #ff5252 !important; margin-top: auto; margin-bottom: 20px; flex-shrink: 0;">
-            <span>[➔] Sign Out Terminal</span>
+            <i class="fa-solid fa-right-from-bracket" style="margin-right: 10px; width: 20px; text-align: center;"></i>
+            <span>Sign Out Terminal</span>
         </a>
     </nav>
 </aside>
