@@ -56,7 +56,9 @@ function renderSidebar($items, $parentId, $current_page) {
 <!-- NATIVE STRUCTURE UPDATED TO ALLOW DYNAMIC INNER SCROLLING -->
 <aside class="sidebar" id="sidebarNavDrawer" style="display: flex; flex-direction: column; height: 100vh; position: fixed; top: 0; left: 0;">
     <!-- Fixed Title Header -->
-    <div class="desktop-sidebar-title" style="flex-shrink: 0; margin-bottom: 15px;">POS Dashboard</div>
+    <div class="desktop-sidebar-title" style="flex-shrink: 0; margin-bottom: 15px;">
+        Hello, <?= htmlspecialchars($_SESSION['username'] ?? 'User') ?>
+    </div>
     
     <!-- Scrollable Navigation Panel -->
     <nav style="flex: 1; overflow-y: auto; overflow-x: hidden; padding-right: 4px; display: flex; flex-direction: column; gap: 2px;">
