@@ -7,12 +7,10 @@ if (!is_dir($sessionPath)) {
     mkdir($sessionPath, 0755, true); 
 }
 
-// If a page prematurely started a default session, close it so we can apply our 1-year settings
 if (session_status() === PHP_SESSION_ACTIVE) {
     session_write_close();
 }
 
-// Now securely enforce the 1-year long-term session configurations safely
 ini_set('session.save_path', $sessionPath);
 ini_set('session.gc_maxlifetime', 31536000); // 1 Year on server memory
 session_set_cookie_params([
@@ -24,7 +22,6 @@ session_set_cookie_params([
 ini_set('session.cookie_lifetime', 31536000);
 ini_set('session.use_only_cookies', 1);
 
-// Safely restart the session with our updated, permanent variables
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -47,7 +44,7 @@ try {
     die("Database connection failed: " . $e->getMessage());
 }
 
-// 3. PERSISTENT TOKEN AUTO-LOGIN RECOVERY LOGIC (Bypasses cPanel Session Drops)
+// 3. PERSISTENT TOKEN AUTO-LOGIN RECOVERY LOGIC
 if (!isset($_SESSION['user_id']) && isset($_COOKIE['pos_remember_token'])) {
     list($cookie_user_id, $cookie_token) = explode(':', $_COOKIE['pos_remember_token']);
     $cookie_user_id = intval($cookie_user_id);
@@ -75,12 +72,25 @@ if (!isset($_SESSION['user_id']) && isset($_COOKIE['pos_remember_token'])) {
 
 // 4. CORE REUSABLE PROTECTION SYSTEM SECURITY CHECKS
 function check_page_access($pdo) {
-    if (isset($_SESSION['role']) && $_SESSION['role'] === 'Super Admin') {
+    if (!isset($_SESSION['role'])) {
+        return false;
+    }
+    if ($_SESSION['role'] === 'Super Admin') {
         return true;
     }
+    
     $current_page = basename($_SERVER['PHP_SELF']);
-    $role = $_SESSION['role'] ?? 'Staff';
 
+    // CRITICAL HARDCODED OVERRIDE: Permits Chef into the kitchen terminal directly 
+    // without crashing into the empty database role mapping tables
+    if ($_SESSION['role'] === 'Chef' && $current_page === 'kitchen.php') {
+        return true;
+    }
+    if ($current_page === 'logout.php') {
+        return true;
+    }
+
+    $role = $_SESSION['role'];
     $stmt = $pdo->prepare("
         SELECT 1 FROM sys_menu m
         JOIN sys_role_menu rm ON m.id = rm.menu_id
