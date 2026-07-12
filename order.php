@@ -1,5 +1,10 @@
 <?php
 // /home/apartment/artistsfarmjaipur.com/Order/order.php
+error_reporting(E_ALL);
+
+// Force errors to display on the screen
+ini_set('display_errors', '1');
+ini_set('display_startup_errors', '1');
 if (session_status() === PHP_SESSION_NONE) { session_start(); }[cite: 8]
 require_once "config/db.php";[cite: 8]
 
